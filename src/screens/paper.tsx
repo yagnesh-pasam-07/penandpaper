@@ -14,7 +14,8 @@ import {
 } from "@dnd-kit/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
+import { bubbleStyle } from "@/components/canvas/bubble";
 import { Hydrated } from "@/components/hydration";
 import { ArrowIcon, CloseIcon, PaperPlaneIcon, PenIcon } from "@/components/icons";
 import { Avatar, Breadcrumb, LeadHeader, NotFound, ProgressBar, btn } from "@/components/ui";
@@ -202,26 +203,7 @@ function PaperStart({ project }: { project: Project }) {
 
 /* ---------- 4.2 Drop thoughts / 4.3 Drag to people ---------- */
 
-const SHAPES: { radius: string; rotate: number; tint: string }[] = [
-  { radius: "58% 42% 55% 45% / 50% 58% 42% 50%", rotate: -3, tint: "var(--t1)" },
-  { radius: "50%", rotate: 2, tint: "var(--t2)" },
-  { radius: "20px", rotate: -1, tint: "var(--t3)" },
-  { radius: "999px 999px 20px 20px", rotate: 3, tint: "var(--t5)" },
-  { radius: "40% 60% 35% 65% / 60% 40% 60% 40%", rotate: -2, tint: "var(--t4)" },
-  { radius: "58% 42% 55% 45% / 50% 58% 42% 50%", rotate: 4, tint: "var(--t2)" },
-];
-
 const PRESETS = [0.5, 1, 1.5, 2, 3, 4, 5, 6];
-
-function bubbleStyle(task: Task, lifted = false): CSSProperties {
-  const s = SHAPES[task.shape % SHAPES.length];
-  return {
-    borderRadius: s.radius,
-    background: s.tint,
-    transform: lifted ? "rotate(-7deg)" : `rotate(${s.rotate}deg)`,
-    boxShadow: lifted ? "0 24px 40px -18px var(--shadow)" : undefined,
-  };
-}
 
 function BubbleFace({ task }: { task: Task }) {
   return (
@@ -246,7 +228,7 @@ function Bubble({ task, selected, onSelect }: { task: Task; selected: boolean; o
       aria-pressed={selected}
       aria-label={`${task.title}, ${task.est === null ? "no time yet" : formatEstLong(task.est)}. Drag to a person, or select then pick a person.`}
       style={{
-        ...bubbleStyle(task),
+        ...bubbleStyle(task.shape),
         opacity: isDragging ? 0.35 : 1,
         outline: selected ? "2px solid var(--red-text)" : undefined,
         outlineOffset: 4,
@@ -552,7 +534,7 @@ function PaperPlan({ project }: { project: Project }) {
 
         <DragOverlay dropAnimation={null}>
           {active && (
-            <div style={bubbleStyle(active, true)} className="flex max-w-[260px] cursor-grabbing flex-col items-center gap-1.5 px-7 py-6 text-center">
+            <div style={bubbleStyle(active.shape, true)} className="flex max-w-[260px] cursor-grabbing flex-col items-center gap-1.5 px-7 py-6 text-center">
               <BubbleFace task={active} />
             </div>
           )}

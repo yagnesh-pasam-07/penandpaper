@@ -1,72 +1,95 @@
-# Pen & Paper — Visual Team Task Planner
+# Pen & Paper
 
-A simple, visual planner for small teams (2–20 people). A lead drops thoughts onto a paper, gives each a time, and drags them onto people. Each person gets their paper at 9:00 in their own time zone and strikes tasks out as they go.
+Plan the day, on paper. Live at **https://penandpaper-app.vercel.app**.
 
-**Drop → Estimate → Drag.**
+Two modules share one app, one sign-in and one database:
 
-- [Product Requirements Document](docs/PRD.md)
-- Design: the "Pen and Paper — App Screens" canvas (the screen numbers below map to it)
+| Module | What it does | Where |
+| --- | --- | --- |
+| **Drop** | A personal brain dump. Open the app, type, press Enter: the thought lands on today's paper. Unstruck thoughts roll over to tomorrow, and a 9 PM email lists the day. | `/drop`, code in `src/modules/drop` |
+| **Team** | A lead drops thoughts, estimates them, and drags them onto people. Each person gets their paper at 9:00 in their own time zone. | `/projects`, `/me`, code in `src/screens` |
 
-## Run it
+- [Product Requirements Document](docs/PRD.md) (team planner)
+
+## Drop
+
+![Drop: today's paper with dropped, struck and carried thoughts](docs/images/drop-today.jpg)
+
+| On a phone: a vertical stream | Past papers | Ink (dark) |
+| --- | --- | --- |
+| ![Drop on a phone](docs/images/drop-phone.png) | ![Past papers](docs/images/drop-history.png) | ![Drop in the dark theme](docs/images/drop-today-dark.jpg) |
+
+- **Canvas home**: `/drop` opens straight to today's paper with the input focused. Enter drops a thought; it appears instantly (saved in the background) with a soft drop animation.
+- **Bubbles**: text plus the time it was dropped. Click to edit, double-click (or swipe right on a phone) to strike out, delete from the edit view or the hover buttons. Links are clickable.
+- **Daily paper**: each day (in `DROP_TIMEZONE`, default IST) is a fresh paper. Unstruck thoughts from the last paper roll over on the first open of the day, marked "from Sat".
+- **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
+- **History**: `/drop/history` lists past papers; each opens read-only.
+- **Phone**: the canvas becomes a vertical stream with the same input.
+- Sign-in required: signed-out visits go to `/signup?next=/drop`.
+
+Shared canvas pieces (bubble looks, the dotted sheet, the interactive thought bubble) live in `src/components/canvas` so the team module can use them too.
+
+## Run it locally
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm test         # unit tests (time parsing, time zones, carry-over)
-npm run build
+cp .env.example .env.local      # then fill in DATABASE_URL, BETTER_AUTH_SECRET, …
+npm run db:migrate              # create tables on your database
+npm run seed -- you@example.com # optional: a week of Drop papers for that email
+npm run dev                     # http://localhost:3000
 ```
 
-Open **`/demo`** to load the story from the design (Yagnesh's team in Hyderabad, Berlin and Toronto) at either "Wednesday morning" or "Wednesday afternoon", and jump to any screen.
+Without Resend configured, development prints every email (sign-in links included) to the terminal, so you can sign in by opening the link from there.
 
-## Screens
+Other scripts: `npm test` (unit tests), `npm run lint`, `npm run build`, `npm run db:generate` (after changing a schema), `npm run db:studio`.
 
-| Design | Screen | Route |
+## Environment variables
+
+See `.env.example` for the full annotated list.
+
+| Variable | Needed | What for |
 | --- | --- | --- |
-| 1.1 | Landing | `/` |
-| 1.2 | Sign up | `/signup` |
-| 2.1 | Projects (empty state / list) | `/projects` |
-| 2.2 | New project | `/projects/new` |
-| 2.3, 3.2 | Project created / Invites sent | `/projects/[id]` |
-| 3.1 | Invite people | `/projects/[id]/invite` |
-| 3.3 | Join from a phone | `/join/[code]` |
-| 4.1 | Morning: start from yesterday | `/projects/[id]/paper` |
-| 4.2, 4.3 | Drop thoughts, drag to people | `/projects/[id]/paper/plan` |
-| 4.4 | Paper sent | `/projects/[id]/paper/sent` |
-| 5.1, 5.2 | Live / Everyone's done | `/projects/[id]/live` |
-| 6.1 | 9:00, the paper arrives | `/me/[id]/notify` |
-| 6.2 | My projects | `/me` |
-| 6.3 | Papers | `/me/[id]` |
-| 6.4 | Today · tap to strike | `/me/[id]/today` |
-| 6.5 | Ask for more time | `/me/[id]/today/more-time` |
-| 6.6 | Paper done | `/me/[id]/done` |
-| 6.7 | Day ends, carry over | `/me/[id]/carry` |
+| `DATABASE_URL` | yes | Neon pooled connection string (the app). |
+| `DATABASE_URL_UNPOOLED` | for migrations | Neon direct connection string (`npm run db:migrate`). |
+| `BETTER_AUTH_SECRET` | yes | Signs session cookies. One per environment: `openssl rand -base64 32`. |
+| `BETTER_AUTH_URL` | production | The site's address, e.g. `https://penandpaper-app.vercel.app`. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | for email | Sign-in links, invites, the daily papers. `EMAIL_FROM`'s domain must be verified in Resend. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | optional | "Continue with Google". Redirect URI: `{BETTER_AUTH_URL}/api/auth/callback/google`. |
+| `CRON_SECRET` | production | Vercel Cron sends it to `/api/cron/drop-digest`. `openssl rand -hex 24`. |
+| `DROP_TIMEZONE` | optional | Drop's day boundaries (default `Asia/Kolkata`). The cron time in `vercel.json` is fixed to 9 PM IST; change both together. |
+| `SUPPORT_EMAIL` | optional | Contact address on `/privacy`. |
 
-Lead screens are responsive from desktop down to phone width; member screens are phone-first and centered on desktop. Both themes, Paper (light) and Ink (dark), follow the OS setting and can be switched from the header.
+## Databases
 
-## Stack
+Neon project `penandpaper` (Singapore), one branch per environment:
 
-- Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4
-- dnd-kit for drag and drop (mouse and touch), with tap-to-assign for phones and keyboard
-- Zustand store saved to `localStorage`
-- Vitest for unit tests
+| Branch | Used by |
+| --- | --- |
+| `main` | Production |
+| `preview` | Vercel Preview deployments |
+| `dev` | Local development (`.env.local`) and Vercel Development |
+
+Migrations live in `drizzle/`. Run `npm run db:migrate` against each branch after adding one.
+
+## Deploy
+
+Vercel project `penandpaper`, functions in `sin1` next to the database.
+
+```bash
+npx vercel deploy --prod
+```
+
+Set the variables above in Vercel → Settings → Environment Variables (Production, Preview, Development) before deploying.
 
 ## Code map
 
 ```
-src/app/            routes (one page per screen, each renders a screen component)
-src/screens/        screen components: start, projects, paper, live, member, demo
-src/components/     shared UI (header, avatar, modal, progress bar, icons, theme toggle)
-src/lib/store.ts    all data and actions (create project, invite, drop, assign, send, strike, carry over…)
-src/lib/demo.ts     the story's seed data
-src/lib/time.ts     dates and time zones ("9:00 Berlin is 12:30 pm yours")
-src/lib/estimate.ts "fix login 2h" -> title + estimate
+src/app/                 routes (pages and /api)
+src/modules/drop/        Drop: schema, server queries, logic, screens
+src/components/canvas/   shared bubbles and paper surface
+src/screens/             team planner screens
+src/db/                  Drizzle schema (auth + team), repository, connections
+src/lib/                 auth, env, time zones, estimates, shared helpers
+src/server/              API handling, session, email
+scripts/seed.ts          seed data for Drop
 ```
-
-## Not wired yet
-
-This first build runs entirely in the browser, so it is a working prototype rather than a multi-user app:
-
-- **Data** lives in `localStorage` per browser. A lead and a member only see each other's changes in the same browser (the `/demo` story uses this). Next: Postgres + Drizzle behind the same store actions.
-- **Auth**: "Continue with Google" shows a note; email sign-up/join works without a password or verification. Next: Auth.js or Clerk.
-- **Delivery**: invites, the 9:00 paper notification, "Help Dev" (opens email) and "Say thanks" are not sent anywhere yet. Next: email/push and the Slack integration from the PRD.
-- The design's story is dated "Wednesday 22 Oct", but 22 Oct 2026 is a Thursday, so the demo uses Wednesday 21 Oct.
