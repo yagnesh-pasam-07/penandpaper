@@ -4,7 +4,7 @@ A simple, visual task planner for small teams (2–20 people).
 
 Team leads dump their thoughts onto a canvas, turn them into estimated tasks, and drag them onto team members, while the tool tracks each person's allocated hours against their available capacity.
 
-**Think → Estimate → Assign.**
+**Drop → Estimate → Drag.**
 
 ## How it works
 
