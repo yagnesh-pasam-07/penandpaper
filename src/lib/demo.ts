@@ -1,11 +1,12 @@
-import type { Lead, Member, Paper, Project, Task } from "./types";
+import type { Member, Paper, Project, Task } from "./types";
 
 /**
  * The story from the design canvas: Yagnesh leads 4 people across
  * Hyderabad, Berlin and Toronto. Wednesday 21 Oct 2026.
  */
 
-const lead: Lead = { name: "Yagnesh", email: "yagnesh@company.com" };
+export const DEMO_LEAD = { name: "Yagnesh", email: "yagnesh@company.com" };
+export const DEMO_PROJECT_NAME = "Atlas HR platform";
 
 const members: Member[] = [
   { id: "asha", name: "Asha", email: "asha@company.com", tz: "Asia/Kolkata", city: "Hyderabad", hours: 8, tint: "t4", status: "joined", leave: [] },
@@ -32,10 +33,7 @@ function pastPapers(): Paper[] {
       status: "sent",
       sentAt: "2026-10-16T03:20:00Z",
       closed: { meera: { at: "2026-10-16T13:00:00Z", reason: "Took longer" } },
-      tasks: [
-        task("Leave types API", 4, "meera", done("2026-10-16T09:00:00Z")),
-        task("Holiday seed data", 3, "meera"),
-      ],
+      tasks: [task("Leave types API", 4, "meera", done("2026-10-16T09:00:00Z")), task("Holiday seed data", 3, "meera")],
     },
     {
       date: "2026-10-19",
@@ -71,10 +69,11 @@ function pastPapers(): Paper[] {
 function baseProject(): Project {
   return {
     id: "atlas",
-    name: "Atlas HR platform",
+    name: DEMO_PROJECT_NAME,
+    leadName: DEMO_LEAD.name,
     hoursPerDay: 8,
     inviteCode: "atlas-7k2",
-    createdAt: "2026-10-13T04:00:00Z",
+    createdAt: "2026-10-12T04:00:00Z",
     leadTz: "Asia/Kolkata",
     leadCity: "Hyderabad",
     invitesSent: true,
@@ -84,17 +83,8 @@ function baseProject(): Project {
   };
 }
 
-/** 8:52 am Wednesday: Tuesday is closed, Wednesday's paper not started. */
-export function demoMorning(): { lead: Lead; project: Project; viewerId: string } {
-  n = 0;
-  return { lead, project: baseProject(), viewerId: "meera" };
-}
-
-/** Wednesday afternoon: paper sent, Dev blocked, Meera asked for more time. */
-export function demoAfternoon(): { lead: Lead; project: Project; viewerId: string } {
-  n = 0;
-  const project = baseProject();
-  project.papers.push({
+function afternoonPaper(): Paper {
+  return {
     date: "2026-10-21",
     status: "sent",
     sentAt: "2026-10-21T03:25:00Z",
@@ -112,6 +102,37 @@ export function demoAfternoon(): { lead: Lead; project: Project; viewerId: strin
       task("Fix calendar overlap", 2, "sana"),
       task("Leave balance tests", 2, "sana", { carriedFrom: "2026-10-20", carryNote: "blocked" }),
     ],
-  });
-  return { lead, project, viewerId: "meera" };
+  };
+}
+
+/** Gives every id in the story a fresh one, so each load is its own copy. */
+function withFreshIds(project: Project, viewer: string, newId: () => string): { project: Project; viewerId: string } {
+  const ids = new Map<string, string>();
+  const map = (id: string) => {
+    if (!ids.has(id)) ids.set(id, newId());
+    return ids.get(id)!;
+  };
+  project.id = map(project.id);
+  project.inviteCode = `atlas-${newId().slice(0, 5)}`;
+  for (const m of project.members) m.id = map(m.id);
+  for (const p of project.papers) {
+    p.closed = Object.fromEntries(Object.entries(p.closed).map(([k, v]) => [map(k), v]));
+    for (const t of p.tasks) {
+      t.id = map(t.id);
+      if (t.assigneeId) t.assigneeId = map(t.assigneeId);
+    }
+  }
+  return { project, viewerId: map(viewer) };
+}
+
+/**
+ * Wednesday 8:52 am: Tuesday is closed, Wednesday's paper not started.
+ * Wednesday afternoon: paper sent, Dev blocked, Meera asked for more time.
+ * The viewer (who this browser is on member screens) is Meera.
+ */
+export function demoStory(moment: "morning" | "afternoon", newId?: () => string): { project: Project; viewerId: string } {
+  n = 0;
+  const project = baseProject();
+  if (moment === "afternoon") project.papers.push(afternoonPaper());
+  return newId ? withFreshIds(project, "meera", newId) : { project, viewerId: "meera" };
 }

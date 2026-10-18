@@ -19,7 +19,8 @@ import { Hydrated } from "@/components/hydration";
 import { ArrowIcon, CloseIcon, PaperPlaneIcon, PenIcon } from "@/components/icons";
 import { Avatar, Breadcrumb, LeadHeader, NotFound, ProgressBar, btn } from "@/components/ui";
 import { formatEstLong, formatHours, formatNum } from "@/lib/estimate";
-import { carryOver, onLeave, paperFor, previousPaper, useStore } from "@/lib/store";
+import { carryOver, onLeave, paperFor, previousPaper } from "@/lib/mutations";
+import { useStore } from "@/lib/store";
 import { hourIn, loadOf, looseThoughts, presentMembers, recipients, sumEst, tasksOf } from "@/lib/selectors";
 import { clock, sameClock, shortDate, weekday, zonedTime } from "@/lib/time";
 import type { Member, Project, Task } from "@/lib/types";
@@ -44,7 +45,7 @@ function Guard({ children }: { children: (project: Project) => React.ReactNode }
   const lead = useStore((s) => s.lead);
   const project = useProject();
   if (!lead) return <NotFound what="Sign up to plan your team's day." href="/signup" cta="Sign up" />;
-  if (!project) return <NotFound what="This project doesn't exist in this browser." href="/projects" cta="All projects" />;
+  if (!project?.isOwner) return <NotFound what="This project doesn't exist, or you don't lead it." href="/projects" cta="All projects" />;
   return <>{children(project)}</>;
 }
 

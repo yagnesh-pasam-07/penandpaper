@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { formatEstLong, formatHours, parseThought } from "./estimate";
 import { clock, nextWorkday, sameClock, shortDate, zonedTime } from "./time";
-import { carryOver } from "./store";
-import { demoAfternoon, demoMorning } from "./demo";
+import { applyAction, carryOver } from "./mutations";
+import { demoStory } from "./demo";
 import { cleanStreak, loadOf } from "./selectors";
 
 describe("parseThought", () => {
@@ -59,7 +59,7 @@ describe("time zones", () => {
 
 describe("story data", () => {
   it("carries Tuesday's unfinished tasks to their owners", () => {
-    const { project } = demoMorning();
+    const { project } = demoStory("morning");
     const carried = carryOver(project, "2026-10-21");
     expect(carried.map((t) => [t.title, t.assigneeId, t.carryNote])).toEqual([
       ["Approval emails", "asha", "took longer"],
@@ -68,14 +68,14 @@ describe("story data", () => {
   });
 
   it("matches the live view numbers in the design", () => {
-    const { project } = demoAfternoon();
+    const { project } = demoStory("afternoon");
     const paper = project.papers.find((p) => p.date === "2026-10-21")!;
     expect(paper.tasks.length).toBe(9);
     expect(paper.tasks.filter((t) => t.done).length).toBe(5);
   });
 
   it("counts Meera's clean papers", () => {
-    const { project } = demoAfternoon();
+    const { project } = demoStory("afternoon");
     const paper = project.papers.find((p) => p.date === "2026-10-21")!;
     for (const t of paper.tasks) if (t.assigneeId === "meera") t.done = true;
     expect(cleanStreak(project, "meera", "2026-10-21")).toBe(3);
@@ -85,5 +85,29 @@ describe("story data", () => {
     expect(loadOf(7.5, 8)).toBe("near");
     expect(loadOf(9, 8)).toBe("over");
     expect(loadOf(4, 8)).toBe("free");
+  });
+
+  it("gives each demo load its own ids", () => {
+    let i = 0;
+    const a = demoStory("afternoon", () => `id${String(++i).padStart(6, "0")}`);
+    expect(a.project.id).not.toBe("atlas");
+    const meera = a.project.members.find((m) => m.name === "Meera")!;
+    expect(a.viewerId).toBe(meera.id);
+    const paper = a.project.papers.find((p) => p.date === "2026-10-21")!;
+    expect(paper.tasks.every((t) => !t.assigneeId || a.project.members.some((m) => m.id === t.assigneeId))).toBe(true);
+  });
+
+  it("carries the same ids in the browser and on the server", () => {
+    const { project } = demoStory("morning");
+    expect(carryOver(project, "2026-10-21").map((t) => t.id)).toEqual(carryOver(project, "2026-10-21").map((t) => t.id));
+  });
+
+  it("refuses to hand out a thought with no time", () => {
+    const { project } = demoStory("morning");
+    applyAction(project, { type: "startPaper", projectId: project.id, date: "2026-10-21" }, "2026-10-21T03:00:00Z");
+    applyAction(project, { type: "dropThought", projectId: project.id, date: "2026-10-21", taskId: "t-new-1", text: "half-day leave rule", shape: 0 }, "x");
+    expect(() =>
+      applyAction(project, { type: "assign", projectId: project.id, date: "2026-10-21", taskId: "t-new-1", memberId: "meera" }, "x"),
+    ).toThrow(/time first/);
   });
 });

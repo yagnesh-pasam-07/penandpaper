@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Hydrated } from "@/components/hydration";
 import { BigCheck, CheckIcon, ChevronIcon, CloseIcon, PenIcon } from "@/components/icons";
 import { Avatar, BackButton, Logo, MemberShell, NotFound, ProgressBar, ThemeToggle, btn } from "@/components/ui";
 import { formatHours, formatNum } from "@/lib/estimate";
-import { paperFor, useStore } from "@/lib/store";
+import { paperFor } from "@/lib/mutations";
+import { useStore } from "@/lib/store";
 import { cleanStreak, greeting, hourIn, memberDone, sumEst, tasksOf } from "@/lib/selectors";
 import { browserTz, clock, cityFromTz, longDate, nextWorkday, shortDate, weekday, ZONES } from "@/lib/time";
 import type { CarryReason, Member, Paper, Project } from "@/lib/types";
@@ -59,21 +60,39 @@ export function JoinScreen() {
   );
 }
 
+type Preview = { id: string; name: string; leadName: string; joined: boolean };
+
 function Join() {
   const router = useRouter();
   const { code } = useParams<{ code: string }>();
-  const project = useStore((s) => s.projects.find((p) => p.inviteCode === code));
-  const lead = useStore((s) => s.lead);
   const joinProject = useStore((s) => s.joinProject);
+  const [preview, setPreview] = useState<Preview | null | "loading">("loading");
   const detected = browserTz();
   const [zone, setZone] = useState(() => ZONES.find((z) => z.tz === detected) ?? { tz: detected, city: cityFromTz(detected) });
   const [picking, setPicking] = useState(false);
   const [withEmail, setWithEmail] = useState(false);
   const [note, setNote] = useState("");
   const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  if (!project) return <NotFound what="This invite link doesn't match a project in this browser." href="/" cta="Pen & Paper" />;
-  const leadName = lead?.name ?? "Your lead";
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/join/${encodeURIComponent(code)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<Preview>) : null))
+      .catch(() => null)
+      .then((p) => live && setPreview(p));
+    return () => {
+      live = false;
+    };
+  }, [code]);
+
+  if (preview === "loading") return <div className="min-h-dvh bg-bg" aria-busy="true" />;
+  if (!preview) return <NotFound what="This invite link doesn't match a project." href="/" cta="Pen & Paper" />;
+  if (preview.joined) {
+    return <NotFound what={`You're already on ${preview.name}.`} href={`/me/${preview.id}`} cta="Open my paper" />;
+  }
+  const project = preview;
+  const leadName = preview.leadName;
   const zoneOptions = ZONES.some((z) => z.city === zone.city) ? ZONES : [zone, ...ZONES];
 
   return (
@@ -132,10 +151,12 @@ function Join() {
 
       <form
         className="mt-auto flex flex-col gap-2.5"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (!EMAIL.test(email.trim())) return;
-          const joined = joinProject(project.inviteCode, email.trim().toLowerCase(), zone.tz, zone.city);
+          if (!EMAIL.test(email.trim()) || busy) return;
+          setBusy(true);
+          const joined = await joinProject(code, email.trim().toLowerCase(), zone.tz, zone.city);
+          setBusy(false);
           if (joined) router.push(`/me/${joined.projectId}`);
         }}
       >
@@ -159,8 +180,8 @@ function Join() {
                 className="h-[52px] rounded-[14px] border-[1.5px] border-ink bg-sheet px-4 text-base font-normal outline-none placeholder:text-mute"
               />
             </label>
-            <button type="submit" disabled={!EMAIL.test(email.trim())} className={`${btn.primary} h-[54px] disabled:opacity-50`}>
-              Join {project.name}
+            <button type="submit" disabled={!EMAIL.test(email.trim()) || busy} className={`${btn.primary} h-[54px] disabled:opacity-50`}>
+              {busy ? "Joining…" : `Join ${project.name}`}
             </button>
           </>
         ) : (
@@ -192,7 +213,6 @@ export function NotifyScreen() {
 }
 
 function Notify({ project, me, paper }: { project: Project; me: Member; paper?: Paper }) {
-  const lead = useStore((s) => s.lead);
   const mine = paper ? tasksOf(paper, me.id) : [];
   return (
     <div className="ruled min-h-dvh bg-soft">
@@ -217,7 +237,7 @@ function Notify({ project, me, paper }: { project: Project; me: Member; paper?: 
               </span>
               <span className="text-base font-semibold">Your {weekday(project.currentDate)} paper is ready</span>
               <span className="text-[15px] text-mute">
-                {mine.length} {mine.length === 1 ? "task" : "tasks"} · {formatHours(sumEst(mine))} · from {lead?.name ?? "your lead"}
+                {mine.length} {mine.length === 1 ? "task" : "tasks"} · {formatHours(sumEst(mine))} · from {project.leadName}
               </span>
             </span>
           </Link>
@@ -390,7 +410,6 @@ export function TodayScreen() {
 
 function Today({ project, me, paper }: { project: Project; me: Member; paper?: Paper }) {
   const router = useRouter();
-  const lead = useStore((s) => s.lead);
   const toggleDone = useStore((s) => s.toggleDone);
   const mine = paper ? tasksOf(paper, me.id) : [];
   const back = `/me/${project.id}`;
@@ -426,7 +445,7 @@ function Today({ project, me, paper }: { project: Project; me: Member; paper?: P
         <div className="flex flex-1 flex-col items-center justify-center gap-[18px] text-center">
           <BigCheck />
           <span className="font-hand text-[50px] leading-none font-bold">Paper done.</span>
-          <span className="max-w-[260px] text-base text-mute">Every task struck out. {lead?.name ?? "Your lead"} can see it already.</span>
+          <span className="max-w-[260px] text-base text-mute">Every task struck out. {project.leadName} can see it already.</span>
           <button
             type="button"
             onClick={() => {
@@ -467,7 +486,7 @@ function Today({ project, me, paper }: { project: Project; me: Member; paper?: P
                 <span className="flex flex-1 flex-col gap-0.5">
                   <span className={`text-[17px] ${t.done ? "strike text-mute" : "font-medium"}`}>{t.title}</span>
                   {!t.done && t.request?.state === "pending" && <span className="text-[13px] text-amber">asked for {formatHours(t.request.hours)}</span>}
-                  {!t.done && t.request?.state === "given" && <span className="text-[13px] text-green">{lead?.name ?? "Lead"} gave {formatHours(t.request.hours)}</span>}
+                  {!t.done && t.request?.state === "given" && <span className="text-[13px] text-green">{project.leadName} gave {formatHours(t.request.hours)}</span>}
                   {!t.done && t.request?.state === "kept" && <span className="text-[13px] text-mute">kept at {formatHours(t.est ?? 0)}</span>}
                   {!t.done && t.blocked && <span className="text-[13px] text-red-text">stuck · {t.blocked.why}</span>}
                 </span>
@@ -502,7 +521,6 @@ export function MoreTimeScreen() {
 
 function MoreTime({ project, me, paper }: { project: Project; me: Member; paper?: Paper }) {
   const router = useRouter();
-  const lead = useStore((s) => s.lead);
   const { requestTime, setBlocked } = useStore();
   const open = paper ? tasksOf(paper, me.id).filter((t) => !t.done) : [];
   const [taskId, setTaskId] = useState(open[0]?.id);
@@ -510,7 +528,7 @@ function MoreTime({ project, me, paper }: { project: Project; me: Member; paper?
   const [why, setWhy] = useState("");
   const today = `/me/${project.id}/today`;
   const task = open.find((t) => t.id === taskId) ?? open[0];
-  const leadName = lead?.name ?? "your lead";
+  const leadName = project.leadName;
 
   if (!paper || !task) return <NotFound what="Nothing open on your paper." href={today} cta="Back to today" />;
   const planned = task.est ?? 0;

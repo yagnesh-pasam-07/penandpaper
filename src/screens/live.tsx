@@ -6,7 +6,8 @@ import { Hydrated } from "@/components/hydration";
 import { BigCheck } from "@/components/icons";
 import { Avatar, Breadcrumb, LeadHeader, NotFound, ProgressBar, btn } from "@/components/ui";
 import { formatHours } from "@/lib/estimate";
-import { paperFor, useStore } from "@/lib/store";
+import { paperFor } from "@/lib/mutations";
+import { useStore } from "@/lib/store";
 import { finishedAt, recipients, sumEst, tasksOf } from "@/lib/selectors";
 import { clock, nextWorkday, sameClock, shortDate, weekday } from "@/lib/time";
 import type { Member, Paper, Project, Task } from "@/lib/types";
@@ -25,7 +26,7 @@ function LiveGuard() {
   const lead = useStore((s) => s.lead);
   const project = useProject();
   if (!lead) return <NotFound what="Sign up to plan your team's day." href="/signup" cta="Sign up" />;
-  if (!project) return <NotFound what="This project doesn't exist in this browser." href="/projects" cta="All projects" />;
+  if (!project?.isOwner) return <NotFound what="This project doesn't exist, or you don't lead it." href="/projects" cta="All projects" />;
   const paper = paperFor(project, project.currentDate);
   if (!paper || paper.status !== "sent") {
     return (

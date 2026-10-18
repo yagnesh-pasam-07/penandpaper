@@ -84,6 +84,7 @@ function SignUp() {
   const signUp = useStore((s) => s.signUp);
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
   const valid = EMAIL.test(email.trim());
 
   return (
@@ -99,11 +100,13 @@ function SignUp() {
 
         <form
           className="flex flex-col gap-3.5"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (!valid) return;
-            signUp(email.trim());
-            router.push("/projects");
+            if (!valid || busy) return;
+            setBusy(true);
+            const ok = await signUp(email.trim());
+            setBusy(false);
+            if (ok) router.push("/projects");
           }}
         >
           <button
@@ -136,8 +139,8 @@ function SignUp() {
               className="h-[52px] rounded-[14px] border-[1.5px] border-ink bg-sheet px-4 text-base font-normal outline-none placeholder:text-mute"
             />
           </label>
-          <button type="submit" disabled={!valid} className={`${btn.primary} disabled:opacity-50`}>
-            Continue
+          <button type="submit" disabled={!valid || busy} className={`${btn.primary} disabled:opacity-50`}>
+            {busy ? "One moment…" : "Continue"}
           </button>
         </form>
 

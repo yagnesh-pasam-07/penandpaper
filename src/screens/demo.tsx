@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Hydrated } from "@/components/hydration";
 import { LeadHeader, Logo, btn } from "@/components/ui";
+import { DEMO_LEAD, DEMO_PROJECT_NAME } from "@/lib/demo";
 import { useStore } from "@/lib/store";
 
 /** Every screen from the design canvas, grouped by the story's rows. */
-const ROWS: { title: string; screens: { id: string; name: string; href: string }[] }[] = [
+function rows(id: string, code: string): { title: string; screens: { id: string; name: string; href: string }[] }[] {
+  return [
   {
     title: "1  Monday: Yagnesh finds Pen & Paper",
     screens: [
@@ -55,7 +58,11 @@ const ROWS: { title: string; screens: { id: string; name: string; href: string }
       { id: "6.7", name: "Day ends, carry over", href: "/me/atlas/carry" },
     ],
   },
-];
+  ].map((row) => ({
+    ...row,
+    screens: row.screens.map((s) => ({ ...s, href: s.href.replace("atlas-7k2", code).replace("/atlas", `/${id}`) })),
+  }));
+}
 
 export function DemoScreen() {
   return (
@@ -68,7 +75,14 @@ export function DemoScreen() {
 function Demo() {
   const router = useRouter();
   const { loadDemo, reset, projects } = useStore();
-  const hasDemo = projects.some((p) => p.id === "atlas");
+  const demo = projects.find((p) => p.isOwner && p.name === DEMO_PROJECT_NAME && p.leadName === DEMO_LEAD.name);
+  const [busy, setBusy] = useState(false);
+  const open = async (moment: "morning" | "afternoon") => {
+    setBusy(true);
+    const id = await loadDemo(moment);
+    setBusy(false);
+    if (id) router.push(moment === "morning" ? `/projects/${id}/paper` : `/projects/${id}/live`);
+  };
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -77,38 +91,34 @@ function Demo() {
         <div className="flex flex-col gap-3">
           <h1 className="text-[34px] font-semibold tracking-[-0.02em]">Demo: one team, one day</h1>
           <p className="max-w-[640px] text-mute">
-            Yagnesh leads 4 people in Hyderabad, Berlin and Toronto. Load the story at a moment in the day, then open any screen. Data lives in this
-            browser only, so loading a moment replaces what&apos;s here.
+            Yagnesh leads 4 people in Hyderabad, Berlin and Toronto. Load the story at a moment in the day, then open any screen. It&apos;s your own copy:
+            loading a moment again replaces it, and this browser plays both Yagnesh (lead) and Meera (member).
           </p>
           <div className="flex flex-wrap gap-2.5 pt-2">
             <button
               type="button"
-              className={btn.primary}
-              onClick={() => {
-                loadDemo("morning");
-                router.push("/projects/atlas/paper");
-              }}
+              className={`${btn.primary} disabled:opacity-50`}
+              disabled={busy}
+              onClick={() => open("morning")}
             >
               Wednesday 8:52 am · plan the paper
             </button>
             <button
               type="button"
-              className={btn.outline}
-              onClick={() => {
-                loadDemo("afternoon");
-                router.push("/projects/atlas/live");
-              }}
+              className={`${btn.outline} disabled:opacity-50`}
+              disabled={busy}
+              onClick={() => open("afternoon")}
             >
               Wednesday afternoon · day underway
             </button>
-            <button type="button" className={btn.ghost} onClick={() => reset()}>
-              Clear everything
+            <button type="button" className={btn.ghost} disabled={busy} onClick={() => reset()}>
+              Sign out and delete my data
             </button>
           </div>
-          {!hasDemo && <p className="text-sm text-amber">Load a moment first; the links below point at the demo project.</p>}
+          {!demo && <p className="text-sm text-amber">Load a moment first; the links below open your demo project.</p>}
         </div>
 
-        {ROWS.map((row) => (
+        {demo && rows(demo.id, demo.inviteCode).map((row) => (
           <section key={row.title} className="flex flex-col gap-3">
             <h2 className="font-hand text-[28px] font-bold">{row.title}</h2>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,240px),1fr))] gap-3">

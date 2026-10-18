@@ -1,80 +1,32 @@
 "use client";
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
-import { parseThought } from "./estimate";
-import { browserTz, cityFromTz, nextWorkday, todayIn } from "./time";
-import type { CarryReason, Lead, Member, Paper, Project, Task, Tint } from "./types";
-import { demoAfternoon, demoMorning } from "./demo";
+import { applyAction, ActionError, uid, type ProjectAction } from "./mutations";
+import { browserTz, cityFromTz, todayIn } from "./time";
+import type { CarryReason, Lead, Project } from "./types";
 
-const TINTS: Tint[] = ["t4", "t3", "t2", "t1", "t5"];
+export { carryOver, nameFromEmail, onLeave, paperFor, previousPaper, uid } from "./mutations";
 
-export function uid(): string {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function inviteCode(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").split("-")[0] || "team";
-  return `${slug}-${Math.random().toString(36).slice(2, 5)}`;
-}
-
-/** "asha.k@company.com" -> "Asha" */
-export function nameFromEmail(email: string): string {
-  const local = email.split("@")[0].split(/[._+-]/)[0] || email;
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
-
-export function onLeave(member: Member, date: string): boolean {
-  return member.leave.includes(date);
-}
-
-/** The latest sent paper before `date`, if any. */
-export function previousPaper(project: Project, date: string): Paper | undefined {
-  return project.papers
-    .filter((p) => p.status === "sent" && p.date < date)
-    .sort((a, b) => b.date.localeCompare(a.date))[0];
-}
-
-/**
- * What rolls into a new paper: every unfinished task of the last sent paper,
- * kept with the same person, plus thoughts that were never handed out.
- */
-export function carryOver(project: Project, date: string): Task[] {
-  const prev = previousPaper(project, date);
-  if (!prev) return [];
-  return prev.tasks
-    .filter((t) => !t.done)
-    .map((t) => {
-      const reason = t.assigneeId ? prev.closed[t.assigneeId]?.reason : undefined;
-      return {
-        id: uid(),
-        title: t.title,
-        est: t.request?.state === "given" ? t.request.hours : t.est,
-        assigneeId: t.assigneeId,
-        done: false,
-        carriedFrom: t.assigneeId ? prev.date : undefined,
-        carryNote: t.blocked ? "blocked" : reason?.toLowerCase(),
-        shape: t.shape,
-      };
-    });
-}
-
-export function paperFor(project: Project, date: string): Paper | undefined {
-  return project.papers.find((p) => p.date === date);
-}
-
-type State = {
+type ServerState = {
   lead: Lead | null;
   projects: Project[];
-  /** Which member this browser is, per project (member screens). */
   viewer: Record<string, string>;
 };
 
+type State = ServerState & {
+  /** "loading" until the first answer from the server. */
+  status: "loading" | "ready" | "offline";
+  /** The last thing that went wrong, shown as a toast. */
+  error: string | null;
+};
+
 type Actions = {
-  signUp: (email: string) => void;
+  refresh: () => Promise<void>;
+  dismissError: () => void;
+  signUp: (email: string) => Promise<boolean>;
   createProject: (name: string, hoursPerDay: 6 | 8) => string;
   addInvites: (projectId: string, emails: string[]) => void;
-  joinProject: (code: string, email: string, tz: string, city: string) => { projectId: string; memberId: string } | null;
+  joinProject: (code: string, email: string, tz: string, city: string) => Promise<{ projectId: string } | null>;
   setLeave: (projectId: string, memberId: string, date: string, leave: boolean) => void;
   startPaper: (projectId: string, date: string) => void;
   dropThought: (projectId: string, date: string, text: string) => void;
@@ -90,212 +42,151 @@ type Actions = {
   reopenDay: (projectId: string, date: string, memberId: string) => void;
   thankTeam: (projectId: string, date: string) => void;
   advanceDay: (projectId: string) => void;
-  loadDemo: (moment: "morning" | "afternoon") => void;
-  reset: () => void;
+  loadDemo: (moment: "morning" | "afternoon") => Promise<string | null>;
+  reset: () => Promise<void>;
 };
 
 export type Store = State & Actions;
 
-const empty: State = { lead: null, projects: [], viewer: {} };
+type ActionResponse = { state: ServerState; projectId?: string; error?: string };
 
-export const useStore = create<Store>()(
-  persist(
-    (set, get) => {
-      /** Copy-on-write update of one project. */
-      const updateProject = (projectId: string, fn: (p: Project) => void) =>
-        set((s) => ({
-          projects: s.projects.map((p) => {
-            if (p.id !== projectId) return p;
-            const copy = structuredClone(p);
-            fn(copy);
-            return copy;
-          }),
-        }));
+async function post(body: object): Promise<ActionResponse> {
+  const res = await fetch("/api/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json().catch(() => ({}))) as Partial<ActionResponse>;
+  if (!res.ok || !json.state) throw new Error(json.error ?? "Couldn't reach Pen & Paper. Check your connection.");
+  return json as ActionResponse;
+}
 
-      const updatePaper = (projectId: string, date: string, fn: (paper: Paper, project: Project) => void) =>
-        updateProject(projectId, (p) => {
-          const paper = paperFor(p, date);
-          if (paper) fn(paper, p);
-        });
+export const useStore = create<Store>()((set, get) => {
+  /*
+   * Changes go to the server one at a time, in order. While any are in flight
+   * the screen keeps its own (already updated) copy; the server's copy replaces
+   * it once the queue is empty.
+   */
+  let queue: Promise<unknown> = Promise.resolve();
+  let inFlight = 0;
 
-      const updateTask = (projectId: string, date: string, taskId: string, fn: (t: Task, paper: Paper) => void) =>
-        updatePaper(projectId, date, (paper) => {
-          const task = paper.tasks.find((t) => t.id === taskId);
-          if (task) fn(task, paper);
-        });
+  const send = <T,>(body: object, onDone?: (r: ActionResponse) => T): Promise<T | null> => {
+    inFlight += 1;
+    const run = queue.then(async () => {
+      try {
+        const r = await post(body);
+        inFlight -= 1;
+        if (inFlight === 0) set({ ...r.state, status: "ready" });
+        return onDone ? onDone(r) : (null as T);
+      } catch (e) {
+        inFlight -= 1;
+        set({ error: e instanceof Error ? e.message : String(e) });
+        if (inFlight === 0) void get().refresh();
+        return null;
+      }
+    });
+    queue = run;
+    return run;
+  };
 
-      return {
-        ...empty,
+  /** Shows the change now, then sends it. */
+  const act = (action: ProjectAction) => {
+    const now = new Date().toISOString();
+    const projects = get().projects.map((p) => {
+      if (p.id !== action.projectId) return p;
+      const copy = structuredClone(p);
+      try {
+        applyAction(copy, action, now);
+      } catch (e) {
+        if (e instanceof ActionError) set({ error: e.message });
+        throw e;
+      }
+      return copy;
+    });
+    set({ projects });
+    void send(action);
+  };
 
-        signUp: (email) => set({ lead: { email, name: nameFromEmail(email) } }),
+  const tryAct = (action: ProjectAction) => {
+    try {
+      act(action);
+    } catch {
+      // Already reported through `error`.
+    }
+  };
 
-        createProject: (name, hoursPerDay) => {
-          const tz = browserTz();
-          const project: Project = {
-            id: uid(),
-            name,
-            hoursPerDay,
-            inviteCode: inviteCode(name),
-            createdAt: new Date().toISOString(),
-            leadTz: tz,
-            leadCity: cityFromTz(tz),
-            invitesSent: false,
-            members: [],
-            currentDate: todayIn(tz),
-            papers: [],
-          };
-          set((s) => ({ projects: [...s.projects, project] }));
-          return project.id;
-        },
+  return {
+    lead: null,
+    projects: [],
+    viewer: {},
+    status: "loading",
+    error: null,
 
-        addInvites: (projectId, emails) =>
-          updateProject(projectId, (p) => {
-            for (const email of emails) {
-              if (p.members.some((m) => m.email.toLowerCase() === email.toLowerCase())) continue;
-              p.members.push({
-                id: uid(),
-                name: nameFromEmail(email),
-                email,
-                tz: p.leadTz,
-                city: p.leadCity,
-                hours: p.hoursPerDay,
-                tint: TINTS[p.members.length % TINTS.length],
-                status: "invited",
-                leave: [],
-              });
-            }
-            p.invitesSent = true;
-          }),
+    refresh: async () => {
+      if (inFlight > 0) return;
+      try {
+        const res = await fetch("/api/state", { cache: "no-store" });
+        if (!res.ok) throw new Error();
+        const state = (await res.json()) as ServerState;
+        if (inFlight === 0) set({ ...state, status: "ready" });
+      } catch {
+        set((s) => ({ status: s.status === "loading" ? "offline" : s.status }));
+      }
+    },
 
-        joinProject: (code, email, tz, city) => {
-          const project = get().projects.find((p) => p.inviteCode === code);
-          if (!project) return null;
-          let memberId = project.members.find((m) => m.email.toLowerCase() === email.toLowerCase())?.id;
-          updateProject(project.id, (p) => {
-            let member = p.members.find((m) => m.id === memberId);
-            if (!member) {
-              member = {
-                id: uid(),
-                name: nameFromEmail(email),
-                email,
-                tz,
-                city,
-                hours: p.hoursPerDay,
-                tint: TINTS[p.members.length % TINTS.length],
-                status: "joined",
-                leave: [],
-              };
-              p.members.push(member);
-              memberId = member.id;
-            }
-            member.status = "joined";
-            member.tz = tz;
-            member.city = city;
-          });
-          set((s) => ({ viewer: { ...s.viewer, [project.id]: memberId! } }));
-          return { projectId: project.id, memberId: memberId! };
-        },
+    dismissError: () => set({ error: null }),
 
-        setLeave: (projectId, memberId, date, leave) =>
-          updateProject(projectId, (p) => {
-            const m = p.members.find((x) => x.id === memberId);
-            if (!m) return;
-            m.leave = leave ? [...new Set([...m.leave, date])] : m.leave.filter((d) => d !== date);
-          }),
+    signUp: async (email) => (await send({ type: "signUp", email }, () => true)) ?? false,
 
-        startPaper: (projectId, date) =>
-          updateProject(projectId, (p) => {
-            if (paperFor(p, date)) return;
-            p.papers.push({ date, status: "draft", tasks: carryOver(p, date), closed: {} });
-          }),
-
-        dropThought: (projectId, date, text) => {
-          const { title, est } = parseThought(text);
-          if (!title) return;
-          updatePaper(projectId, date, (paper) => {
-            paper.tasks.push({ id: uid(), title, est, assigneeId: null, done: false, shape: Math.floor(Math.random() * 6) });
-          });
-        },
-
-        setEstimate: (projectId, date, taskId, est) =>
-          updateTask(projectId, date, taskId, (t) => {
-            t.est = est;
-          }),
-
-        assign: (projectId, date, taskId, memberId) =>
-          updateTask(projectId, date, taskId, (t) => {
-            t.assigneeId = memberId;
-          }),
-
-        removeTask: (projectId, date, taskId) =>
-          updatePaper(projectId, date, (paper) => {
-            paper.tasks = paper.tasks.filter((t) => t.id !== taskId);
-          }),
-
-        sendPaper: (projectId, date) =>
-          updatePaper(projectId, date, (paper) => {
-            paper.status = "sent";
-            paper.sentAt = new Date().toISOString();
-          }),
-
-        toggleDone: (projectId, date, taskId) =>
-          updateTask(projectId, date, taskId, (t) => {
-            t.done = !t.done;
-            t.doneAt = t.done ? new Date().toISOString() : undefined;
-            if (t.done) t.blocked = undefined;
-          }),
-
-        requestTime: (projectId, date, taskId, hours, why) =>
-          updateTask(projectId, date, taskId, (t) => {
-            t.request = { hours, why, at: new Date().toISOString(), state: "pending" };
-          }),
-
-        answerRequest: (projectId, date, taskId, give) =>
-          updateTask(projectId, date, taskId, (t) => {
-            if (!t.request) return;
-            t.request.state = give ? "given" : "kept";
-            if (give) t.est = t.request.hours;
-          }),
-
-        setBlocked: (projectId, date, taskId, why) =>
-          updateTask(projectId, date, taskId, (t) => {
-            t.blocked = why === null ? undefined : { why, at: new Date().toISOString() };
-          }),
-
-        closeDay: (projectId, date, memberId, reason) =>
-          updatePaper(projectId, date, (paper) => {
-            paper.closed[memberId] = { at: new Date().toISOString(), reason };
-          }),
-
-        reopenDay: (projectId, date, memberId) =>
-          updatePaper(projectId, date, (paper) => {
-            delete paper.closed[memberId];
-          }),
-
-        thankTeam: (projectId, date) =>
-          updatePaper(projectId, date, (paper) => {
-            paper.thanked = true;
-          }),
-
-        advanceDay: (projectId) =>
-          updateProject(projectId, (p) => {
-            p.currentDate = nextWorkday(p.currentDate);
-          }),
-
-        loadDemo: (moment) => {
-          const seed = moment === "morning" ? demoMorning() : demoAfternoon();
-          set({ lead: seed.lead, projects: [seed.project], viewer: { [seed.project.id]: seed.viewerId } });
-        },
-
-        reset: () => set(empty),
+    createProject: (name, hoursPerDay) => {
+      const id = uid();
+      const tz = browserTz();
+      const lead = get().lead;
+      const optimistic: Project = {
+        id,
+        name,
+        leadName: lead?.name ?? "",
+        isOwner: true,
+        hoursPerDay,
+        inviteCode: "",
+        createdAt: new Date().toISOString(),
+        leadTz: tz,
+        leadCity: cityFromTz(tz),
+        invitesSent: false,
+        members: [],
+        currentDate: todayIn(tz),
+        papers: [],
       };
+      set((s) => ({ projects: [...s.projects, optimistic] }));
+      void send({ type: "createProject", id, name, hoursPerDay, tz });
+      return id;
     },
-    {
-      name: "pen-and-paper",
-      version: 1,
-      storage: createJSONStorage(() => localStorage),
-      skipHydration: true,
-    },
-  ),
-);
 
+    addInvites: (projectId, emails) => tryAct({ type: "addInvites", projectId, members: emails.map((email) => ({ id: uid(), email })) }),
+
+    joinProject: (code, email, tz, city) => send({ type: "joinProject", code, email, tz, city }, (r) => (r.projectId ? { projectId: r.projectId } : null)),
+
+    setLeave: (projectId, memberId, date, leave) => tryAct({ type: "setLeave", projectId, memberId, date, leave }),
+    startPaper: (projectId, date) => tryAct({ type: "startPaper", projectId, date }),
+    dropThought: (projectId, date, text) =>
+      tryAct({ type: "dropThought", projectId, date, text, taskId: uid(), shape: Math.floor(Math.random() * 6) }),
+    setEstimate: (projectId, date, taskId, est) => tryAct({ type: "setEstimate", projectId, date, taskId, est }),
+    assign: (projectId, date, taskId, memberId) => tryAct({ type: "assign", projectId, date, taskId, memberId }),
+    removeTask: (projectId, date, taskId) => tryAct({ type: "removeTask", projectId, date, taskId }),
+    sendPaper: (projectId, date) => tryAct({ type: "sendPaper", projectId, date }),
+    toggleDone: (projectId, date, taskId) => tryAct({ type: "toggleDone", projectId, date, taskId }),
+    requestTime: (projectId, date, taskId, hours, why) => tryAct({ type: "requestTime", projectId, date, taskId, hours, why }),
+    answerRequest: (projectId, date, taskId, give) => tryAct({ type: "answerRequest", projectId, date, taskId, give }),
+    setBlocked: (projectId, date, taskId, why) => tryAct({ type: "setBlocked", projectId, date, taskId, why }),
+    closeDay: (projectId, date, memberId, reason) => tryAct({ type: "closeDay", projectId, date, memberId, reason }),
+    reopenDay: (projectId, date, memberId) => tryAct({ type: "reopenDay", projectId, date, memberId }),
+    thankTeam: (projectId, date) => tryAct({ type: "thankTeam", projectId, date }),
+    advanceDay: (projectId) => tryAct({ type: "advanceDay", projectId }),
+
+    loadDemo: (moment) => send({ type: "loadDemo", moment }, (r) => r.projectId ?? null),
+
+    reset: async () => {
+      await send({ type: "reset" });
+    },
+  };
+});

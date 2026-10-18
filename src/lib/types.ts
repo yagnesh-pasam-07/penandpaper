@@ -64,6 +64,10 @@ export type Paper = {
 export type Project = {
   id: string;
   name: string;
+  /** The lead's first name, as members see it ("Yagnesh added you to…"). */
+  leadName: string;
+  /** Sent by the server: true when this browser's account leads the project. */
+  isOwner?: boolean;
   hoursPerDay: 6 | 8;
   inviteCode: string;
   createdAt: string;

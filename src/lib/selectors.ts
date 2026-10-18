@@ -1,4 +1,4 @@
-import { onLeave } from "./store";
+import { onLeave } from "./mutations";
 import type { Member, Paper, Project, Task } from "./types";
 
 export function sumEst(tasks: Task[]): number {

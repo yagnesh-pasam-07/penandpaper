@@ -6,7 +6,8 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { Hydrated } from "@/components/hydration";
 import { CheckIcon, ChevronIcon, CloseIcon, NotebookIcon, PlusIcon } from "@/components/icons";
 import { Avatar, Breadcrumb, LeadHeader, Logo, Modal, NotFound, btn, tintClass } from "@/components/ui";
-import { paperFor, useStore } from "@/lib/store";
+import { paperFor } from "@/lib/mutations";
+import { useStore } from "@/lib/store";
 import { recipients } from "@/lib/selectors";
 import { shortDate, weekday } from "@/lib/time";
 import type { Project, Tint } from "@/lib/types";
@@ -37,7 +38,7 @@ export function ProjectsScreen() {
 }
 
 function Projects() {
-  const projects = useStore((s) => s.projects);
+  const projects = useStore((s) => s.projects).filter((p) => p.isOwner);
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <LeadHeader left={<Logo />} right={<LeadAvatar />} />
@@ -250,7 +251,7 @@ function Step({
 
 function ProjectHome() {
   const project = useProject();
-  if (!project) return <NotFound what="This project doesn't exist in this browser." href="/projects" cta="All projects" />;
+  if (!project?.isOwner) return <NotFound what="This project doesn't exist, or you don't lead it." href="/projects" cta="All projects" />;
 
   const paper = paperFor(project, project.currentDate);
   const sent = paper?.status === "sent";
@@ -346,7 +347,7 @@ function Invite() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  if (!project) return <NotFound what="This project doesn't exist in this browser." href="/projects" cta="All projects" />;
+  if (!project?.isOwner) return <NotFound what="This project doesn't exist, or you don't lead it." href="/projects" cta="All projects" />;
   const back = `/projects/${project.id}`;
   const link = `${typeof window === "undefined" ? "" : window.location.origin}/join/${project.inviteCode}`;
   const linkLabel = link.replace(/^https?:\/\//, "");
