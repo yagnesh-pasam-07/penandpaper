@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Paper (light) and Ink (dark) tokens, taken from the design canvas. */
+:root,
+[data-theme="light"] {
+  --bg: #faf8f3;
+  --sheet: #ffffff;
+  --line: #e6e1d7;
+  --soft: #f3f0ea;
+  --ink: #1e1d1a;
+  --mute: #5f5b54;
+  --red: #c8382f;
+  --red-text: #c8382f;
+  --on-red: #ffffff;
+  --red-soft: #fbe6e2;
+  --green: #2f7a4f;
+  --green-soft: #ddf0e3;
+  --amber: #9a5414;
+  --amber-soft: #fbebd9;
+  --track: #ece8e0;
+  --t1: #fff1bf;
+  --t2: #d9f0df;
+  --t3: #d8e8fa;
+  --t4: #fadcd6;
+  --t5: #e8def8;
+  --shadow: rgba(30, 29, 26, 0.1);
+  --scrim: rgba(30, 29, 26, 0.28);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #151412;
+  --sheet: #1e1d1a;
+  --line: #2f2d29;
+  --soft: #242320;
+  --ink: #f1ede5;
+  --mute: #a6a096;
+  --red: #d4483d;
+  --red-text: #f0786d;
+  --on-red: #ffffff;
+  --red-soft: #3a201c;
+  --green: #6cc892;
+  --green-soft: #1c3125;
+  --amber: #e2a65e;
+  --amber-soft: #372816;
+  --track: #2f2d29;
+  --t1: #3e3721;
+  --t2: #203629;
+  --t3: #1f2d3d;
+  --t4: #3d2622;
+  --t5: #2e2740;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --scrim: rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sheet: var(--sheet);
+  --color-line: var(--line);
+  --color-soft: var(--soft);
+  --color-ink: var(--ink);
+  --color-mute: var(--mute);
+  --color-red: var(--red);
+  --color-red-text: var(--red-text);
+  --color-on-red: var(--on-red);
+  --color-red-soft: var(--red-soft);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-track: var(--track);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-t3: var(--t3);
+  --color-t4: var(--t4);
+  --color-t5: var(--t5);
+  --color-shadow: var(--shadow);
+  --color-scrim: var(--scrim);
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --font-hand: var(--font-caveat), cursive;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.strike {
+  text-decoration: line-through;
+  text-decoration-color: var(--red-text);
+  text-decoration-thickness: 2px;
+}
+
+.dot-grid {
+  background-image: radial-gradient(var(--line) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+}
+
+.ruled {
+  background-image: linear-gradient(var(--line) 1px, transparent 1px);
+  background-size: 100% 34px;
+}
+
+.scrim-bg {
+  background-image: linear-gradient(var(--scrim), var(--scrim));
+}
+
+:focus-visible {
+  outline: 2px solid var(--red-text);
+  outline-offset: 2px;
+}
