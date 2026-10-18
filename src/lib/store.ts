@@ -13,7 +13,7 @@ type ServerState = {
   projects: Project[];
   viewer: Record<string, string>;
   /** Which sign-in methods work here. */
-  signIn: { email: boolean; google: boolean };
+  signIn: { password: boolean; email: boolean; google: boolean };
 };
 
 type State = ServerState & {
@@ -122,7 +122,7 @@ export const useStore = create<Store>()((set, get) => {
     lead: null,
     projects: [],
     viewer: {},
-    signIn: { email: false, google: false },
+    signIn: { password: false, email: false, google: false },
     status: "loading",
     error: null,
 
