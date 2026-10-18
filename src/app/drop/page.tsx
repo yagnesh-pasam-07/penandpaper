@@ -12,7 +12,7 @@ async function Today() {
   // Needs the live request (session cookie); never part of a prerender.
   await connection();
   const user = await currentUser();
-  if (!user) redirect("/signup?next=/drop");
+  if (!user) redirect("/login?next=/drop");
   const paper = await getToday(user.id);
   return <DropCanvas initial={paper} me={{ name: user.name, email: user.email }} />;
 }

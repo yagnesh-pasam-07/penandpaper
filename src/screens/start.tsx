@@ -37,12 +37,13 @@ export function LandingScreen() {
 function Landing() {
   const lead = useStore((s) => s.lead);
   const startHref = lead ? "/drop" : "/signup";
+  const loginHref = lead ? "/drop" : "/login";
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <LeadHeader
         left={<Logo size="lg" />}
         right={
-          <Link href={startHref} className="px-1 py-2.5 text-[15px] font-medium">
+          <Link href={loginHref} className="px-1 py-2.5 text-[15px] font-medium">
             {lead ? "Open my paper" : "Log in"}
           </Link>
         }
@@ -106,18 +107,50 @@ function Landing() {
   );
 }
 
-/** 1.2 Sign up */
+/** 1.2 Sign up, and its twin, Log in. Both create the account on first use. */
 export function SignUpScreen() {
   return (
     <Hydrated>
-      <SignUp />
+      <AuthPage mode="signup" />
     </Hydrated>
   );
 }
 
-function SignUp() {
+export function LogInScreen() {
+  return (
+    <Hydrated>
+      <AuthPage mode="login" />
+    </Hydrated>
+  );
+}
+
+const COPY = {
+  signup: {
+    title: "Grab a fresh sheet",
+    lead: "Create your account and drop your first thought in seconds.",
+    google: "Sign up with Google",
+    email: "Email me a sign-up link",
+    switchText: "Already have an account?",
+    switchCta: "Log in",
+    switchHref: "/login",
+  },
+  login: {
+    title: "Welcome back",
+    lead: "Log in to pick up today's paper.",
+    google: "Log in with Google",
+    email: "Email me a log-in link",
+    switchText: "New to Pen & Paper?",
+    switchCta: "Create an account",
+    switchHref: "/signup",
+  },
+} as const;
+
+function AuthPage({ mode }: { mode: "signup" | "login" }) {
   const lead = useStore((s) => s.lead);
-  const next = safeNext(useSearchParams().get("next"), "/drop");
+  const nextParam = useSearchParams().get("next");
+  const next = safeNext(nextParam, "/drop");
+  const copy = COPY[mode];
+  const switchHref = nextParam ? `${copy.switchHref}?next=${encodeURIComponent(next)}` : copy.switchHref;
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-10">
@@ -126,8 +159,8 @@ function SignUp() {
           <Link href="/" aria-label="Pen & Paper home" className="text-red-text">
             <PenIcon size={36} />
           </Link>
-          <h1 className="text-[32px] font-semibold tracking-[-0.02em]">{lead ? "You're signed in" : "Grab a fresh sheet"}</h1>
-          <p className="text-base text-mute">{lead ? `As ${lead.email}.` : "Sign in or create your account to plan your team's day."}</p>
+          <h1 className="text-[32px] font-semibold tracking-[-0.02em]">{lead ? "You're signed in" : copy.title}</h1>
+          <p className="text-base text-mute">{lead ? `As ${lead.email}.` : copy.lead}</p>
         </div>
 
         {lead ? (
@@ -135,7 +168,15 @@ function SignUp() {
             Continue
           </Link>
         ) : (
-          <SignInPanel next={next} />
+          <>
+            <SignInPanel next={next} googleLabel={copy.google} emailCta={copy.email} />
+            <p className="text-center text-[15px] text-mute">
+              {copy.switchText}{" "}
+              <Link href={switchHref} className="font-semibold text-ink underline-offset-2 hover:underline">
+                {copy.switchCta}
+              </Link>
+            </p>
+          </>
         )}
 
         <p className="text-center text-sm text-mute">

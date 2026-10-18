@@ -78,7 +78,7 @@ function Demo() {
   const { loadDemo, deleteDemo, projects, lead } = useStore();
   const demo = projects.find((p) => p.isOwner && p.name === DEMO_PROJECT_NAME && p.inviteCode.startsWith("atlas-"));
   const [busy, setBusy] = useState(false);
-  if (!lead) return <NotFound what="Sign in to load the demo into your account." href="/signup?next=/demo" cta="Sign in" />;
+  if (!lead) return <NotFound what="Sign in to load the demo into your account." href="/login?next=/demo" cta="Sign in" />;
   const open = async (moment: "morning" | "afternoon") => {
     setBusy(true);
     const id = await loadDemo(moment);
