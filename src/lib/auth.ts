@@ -9,7 +9,7 @@ import { env, googleEnabled } from "@/lib/env";
 import { nameFromEmail } from "@/lib/mutations";
 import { sendMail } from "@/server/email";
 
-const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL, env.VERCEL_PROJECT_PRODUCTION_URL, "penandpaper-app.vercel.app"]
+const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL, env.VERCEL_PROJECT_PRODUCTION_URL, "penandpaper-app.vercel.app", "penandpaper-three.vercel.app"]
   .filter((host): host is string => Boolean(host))
   .map((host) => `https://${host}`);
 

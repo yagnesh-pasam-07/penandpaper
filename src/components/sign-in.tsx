@@ -24,27 +24,61 @@ function GoogleMark() {
   );
 }
 
+function FieldError({ id, text }: { id: string; text: string }) {
+  if (!text) return null;
+  return (
+    <span id={id} className="text-[13px] font-normal text-red-text">
+      {text}
+    </span>
+  );
+}
+
 const FIELD =
   "h-[52px] w-full rounded-[14px] border-[1.5px] border-ink bg-sheet px-4 text-base font-normal outline-none placeholder:text-mute focus-visible:outline-none";
 
-/** Better Auth's error codes, in plain words. */
-function friendly(code: string | undefined, message: string | undefined, mode: "signup" | "login"): string {
-  switch (code) {
+const FIELD_BAD = "border-red-text";
+const EMAIL_KEY = "pp-auth-email";
+
+/** Carries the typed email between /signup and /login, kept out of the URL. */
+function rememberEmail(email: string) {
+  try {
+    sessionStorage.setItem(EMAIL_KEY, email);
+  } catch {}
+}
+
+function recalledEmail(): string {
+  try {
+    return sessionStorage.getItem(EMAIL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+type Problem = { text: string; fix?: "login" | "signup" };
+type AuthError = { code?: string; message?: string; status?: number };
+
+/** Better Auth's errors in plain words, with the next step when there is one. */
+function explain(err: AuthError, mode: "signup" | "login"): Problem {
+  switch (err.code) {
     case "USER_ALREADY_EXISTS":
     case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
-      return "There's already an account with that email. Log in instead.";
+      return { text: "This email already has an account. Log in with its password instead.", fix: "login" };
     case "INVALID_EMAIL_OR_PASSWORD":
-      return "That email and password don't match.";
+      return { text: "That email and password don't match. Check both for typos, or create an account if you're new here.", fix: "signup" };
     case "PASSWORD_TOO_SHORT":
-      return "Use at least 8 characters for your password.";
+      return { text: "Use at least 8 characters for your password." };
     case "PASSWORD_TOO_LONG":
-      return "That password is too long (128 characters at most).";
+      return { text: "That password is too long (128 characters at most)." };
     case "INVALID_EMAIL":
-      return "That doesn't look like an email address.";
-    default:
-      if (message?.toLowerCase().includes("too many")) return "Too many tries. Wait a minute and try again.";
-      return mode === "signup" ? "Couldn't create your account. Try again." : "Couldn't log you in. Try again.";
+      return { text: "That doesn't look like an email address." };
+    case "INVALID_ORIGIN":
+      return { text: "Sign-in doesn't work on this address. Open penandpaper-app.vercel.app and try there." };
   }
+  if (err.status === 429 || err.message?.toLowerCase().includes("too many"))
+    return { text: "Too many tries in a row. Wait a minute, then try again." };
+  if (!err.status) return { text: "Couldn't reach Pen & Paper. Check your internet connection and try again." };
+  if (err.status >= 500) return { text: "Something broke on our side. Try again in a minute." };
+  return { text: err.message ? `${err.message}.`.replace(/\.\.$/, ".") : mode === "signup" ? "Couldn't create your account. Try again." : "Couldn't log you in. Try again." };
 }
 
 /**
@@ -57,15 +91,32 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
   const refresh = useStore((s) => s.refresh);
   const [mode, setMode] = useState(startMode);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(recalledEmail);
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState<"google" | "password" | "link" | null>(null);
-  const [error, setError] = useState("");
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [checked, setChecked] = useState(false);
   const [linkSentTo, setLinkSentTo] = useState<string | null>(null);
   const signup = mode === "signup";
   const cleanEmail = email.trim().toLowerCase();
-  const ready = EMAIL.test(cleanEmail) && password.length >= 8 && (!signup || name.trim().length > 0);
+  const fieldErrors = {
+    name: signup && !name.trim() ? "Add your name." : "",
+    email: !cleanEmail ? "Enter your email." : !EMAIL.test(cleanEmail) ? "That doesn't look like an email address." : "",
+    password: !password ? "Enter your password." : signup && password.length < 8 ? `Use at least 8 characters (${password.length} so far).` : "",
+  };
+  const shown = (field: keyof typeof fieldErrors) => (checked ? fieldErrors[field] : "");
+  const setError = (text: string) => setProblem(text ? { text } : null);
+
+  const switchTo = (target: "signup" | "login") => {
+    setProblem(null);
+    setChecked(false);
+    if (switchInline) setMode(target);
+    else {
+      rememberEmail(cleanEmail);
+      router.push(`/${target}?next=${encodeURIComponent(next)}`);
+    }
+  };
 
   const done = async () => {
     await refresh();
@@ -117,27 +168,47 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
       )}
 
       <form
+        noValidate
         className="flex flex-col gap-3.5"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!ready || busy) return;
+          if (busy) return;
+          setChecked(true);
+          setProblem(null);
+          if (Object.values(fieldErrors).some(Boolean)) return;
           setBusy("password");
-          setError("");
-          const { error: err } = signup
-            ? await authClient.signUp.email({ name: name.trim(), email: cleanEmail, password, callbackURL: next })
-            : await authClient.signIn.email({ email: cleanEmail, password, callbackURL: next });
+          let err: AuthError | null;
+          try {
+            ({ error: err } = signup
+              ? await authClient.signUp.email({ name: name.trim(), email: cleanEmail, password, callbackURL: next })
+              : await authClient.signIn.email({ email: cleanEmail, password, callbackURL: next }));
+          } catch {
+            err = {};
+          }
           if (err) {
             setBusy(null);
-            setError(friendly(err.code, err.message, mode));
+            setProblem(explain(err, mode));
             return;
           }
+          rememberEmail("");
           await done();
         }}
       >
         {signup && (
           <label className="flex flex-col gap-2 text-sm font-medium">
             Your name
-            <input autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Asha" maxLength={80} className={FIELD} />
+            <input
+              autoComplete="name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Asha"
+              maxLength={80}
+              aria-invalid={Boolean(shown("name"))}
+              aria-describedby={shown("name") ? "name-error" : undefined}
+              className={`${FIELD} ${shown("name") ? FIELD_BAD : ""}`}
+            />
+            <FieldError id="name-error" text={shown("name")} />
           </label>
         )}
         <label className="flex flex-col gap-2 text-sm font-medium">
@@ -149,8 +220,11 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
-            className={FIELD}
+            aria-invalid={Boolean(shown("email"))}
+            aria-describedby={shown("email") ? "email-error" : undefined}
+            className={`${FIELD} ${shown("email") ? FIELD_BAD : ""}`}
           />
+          <FieldError id="email-error" text={shown("email")} />
         </label>
         <label className="flex flex-col gap-2 text-sm font-medium">
           Password
@@ -159,12 +233,13 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
               type={show ? "text" : "password"}
               autoComplete={signup ? "new-password" : "current-password"}
               required
-              minLength={8}
               maxLength={128}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={signup ? "At least 8 characters" : ""}
-              className={`${FIELD} pr-20`}
+              aria-invalid={Boolean(shown("password"))}
+              aria-describedby={shown("password") ? "password-error" : undefined}
+              className={`${FIELD} pr-20 ${shown("password") ? FIELD_BAD : ""}`}
             />
             <button
               type="button"
@@ -175,8 +250,9 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
               {show ? "Hide" : "Show"}
             </button>
           </span>
+          <FieldError id="password-error" text={shown("password")} />
         </label>
-        <button type="submit" disabled={!ready || busy !== null} className={`${btn.primary} disabled:opacity-50`}>
+        <button type="submit" disabled={busy !== null} className={`${btn.primary} disabled:opacity-50`}>
           {busy === "password" ? (signup ? "Creating your account…" : "Logging in…") : signup ? "Create account" : "Log in"}
         </button>
       </form>
@@ -199,10 +275,15 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
         </button>
       )}
 
-      {error && (
-        <p role="alert" className="text-center text-sm text-red-text">
-          {error}
-        </p>
+      {problem && (
+        <div role="alert" className="flex flex-col items-center gap-2 rounded-[14px] border border-red-text/40 bg-red-soft px-4 py-3 text-center text-sm text-red-text">
+          <span>{problem.text}</span>
+          {problem.fix && (
+            <button type="button" onClick={() => switchTo(problem.fix!)} className="font-semibold text-ink underline underline-offset-2">
+              {problem.fix === "login" ? "Log in instead" : "Create an account"}
+            </button>
+          )}
+        </div>
       )}
 
       {switchInline && (
@@ -210,10 +291,7 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
           {signup ? "Already have an account?" : "New here?"}{" "}
           <button
             type="button"
-            onClick={() => {
-              setMode(signup ? "login" : "signup");
-              setError("");
-            }}
+            onClick={() => switchTo(signup ? "login" : "signup")}
             className="font-semibold text-ink underline-offset-2 hover:underline"
           >
             {signup ? "Log in" : "Create an account"}
