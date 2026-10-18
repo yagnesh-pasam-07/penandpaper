@@ -107,7 +107,11 @@ export function SignInPanel({ next, googleLabel = "Continue with Google", emailC
           </button>
         </>
       )}
-      {!methods.email && !methods.google && <p className="text-center text-sm text-amber">Sign-in isn&apos;t set up on this server yet.</p>}
+      {!methods.email && !methods.google && (
+        <p role="status" className="rounded-[14px] border border-dashed border-line px-4 py-3 text-center text-sm text-mute">
+          Sign-in opens shortly. We&apos;re switching on Google sign-in.
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-center text-sm text-red-text">
           {error}

@@ -12,7 +12,7 @@ async function History() {
   // Needs the live request (session cookie); never part of a prerender.
   await connection();
   const user = await currentUser();
-  if (!user) redirect("/signup?next=/drop/history");
+  if (!user) redirect("/login?next=/drop/history");
   return <HistoryList me={{ name: user.name, email: user.email }} papers={await listHistory(user.id)} />;
 }
 

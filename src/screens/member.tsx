@@ -28,7 +28,7 @@ function useMemberDay(): { project?: Project; me?: Member; paper?: Paper } {
 function MemberGuard({ children }: { children: (ctx: { project: Project; me: Member; paper?: Paper }) => ReactNode }) {
   const { project, me, paper } = useMemberDay();
   const lead = useStore((s) => s.lead);
-  if (!lead) return <NotFound what="Sign in to see your paper." href="/signup?next=/me" cta="Sign in" />;
+  if (!lead) return <NotFound what="Sign in to see your paper." href="/login?next=/me" cta="Sign in" />;
   if (!project) return <NotFound what="This project doesn't exist in this browser." href="/me" cta="My projects" />;
   if (!me) return <NotFound what="Join this project from your invite link first." href={`/join/${project.inviteCode}`} cta="Join" />;
   return <>{children({ project, me, paper })}</>;
@@ -245,7 +245,7 @@ function MyProjects() {
   const account = useStore((s) => s.lead);
   const signOut = useStore((s) => s.signOut);
   const router = useRouter();
-  if (!account) return <NotFound what="Sign in to see your paper." href="/signup?next=/me" cta="Sign in" />;
+  if (!account) return <NotFound what="Sign in to see your paper." href="/login?next=/me" cta="Sign in" />;
 
   return (
     <MemberShell className="gap-7 pt-8">

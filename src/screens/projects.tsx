@@ -35,7 +35,7 @@ export { LeadAvatar };
 /** Lead screens need an account; this keeps the guard in one place. */
 function RequireLead({ children }: { children: ReactNode }) {
   const lead = useStore((s) => s.lead);
-  if (!lead) return <NotFound what="Sign in to plan your team's day." href="/signup" cta="Sign in" />;
+  if (!lead) return <NotFound what="Sign in to plan your team's day." href="/login" cta="Log in" />;
   return <>{children}</>;
 }
 

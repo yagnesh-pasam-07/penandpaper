@@ -56,7 +56,7 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
   if (res.status === 401) {
     // A full load on purpose: the session is gone, so nothing on screen should survive.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.href = "/signup?next=/drop";
+    window.location.href = "/login?next=/drop";
     throw new Error("Signed out.");
   }
   if (!res.ok) {

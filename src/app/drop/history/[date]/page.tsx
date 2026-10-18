@@ -10,7 +10,7 @@ async function Paper({ params }: { params: Promise<{ date: string }> }) {
   await connection();
   const { date } = await params;
   const user = await currentUser();
-  if (!user) redirect(`/signup?next=/drop/history/${date}`);
+  if (!user) redirect(`/login?next=/drop/history/${date}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
   const paper = await getPaper(user.id, date);
   if (!paper) notFound();
