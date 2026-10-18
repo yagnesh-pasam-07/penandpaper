@@ -21,11 +21,11 @@ export type AppState = {
   /** projectId -> the member this account is on that project. */
   viewer: Record<string, string>;
   /** Which sign-in methods work in this environment. */
-  signIn: { email: boolean; google: boolean };
+  signIn: { password: boolean; email: boolean; google: boolean };
 };
 
 export async function stateFor(q: Q, user: User | null): Promise<AppState> {
-  const signIn = { email: emailEnabled || process.env.NODE_ENV !== "production", google: googleEnabled };
+  const signIn = { password: true, email: emailEnabled, google: googleEnabled };
   if (!user) return { lead: null, projects: [], viewer: {}, signIn };
   const [owned, joined] = await Promise.all([
     q.select({ id: projects.id }).from(projects).where(eq(projects.ownerId, user.id)),
@@ -139,7 +139,7 @@ export async function handleAction(db: Db, user: User | null, action: AnyAction)
       if (!target) throw new HttpError(404, "This invite link doesn't match a project.");
       const team = await db.select().from(members).where(eq(members.projectId, target.id)).orderBy(members.position);
       if (team.some((m) => m.userId === user.id)) return { projectId: target.id };
-      // The signed-in address is verified, so it can claim the invite sent to it.
+      // Whoever holds the invite link and signs in with the invited address takes that seat.
       const invited = team.find((m) => !m.userId && m.email.toLowerCase() === user.email.toLowerCase());
       if (invited) {
         await db.update(members).set({ userId: user.id, status: "joined", tz: action.tz, city: action.city }).where(eq(members.id, invited.id));

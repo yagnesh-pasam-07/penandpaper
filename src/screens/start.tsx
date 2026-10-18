@@ -128,8 +128,6 @@ const COPY = {
   signup: {
     title: "Grab a fresh sheet",
     lead: "Create your account and drop your first thought in seconds.",
-    google: "Sign up with Google",
-    email: "Email me a sign-up link",
     switchText: "Already have an account?",
     switchCta: "Log in",
     switchHref: "/login",
@@ -137,8 +135,6 @@ const COPY = {
   login: {
     title: "Welcome back",
     lead: "Log in to pick up today's paper.",
-    google: "Log in with Google",
-    email: "Email me a log-in link",
     switchText: "New to Pen & Paper?",
     switchCta: "Create an account",
     switchHref: "/signup",
@@ -169,7 +165,7 @@ function AuthPage({ mode }: { mode: "signup" | "login" }) {
           </Link>
         ) : (
           <>
-            <SignInPanel next={next} googleLabel={copy.google} emailCta={copy.email} />
+            <SignInPanel key={mode} next={next} mode={mode} />
             <p className="text-center text-[15px] text-mute">
               {copy.switchText}{" "}
               <Link href={switchHref} className="font-semibold text-ink underline-offset-2 hover:underline">

@@ -18,9 +18,13 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL ?? vercelOrigins[0],
   trustedOrigins: vercelOrigins,
   database: drizzleAdapter(httpDb, { provider: "pg", usePlural: true, schema }),
-  // A Google sign-in may join an email-link account with the same address:
-  // both prove the person controls that inbox.
-  account: { accountLinking: { enabled: true, trustedProviders: ["google"] } },
+  // Email + password works with no email service. Nothing checks the address
+  // yet, so a password account counts as unverified (see accountLinking).
+  emailAndPassword: { enabled: true, minPasswordLength: 8, maxPasswordLength: 128, autoSignIn: true },
+  // Google may join an existing account with the same address only when that
+  // address was verified (an email link). Never a password account whose email
+  // nobody checked: it could belong to whoever typed someone else's address.
+  account: { accountLinking: { enabled: true, trustedProviders: ["google"], requireLocalEmailVerified: true } },
   socialProviders: googleEnabled ? { google: { clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET! } } : {},
   databaseHooks: {
     user: {

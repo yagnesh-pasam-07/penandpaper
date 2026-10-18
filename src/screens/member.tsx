@@ -167,7 +167,7 @@ function Join() {
             <span className="text-center text-[13px] text-mute">as {preview.signedInAs}</span>
           </>
         ) : (
-          <SignInPanel next={`/join/${code}`} googleLabel="Join with Google" emailCta="Email me a link to join" />
+          <SignInPanel next={`/join/${code}`} mode="signup" switchInline />
         )}
       </div>
     </MemberShell>
