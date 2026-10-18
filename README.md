@@ -1,4 +1,4 @@
-# Paper & Pen — Visual Team Task Planner
+# Pen & Paper — Visual Team Task Planner
 
 A simple, visual task planner for small teams (2–20 people).
 

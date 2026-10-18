@@ -1,8 +1,8 @@
-# Product Requirements Document: Paper & Pen — Visual Team Task Planner
+# Product Requirements Document: Pen & Paper — Visual Team Task Planner
 
 | Field | Value |
 |---|---|
-| Product | Paper & Pen (working name) |
+| Product | Pen & Paper (working name) |
 | Document owner | Yagnesh |
 | Status | Draft v1.0 |
 | Last updated | 2026-10-18 |
@@ -12,7 +12,7 @@
 
 ## 1. Summary
 
-Paper & Pen is a lightweight, visual task-planning tool for small teams (2–20 people). It lets a team lead turn unstructured thoughts into estimated tasks and distribute them across team members based on each person's available hours, all on a single canvas.
+Pen & Paper is a lightweight, visual task-planning tool for small teams (2–20 people). It lets a team lead turn unstructured thoughts into estimated tasks and distribute them across team members based on each person's available hours, all on a single canvas.
 
 **Core loop: Think → Estimate → Assign.**
 
@@ -210,7 +210,7 @@ Thresholds are workspace-configurable (P2). Color is never the only signal — l
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│  Paper & Pen  ◀ Tue, Oct 18 ▶        Summary: 21h tasks / 18h cap  │
+│  Pen & Paper  ◀ Tue, Oct 18 ▶        Summary: 21h tasks / 18h cap  │
 │                                     3 unassigned · 1 overloaded    │
 ├────────────────────────────────────────────────────────────────────┤
 │                                                     ┌────────────┐ │
