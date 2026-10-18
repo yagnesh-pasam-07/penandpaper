@@ -24,6 +24,7 @@ Two modules share one app, one sign-in and one database:
 - **Daily paper**: each day (in `DROP_TIMEZONE`, default IST) is a fresh paper. Unstruck thoughts from the last paper roll over on the first open of the day, marked "from Sat".
 - **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
 - **History**: `/drop/history` lists past papers; each opens read-only.
+- **Keyboard first**: Space, or simply typing, puts the cursor in the drop box from anywhere on the page; Enter drops; Esc clears, and a second Esc steps out.
 - **Phone**: the canvas becomes a vertical stream with the same input.
 - Sign-in required: signed-out visits go to `/signup?next=/drop`.
 
@@ -40,6 +41,8 @@ npm run dev                     # http://localhost:3000
 ```
 
 Without Resend configured, development prints every email (sign-in links included) to the terminal, so you can sign in by opening the link from there.
+
+`npm run dev` clears `.next` first: a production build left there breaks the dev server.
 
 Other scripts: `npm test` (unit tests), `npm run lint`, `npm run build`, `npm run db:generate` (after changing a schema), `npm run db:studio`.
 

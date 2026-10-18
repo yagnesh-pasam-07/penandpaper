@@ -78,6 +78,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
   // an edit never overtakes the drop it edits.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const input = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(true);
   const tz = useViewerTz();
 
   /** Queues a save in the background; on failure, undoes it on screen and says so. */
@@ -114,6 +115,29 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
       document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("focus", sync);
     };
+  }, []);
+
+  // Keyboard first: Space (or simply typing) puts the cursor in the drop box
+  // from anywhere on the page, so a thought never needs the mouse.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
+      const box = input.current;
+      if (!box) return;
+      if (e.key === " ") {
+        // A focused button or link keeps Space for itself.
+        if (el?.closest("button, a, summary")) return;
+        e.preventDefault();
+        box.focus();
+      } else if (e.key.length === 1) {
+        // Focus moves before the key lands, so the letter is typed into the box.
+        box.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const drop = () => {
@@ -208,11 +232,24 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
               autoComplete="off"
               enterKeyHint="send"
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && setText("")}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key !== "Escape") return;
+                // First Esc clears; the next one steps out so Space works again.
+                if (text) setText("");
+                else e.currentTarget.blur();
+              }}
               placeholder="What's on your mind?"
               className="min-w-0 flex-1 bg-transparent text-lg text-ink outline-none placeholder:text-mute focus-visible:outline-none"
             />
-            <span className="hidden text-[13px] text-mute sm:inline">Enter to drop</span>
+            <span className="hidden text-[13px] text-mute sm:inline" aria-hidden="true">
+              {focused ? "Enter to drop" : (
+                <>
+                  <kbd className="rounded-md border border-line bg-soft px-1.5 py-0.5 font-sans text-[12px]">Space</kbd> to write
+                </>
+              )}
+            </span>
           </label>
         </form>
 
@@ -247,7 +284,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
         </PaperSurface>
 
         <p className="hidden text-center text-[13px] text-mute sm:block">
-          Click to edit · double-click to strike · open thoughts roll over to tomorrow · your paper is emailed at 9 PM
+          Space or just type to write · Enter to drop · Esc to step out · double-click to strike · emailed at 9 PM
         </p>
         <p className="text-center text-[13px] text-mute sm:hidden">Tap to edit · swipe right to strike · emailed at 9 PM</p>
       </main>
