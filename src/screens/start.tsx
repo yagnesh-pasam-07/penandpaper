@@ -36,14 +36,14 @@ export function LandingScreen() {
 
 function Landing() {
   const lead = useStore((s) => s.lead);
-  const startHref = lead ? "/projects" : "/signup";
+  const startHref = lead ? "/drop" : "/signup";
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <LeadHeader
         left={<Logo size="lg" />}
         right={
           <Link href={startHref} className="px-1 py-2.5 text-[15px] font-medium">
-            {lead ? "Open my projects" : "Log in"}
+            {lead ? "Open my paper" : "Log in"}
           </Link>
         }
       />
@@ -117,7 +117,7 @@ export function SignUpScreen() {
 
 function SignUp() {
   const lead = useStore((s) => s.lead);
-  const next = safeNext(useSearchParams().get("next"), "/projects");
+  const next = safeNext(useSearchParams().get("next"), "/drop");
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-10">

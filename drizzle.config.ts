@@ -5,7 +5,7 @@ config({ path: ".env.local" });
 
 export default defineConfig({
   dialect: "postgresql",
-  schema: "./src/db/schema.ts",
+  schema: ["./src/db/schema.ts", "./src/modules/drop/schema.ts"],
   out: "./drizzle",
   // Migrations run on a direct (unpooled) connection when one is set.
   dbCredentials: { url: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL || "" },

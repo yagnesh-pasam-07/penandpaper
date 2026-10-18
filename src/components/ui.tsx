@@ -88,7 +88,7 @@ export function Avatar({
     <span
       aria-hidden="true"
       style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
-      className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-ink ${tint ? tintBg[tint] : "bg-ink text-bg"} ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${tint ? `${tintBg[tint]} text-ink` : "bg-ink text-bg"} ${className}`}
     >
       {name.charAt(0).toUpperCase()}
     </span>
@@ -115,11 +115,17 @@ export function AccountMenu({ name, email, tint, onSignOut }: { name: string; em
           <span className="text-sm font-semibold">{name}</span>
           <span className="truncate text-[13px] text-mute">{email}</span>
         </span>
+        <Link href="/drop" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+          My paper
+        </Link>
+        <Link href="/drop/history" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+          Past papers
+        </Link>
         <Link href="/projects" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
-          Projects I lead
+          Team projects
         </Link>
         <Link href="/me" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
-          My papers
+          Team papers
         </Link>
         <button type="button" onClick={onSignOut} className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-text hover:bg-red-soft">
           Sign out
