@@ -11,7 +11,8 @@ export type Q = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 export type StoredProject = {
   project: Project;
   ownerId: string;
-  /** memberId -> the account that joined as that member. */
+  isDemo: boolean;
+  /** memberId -> the user who joined as that member. */
   memberAccounts: Record<string, string | null>;
 };
 
@@ -87,12 +88,12 @@ export async function loadProjects(q: Q, ids: string[]): Promise<StoredProject[]
             }),
           ),
       };
-      return { project, ownerId: p.ownerId, memberAccounts: Object.fromEntries(mine.map((m) => [m.id, m.accountId])) };
+      return { project, ownerId: p.ownerId, isDemo: p.isDemo, memberAccounts: Object.fromEntries(mine.map((m) => [m.id, m.userId])) };
     });
 }
 
 /** Writes the whole project back: upserts what's there, deletes what was removed. */
-export async function saveProject(q: Q, project: Project, ownerId: string): Promise<void> {
+export async function saveProject(q: Q, project: Project, ownerId: string, opts: { isDemo?: boolean } = {}): Promise<void> {
   await q
     .insert(projects)
     .values({
@@ -106,6 +107,7 @@ export async function saveProject(q: Q, project: Project, ownerId: string): Prom
       leadCity: project.leadCity,
       invitesSent: project.invitesSent,
       currentDate: project.currentDate,
+      isDemo: opts.isDemo ?? false,
       createdAt: new Date(project.createdAt),
     })
     .onConflictDoUpdate({
@@ -132,7 +134,7 @@ export async function saveProject(q: Q, project: Project, ownerId: string): Prom
           position,
         })),
       )
-      // accountId is only ever set by joining, never by a save.
+      // userId is only ever set by joining, never by a save.
       .onConflictDoUpdate({
         target: members.id,
         set: excluded(members, ["name", "email", "tz", "city", "hours", "tint", "status", "leave", "position"]),

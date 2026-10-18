@@ -44,7 +44,7 @@ function useClock(tz: string): string {
 function Guard({ children }: { children: (project: Project) => React.ReactNode }) {
   const lead = useStore((s) => s.lead);
   const project = useProject();
-  if (!lead) return <NotFound what="Sign up to plan your team's day." href="/signup" cta="Sign up" />;
+  if (!lead) return <NotFound what="Sign in to plan your team's day." href="/signup" cta="Sign in" />;
   if (!project?.isOwner) return <NotFound what="This project doesn't exist, or you don't lead it." href="/projects" cta="All projects" />;
   return <>{children(project)}</>;
 }

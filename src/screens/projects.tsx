@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { Hydrated } from "@/components/hydration";
 import { CheckIcon, ChevronIcon, CloseIcon, NotebookIcon, PlusIcon } from "@/components/icons";
-import { Avatar, Breadcrumb, LeadHeader, Logo, Modal, NotFound, btn, tintClass } from "@/components/ui";
+import { AccountMenu, Avatar, Breadcrumb, LeadHeader, Logo, Modal, NotFound, btn, tintClass } from "@/components/ui";
 import { paperFor } from "@/lib/mutations";
 import { useStore } from "@/lib/store";
 import { recipients } from "@/lib/selectors";
@@ -14,14 +14,28 @@ import type { Project, Tint } from "@/lib/types";
 import { useProject } from "@/lib/use-project";
 
 function LeadAvatar() {
+  const router = useRouter();
   const lead = useStore((s) => s.lead);
-  return <Avatar name={lead?.name ?? "?"} size={36} />;
+  const signOut = useStore((s) => s.signOut);
+  if (!lead) return null;
+  return (
+    <AccountMenu
+      name={lead.name}
+      email={lead.email}
+      onSignOut={async () => {
+        await signOut();
+        router.push("/");
+      }}
+    />
+  );
 }
+
+export { LeadAvatar };
 
 /** Lead screens need an account; this keeps the guard in one place. */
 function RequireLead({ children }: { children: ReactNode }) {
   const lead = useStore((s) => s.lead);
-  if (!lead) return <NotFound what="Sign up to plan your team's day." href="/signup" cta="Sign up" />;
+  if (!lead) return <NotFound what="Sign in to plan your team's day." href="/signup" cta="Sign in" />;
   return <>{children}</>;
 }
 

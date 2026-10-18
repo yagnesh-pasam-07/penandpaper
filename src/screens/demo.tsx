@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Hydrated } from "@/components/hydration";
 import { LeadHeader, Logo, btn } from "@/components/ui";
-import { DEMO_LEAD, DEMO_PROJECT_NAME } from "@/lib/demo";
+import { DEMO_PROJECT_NAME } from "@/lib/demo";
+import { NotFound } from "@/components/ui";
 import { useStore } from "@/lib/store";
 
 /** Every screen from the design canvas, grouped by the story's rows. */
@@ -74,9 +75,10 @@ export function DemoScreen() {
 
 function Demo() {
   const router = useRouter();
-  const { loadDemo, reset, projects } = useStore();
-  const demo = projects.find((p) => p.isOwner && p.name === DEMO_PROJECT_NAME && p.leadName === DEMO_LEAD.name);
+  const { loadDemo, deleteDemo, projects, lead } = useStore();
+  const demo = projects.find((p) => p.isOwner && p.name === DEMO_PROJECT_NAME && p.inviteCode.startsWith("atlas-"));
   const [busy, setBusy] = useState(false);
+  if (!lead) return <NotFound what="Sign in to load the demo into your account." href="/signup?next=/demo" cta="Sign in" />;
   const open = async (moment: "morning" | "afternoon") => {
     setBusy(true);
     const id = await loadDemo(moment);
@@ -92,7 +94,7 @@ function Demo() {
           <h1 className="text-[34px] font-semibold tracking-[-0.02em]">Demo: one team, one day</h1>
           <p className="max-w-[640px] text-mute">
             Yagnesh leads 4 people in Hyderabad, Berlin and Toronto. Load the story at a moment in the day, then open any screen. It&apos;s your own copy:
-            loading a moment again replaces it, and this browser plays both Yagnesh (lead) and Meera (member).
+            loading a moment again replaces it, and you play both the lead and Meera (member). Nobody gets an email from the demo.
           </p>
           <div className="flex flex-wrap gap-2.5 pt-2">
             <button
@@ -111,8 +113,8 @@ function Demo() {
             >
               Wednesday afternoon · day underway
             </button>
-            <button type="button" className={btn.ghost} disabled={busy} onClick={() => reset()}>
-              Sign out and delete my data
+            <button type="button" className={btn.ghost} disabled={busy || !demo} onClick={() => deleteDemo()}>
+              Delete the demo
             </button>
           </div>
           {!demo && <p className="text-sm text-amber">Load a moment first; the links below open your demo project.</p>}

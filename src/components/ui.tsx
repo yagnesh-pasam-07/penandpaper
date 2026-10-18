@@ -95,6 +95,40 @@ export function Avatar({
   );
 }
 
+/** The signed-in person's avatar; opens a small menu with their email and Sign out. */
+export function AccountMenu({ name, email, tint, onSignOut }: { name: string; email: string; tint?: Tint; onSignOut: () => void }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (ref.current?.open && !ref.current.contains(e.target as Node)) ref.current.open = false;
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, []);
+  return (
+    <details ref={ref} className="relative">
+      <summary aria-label="Account" className="flex cursor-pointer list-none rounded-full [&::-webkit-details-marker]:hidden">
+        <Avatar name={name} tint={tint} size={36} />
+      </summary>
+      <div className="absolute right-0 z-40 mt-2 flex w-60 flex-col gap-1 rounded-2xl border border-line bg-sheet p-2 shadow-[0_18px_40px_-20px_var(--shadow)]">
+        <span className="flex flex-col px-3 py-2">
+          <span className="text-sm font-semibold">{name}</span>
+          <span className="truncate text-[13px] text-mute">{email}</span>
+        </span>
+        <Link href="/projects" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+          Projects I lead
+        </Link>
+        <Link href="/me" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+          My papers
+        </Link>
+        <button type="button" onClick={onSignOut} className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-text hover:bg-red-soft">
+          Sign out
+        </button>
+      </div>
+    </details>
+  );
+}
+
 /* ---------- Layout ---------- */
 
 export function BackButton({ href, label, size = 40 }: { href: string; label: string; size?: number }) {

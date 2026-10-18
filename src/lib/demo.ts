@@ -5,15 +5,15 @@ import type { Member, Paper, Project, Task } from "./types";
  * Hyderabad, Berlin and Toronto. Wednesday 21 Oct 2026.
  */
 
-export const DEMO_LEAD = { name: "Yagnesh", email: "yagnesh@company.com" };
+export const DEMO_LEAD = { name: "Yagnesh", email: "yagnesh@example.com" };
 export const DEMO_PROJECT_NAME = "Atlas HR platform";
 
 const members: Member[] = [
-  { id: "asha", name: "Asha", email: "asha@company.com", tz: "Asia/Kolkata", city: "Hyderabad", hours: 8, tint: "t4", status: "joined", leave: [] },
-  { id: "dev", name: "Dev", email: "dev@company.com", tz: "Europe/Berlin", city: "Berlin", hours: 6, tint: "t3", status: "joined", leave: [] },
-  { id: "meera", name: "Meera", email: "meera@company.com", tz: "Asia/Kolkata", city: "Hyderabad", hours: 8, tint: "t2", status: "joined", leave: [] },
-  { id: "sana", name: "Sana", email: "sana@company.com", tz: "America/Toronto", city: "Toronto", hours: 8, tint: "t1", status: "joined", leave: [] },
-  { id: "rohan", name: "Rohan", email: "rohan@company.com", tz: "Asia/Kolkata", city: "Hyderabad", hours: 8, tint: "t5", status: "joined", leave: ["2026-10-21"] },
+  { id: "asha", name: "Asha", email: "asha@example.com", tz: "Asia/Kolkata", city: "Hyderabad", hours: 8, tint: "t4", status: "joined", leave: [] },
+  { id: "dev", name: "Dev", email: "dev@example.com", tz: "Europe/Berlin", city: "Berlin", hours: 6, tint: "t3", status: "joined", leave: [] },
+  { id: "meera", name: "Meera", email: "meera@example.com", tz: "Asia/Kolkata", city: "Hyderabad", hours: 8, tint: "t2", status: "joined", leave: [] },
+  { id: "sana", name: "Sana", email: "sana@example.com", tz: "America/Toronto", city: "Toronto", hours: 8, tint: "t1", status: "joined", leave: [] },
+  { id: "rohan", name: "Rohan", email: "rohan@example.com", tz: "Asia/Kolkata", city: "Hyderabad", hours: 8, tint: "t5", status: "joined", leave: ["2026-10-21"] },
 ];
 
 let n = 0;

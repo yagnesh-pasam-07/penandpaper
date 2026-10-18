@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { authClient } from "./auth-client";
 import { applyAction, ActionError, uid, type ProjectAction } from "./mutations";
 import { browserTz, cityFromTz, todayIn } from "./time";
 import type { CarryReason, Lead, Project } from "./types";
@@ -11,6 +12,8 @@ type ServerState = {
   lead: Lead | null;
   projects: Project[];
   viewer: Record<string, string>;
+  /** Which sign-in methods work here. */
+  signIn: { email: boolean; google: boolean };
 };
 
 type State = ServerState & {
@@ -23,10 +26,9 @@ type State = ServerState & {
 type Actions = {
   refresh: () => Promise<void>;
   dismissError: () => void;
-  signUp: (email: string) => Promise<boolean>;
   createProject: (name: string, hoursPerDay: 6 | 8) => string;
   addInvites: (projectId: string, emails: string[]) => void;
-  joinProject: (code: string, email: string, tz: string, city: string) => Promise<{ projectId: string } | null>;
+  joinProject: (code: string, tz: string, city: string) => Promise<{ projectId: string } | null>;
   setLeave: (projectId: string, memberId: string, date: string, leave: boolean) => void;
   startPaper: (projectId: string, date: string) => void;
   dropThought: (projectId: string, date: string, text: string) => void;
@@ -43,7 +45,8 @@ type Actions = {
   thankTeam: (projectId: string, date: string) => void;
   advanceDay: (projectId: string) => void;
   loadDemo: (moment: "morning" | "afternoon") => Promise<string | null>;
-  reset: () => Promise<void>;
+  deleteDemo: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 export type Store = State & Actions;
@@ -119,6 +122,7 @@ export const useStore = create<Store>()((set, get) => {
     lead: null,
     projects: [],
     viewer: {},
+    signIn: { email: false, google: false },
     status: "loading",
     error: null,
 
@@ -135,8 +139,6 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     dismissError: () => set({ error: null }),
-
-    signUp: async (email) => (await send({ type: "signUp", email }, () => true)) ?? false,
 
     createProject: (name, hoursPerDay) => {
       const id = uid();
@@ -164,7 +166,7 @@ export const useStore = create<Store>()((set, get) => {
 
     addInvites: (projectId, emails) => tryAct({ type: "addInvites", projectId, members: emails.map((email) => ({ id: uid(), email })) }),
 
-    joinProject: (code, email, tz, city) => send({ type: "joinProject", code, email, tz, city }, (r) => (r.projectId ? { projectId: r.projectId } : null)),
+    joinProject: (code, tz, city) => send({ type: "joinProject", code, tz, city }, (r) => (r.projectId ? { projectId: r.projectId } : null)),
 
     setLeave: (projectId, memberId, date, leave) => tryAct({ type: "setLeave", projectId, memberId, date, leave }),
     startPaper: (projectId, date) => tryAct({ type: "startPaper", projectId, date }),
@@ -185,8 +187,14 @@ export const useStore = create<Store>()((set, get) => {
 
     loadDemo: (moment) => send({ type: "loadDemo", moment }, (r) => r.projectId ?? null),
 
-    reset: async () => {
-      await send({ type: "reset" });
+    deleteDemo: async () => {
+      await send({ type: "deleteDemo" });
+    },
+
+    signOut: async () => {
+      await authClient.signOut();
+      set({ lead: null, projects: [], viewer: {} });
+      await get().refresh();
     },
   };
 });

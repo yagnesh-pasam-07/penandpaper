@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Hydrated } from "@/components/hydration";
+import { SignInPanel, safeNext } from "@/components/sign-in";
 import { PenIcon, SquiggleArrow } from "@/components/icons";
 import { Avatar, LeadHeader, Logo, ProgressBar, btn } from "@/components/ui";
 import { useStore } from "@/lib/store";
@@ -96,6 +96,12 @@ function Landing() {
           </div>
         </div>
       </main>
+      <footer className="mx-auto flex w-full max-w-[1120px] justify-between px-4 pb-8 text-[13px] text-mute sm:px-8">
+        <span>Pen &amp; Paper</span>
+        <Link href="/privacy" className="hover:text-ink">
+          Privacy
+        </Link>
+      </footer>
     </div>
   );
 }
@@ -109,84 +115,37 @@ export function SignUpScreen() {
   );
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 function SignUp() {
-  const router = useRouter();
-  const signUp = useStore((s) => s.signUp);
-  const [email, setEmail] = useState("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const valid = EMAIL.test(email.trim());
+  const lead = useStore((s) => s.lead);
+  const next = safeNext(useSearchParams().get("next"), "/projects");
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-10">
       <div className="flex w-full max-w-[400px] flex-col gap-7">
         <div className="flex flex-col items-center gap-2.5 text-center">
-          <span className="text-red-text">
+          <Link href="/" aria-label="Pen & Paper home" className="text-red-text">
             <PenIcon size={36} />
-          </span>
-          <h1 className="text-[32px] font-semibold tracking-[-0.02em]">Grab a fresh sheet</h1>
-          <p className="text-base text-mute">Create your account to plan your team&apos;s day.</p>
+          </Link>
+          <h1 className="text-[32px] font-semibold tracking-[-0.02em]">{lead ? "You're signed in" : "Grab a fresh sheet"}</h1>
+          <p className="text-base text-mute">{lead ? `As ${lead.email}.` : "Sign in or create your account to plan your team's day."}</p>
         </div>
 
-        <form
-          className="flex flex-col gap-3.5"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!valid || busy) return;
-            setBusy(true);
-            const ok = await signUp(email.trim());
-            setBusy(false);
-            if (ok) router.push("/projects");
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setNote("Google sign-in isn't connected yet. Use your work email for now.")}
-            className="flex h-[52px] items-center justify-center gap-2.5 rounded-[14px] border border-line bg-sheet text-base font-medium hover:bg-soft"
-          >
-            <GoogleMark />
-            Continue with Google
-          </button>
-          {note && (
-            <p role="status" className="text-center text-sm text-amber">
-              {note}
-            </p>
-          )}
-          <div className="flex items-center gap-3 text-[13px] text-mute">
-            <span className="h-px flex-1 bg-line" />
-            or
-            <span className="h-px flex-1 bg-line" />
-          </div>
-          <label className="flex flex-col gap-2 text-sm font-medium">
-            Work email
-            <input
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              className="h-[52px] rounded-[14px] border-[1.5px] border-ink bg-sheet px-4 text-base font-normal outline-none placeholder:text-mute"
-            />
-          </label>
-          <button type="submit" disabled={!valid || busy} className={`${btn.primary} disabled:opacity-50`}>
-            {busy ? "One moment…" : "Continue"}
-          </button>
-        </form>
+        {lead ? (
+          <Link href={next} className={btn.primary}>
+            Continue
+          </Link>
+        ) : (
+          <SignInPanel next={next} />
+        )}
 
-        <p className="text-center text-sm text-mute">Got an invite? Open the link in your email, you&apos;ll land right on your paper.</p>
+        <p className="text-center text-sm text-mute">
+          Got an invite? Open the link in your email, you&apos;ll land right on your paper.
+          <br />
+          <Link href="/privacy" className="underline underline-offset-2">
+            How we handle your data
+          </Link>
+        </p>
       </div>
     </div>
-  );
-}
-
-function GoogleMark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-      <circle cx="9" cy="9" r="7.2" />
-      <path d="M9 5.5v7M5.5 9h7" />
-    </svg>
   );
 }

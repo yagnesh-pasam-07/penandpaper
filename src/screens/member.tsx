@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Hydrated } from "@/components/hydration";
+import { SignInPanel } from "@/components/sign-in";
 import { BigCheck, CheckIcon, ChevronIcon, CloseIcon, PenIcon } from "@/components/icons";
-import { Avatar, BackButton, Logo, MemberShell, NotFound, ProgressBar, ThemeToggle, btn } from "@/components/ui";
+import { AccountMenu, Avatar, BackButton, Logo, MemberShell, NotFound, ProgressBar, ThemeToggle, btn } from "@/components/ui";
 import { formatHours, formatNum } from "@/lib/estimate";
 import { paperFor } from "@/lib/mutations";
 import { useStore } from "@/lib/store";
@@ -14,7 +15,6 @@ import { browserTz, clock, cityFromTz, longDate, nextWorkday, shortDate, weekday
 import type { CarryReason, Member, Paper, Project } from "@/lib/types";
 import { useProject } from "@/lib/use-project";
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The member this browser is in the routed project, plus today's sent paper. */
 function useMemberDay(): { project?: Project; me?: Member; paper?: Paper } {
@@ -27,6 +27,8 @@ function useMemberDay(): { project?: Project; me?: Member; paper?: Paper } {
 
 function MemberGuard({ children }: { children: (ctx: { project: Project; me: Member; paper?: Paper }) => ReactNode }) {
   const { project, me, paper } = useMemberDay();
+  const lead = useStore((s) => s.lead);
+  if (!lead) return <NotFound what="Sign in to see your paper." href="/signup?next=/me" cta="Sign in" />;
   if (!project) return <NotFound what="This project doesn't exist in this browser." href="/me" cta="My projects" />;
   if (!me) return <NotFound what="Join this project from your invite link first." href={`/join/${project.inviteCode}`} cta="Join" />;
   return <>{children({ project, me, paper })}</>;
@@ -60,7 +62,7 @@ export function JoinScreen() {
   );
 }
 
-type Preview = { id: string; name: string; leadName: string; joined: boolean };
+type Preview = { id: string; name: string; leadName: string; joined: boolean; signedInAs: string | null };
 
 function Join() {
   const router = useRouter();
@@ -70,9 +72,6 @@ function Join() {
   const detected = browserTz();
   const [zone, setZone] = useState(() => ZONES.find((z) => z.tz === detected) ?? { tz: detected, city: cityFromTz(detected) });
   const [picking, setPicking] = useState(false);
-  const [withEmail, setWithEmail] = useState(false);
-  const [note, setNote] = useState("");
-  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -149,59 +148,28 @@ function Join() {
         )}
       </div>
 
-      <form
-        className="mt-auto flex flex-col gap-2.5"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!EMAIL.test(email.trim()) || busy) return;
-          setBusy(true);
-          const joined = await joinProject(code, email.trim().toLowerCase(), zone.tz, zone.city);
-          setBusy(false);
-          if (joined) router.push(`/me/${joined.projectId}`);
-        }}
-      >
-        {withEmail ? (
-          <>
-            {note && (
-              <p role="status" className="text-sm text-amber">
-                {note}
-              </p>
-            )}
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              Your email
-              <input
-                type="email"
-                autoComplete="email"
-                autoFocus
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="h-[52px] rounded-[14px] border-[1.5px] border-ink bg-sheet px-4 text-base font-normal outline-none placeholder:text-mute"
-              />
-            </label>
-            <button type="submit" disabled={!EMAIL.test(email.trim()) || busy} className={`${btn.primary} h-[54px] disabled:opacity-50`}>
-              {busy ? "Joining…" : `Join ${project.name}`}
-            </button>
-          </>
-        ) : (
+      <div className="mt-auto flex flex-col gap-2.5">
+        {preview.signedInAs ? (
           <>
             <button
               type="button"
-              onClick={() => {
-                setNote("Google sign-in isn't connected yet. Use the email your invite went to.");
-                setWithEmail(true);
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                const joined = await joinProject(code, zone.tz, zone.city);
+                setBusy(false);
+                if (joined) router.push(`/me/${joined.projectId}`);
               }}
-              className={`${btn.primary} h-[54px]`}
+              className={`${btn.primary} h-[54px] disabled:opacity-50`}
             >
-              Join with Google
+              {busy ? "Joining…" : `Join ${project.name}`}
             </button>
-            <button type="button" onClick={() => setWithEmail(true)} className="h-12 text-[15px] font-medium">
-              Use my email instead
-            </button>
+            <span className="text-center text-[13px] text-mute">as {preview.signedInAs}</span>
           </>
+        ) : (
+          <SignInPanel next={`/join/${code}`} googleLabel="Join with Google" emailCta="Email me a link to join" />
         )}
-      </form>
+      </div>
     </MemberShell>
   );
 }
@@ -274,6 +242,10 @@ function MyProjects() {
     .map((p) => ({ project: p, me: p.members.find((m) => m.id === viewer[p.id]) }))
     .filter((x): x is { project: Project; me: Member } => Boolean(x.me));
   const first = mine[0];
+  const account = useStore((s) => s.lead);
+  const signOut = useStore((s) => s.signOut);
+  const router = useRouter();
+  if (!account) return <NotFound what="Sign in to see your paper." href="/signup?next=/me" cta="Sign in" />;
 
   return (
     <MemberShell className="gap-7 pt-8">
@@ -281,7 +253,17 @@ function MyProjects() {
         <Logo size="sm" />
         <span className="flex items-center gap-1">
           <ThemeToggle />
-          {first && <Avatar name={first.me.name} tint={first.me.tint} size={36} />}
+          {account && (
+            <AccountMenu
+              name={first?.me.name ?? account.name}
+              email={account.email}
+              tint={first?.me.tint}
+              onSignOut={async () => {
+                await signOut();
+                router.push("/");
+              }}
+            />
+          )}
         </span>
       </div>
 

@@ -1,8 +1,9 @@
 import { withDb } from "@/db";
-import { currentAccount } from "@/server/session";
 import { stateFor } from "@/server/api";
+import { currentUser } from "@/server/session";
 
 export async function GET() {
-  const state = await withDb(async (db) => stateFor(db, await currentAccount(db)));
+  const user = await currentUser();
+  const state = await withDb((db) => stateFor(db, user));
   return Response.json(state, { headers: { "Cache-Control": "no-store" } });
 }
