@@ -20,7 +20,7 @@ Two modules share one app, one sign-in and one database:
 | ![Drop on a phone](docs/images/drop-phone.png) | ![Past papers](docs/images/drop-history.png) | ![Drop in the dark theme](docs/images/drop-today-dark.jpg) |
 
 - **Canvas home**: `/drop` opens straight to today's paper with the input focused. Enter drops a thought; it appears instantly (saved in the background) with a soft drop animation.
-- **Bubbles**: hand-cut notes, each with its own imperfect outline (seeded by when it was dropped, so it keeps its shape across days) and a faint ink edge, with the time it was dropped. Click to edit; double-click (or swipe right on a phone) to strike out, delete from the edit view or the hover buttons. Links are clickable.
+- **Bubbles**: hand-cut notes, each with its own imperfect outline (seeded by when it was dropped, so it keeps its shape across days) and a faint ink edge, with the time it was dropped. Click to edit; double-click (or swipe right on a phone) to strike out: one thin red pen line draws across the words, which stay readable, and a moment later the thought sinks into a small **Done today** row below the sheet; delete from the edit view or the hover buttons. Links are clickable.
 - **Daily paper**: each day (in `DROP_TIMEZONE`, default IST) is a fresh paper. Unstruck thoughts from the last paper roll over on the first open of the day, marked "from Sat".
 - **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
 - **History**: `/drop/history` lists past papers; each opens read-only.

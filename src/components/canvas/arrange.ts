@@ -14,6 +14,9 @@ export const GRID = 24;
 /** How close (px) an edge or centre must come before it snaps to a neighbour. */
 export const MAGNET = 14;
 const PAD = 24;
+/** Kept clear at the sheet's sides, and more at the top for a bubble's hover buttons. */
+const EDGE = 12;
+const EDGE_TOP = 22;
 const GAP_X = 32;
 const GAP_Y = 28;
 
@@ -88,9 +91,11 @@ export function layout(
   return out;
 }
 
+/** Keeps a bubble wholly on the sheet. */
 function clamp(b: Box, width: number): Box {
-  const x = Math.min(Math.max(b.x, b.w / 2), Math.max(b.w / 2, width - b.w / 2));
-  return { ...b, x, y: Math.max(b.y, b.h / 2) };
+  const lo = b.w / 2 + EDGE;
+  const x = Math.min(Math.max(b.x, lo), Math.max(lo, width - b.w / 2 - EDGE));
+  return { ...b, x, y: Math.max(b.y, b.h / 2 + EDGE_TOP) };
 }
 
 const toDot = (v: number) => Math.round((v - GRID / 2) / GRID) * GRID + GRID / 2;

@@ -76,7 +76,8 @@ export function FreeCanvas<T extends Item>({
     boxes.set(drag.id, raw);
   }
 
-  const height = Math.max(minHeight, ...[...boxes.values()].map((b) => b.y + b.h / 2 + 32));
+  const bottoms = [...boxes.values()].map((b) => b.y + b.h / 2 + 32).filter(Number.isFinite);
+  const height = Math.max(minHeight, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
   const latest = useRef({ boxes, items, width, onArrange });

@@ -20,6 +20,8 @@ type Props = {
   readOnly?: boolean;
   /** On a sheet where it can be dragged: shows a grab cursor. */
   movable?: boolean;
+  /** Smaller, for the "done today" row. */
+  small?: boolean;
   onEdit?: (text: string) => void;
   onToggle?: () => void;
   onDelete?: () => void;
@@ -56,7 +58,7 @@ export function LinkedText({ text }: { text: string }) {
  * One thought on paper. Click to edit, double-click (or swipe right on a phone)
  * to strike it out; Delete lives in the edit view and the hover buttons.
  */
-export function ThoughtBubble({ text, done, shape, seed, meta, fresh, stream, readOnly, movable, onEdit, onToggle, onDelete }: Props) {
+export function ThoughtBubble({ text, done, shape, seed, meta, fresh, stream, readOnly, movable, small, onEdit, onToggle, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [dx, setDx] = useState(0);
@@ -129,7 +131,9 @@ export function ThoughtBubble({ text, done, shape, seed, meta, fresh, stream, re
   };
 
   const look = bubbleStyle(shape, false, seed);
-  const shapeStyle = stream ? { ...look, transform: `translateX(${dx}px)` } : look;
+  // Done stops shouting: the tint goes neutral, the outline stays.
+  const settled = done ? { ...look, background: "var(--soft)" } : look;
+  const shapeStyle = stream ? { ...settled, transform: `translateX(${dx}px)` } : settled;
 
   if (editing) {
     return (
@@ -198,10 +202,12 @@ export function ThoughtBubble({ text, done, shape, seed, meta, fresh, stream, re
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`flex flex-col gap-1.5 px-6 py-5 transition-[opacity,transform] ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"} ${done ? "opacity-60" : ""}`}
+        className={`flex flex-col gap-1.5 transition-[background-color,transform] duration-300 ${small ? "px-4 py-3" : "px-6 py-5"} ${done ? "is-done" : ""} ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
       >
-        <span className={`font-hand text-[22px] leading-snug font-semibold break-words whitespace-pre-wrap sm:text-[24px] ${done ? "strike text-mute" : ""}`}>
-          <LinkedText text={text} />
+        <span className={`font-hand leading-snug font-semibold break-words whitespace-pre-wrap ${small ? "text-[18px]" : "text-[22px] sm:text-[24px]"}`}>
+          <span className="pen-strike">
+            <LinkedText text={text} />
+          </span>
         </span>
         {meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
       </div>

@@ -62,7 +62,7 @@ describe("snap", () => {
 
   it("stays on the sheet", () => {
     const { box } = snap({ x: 990, y: -40, ...size }, [], 1000);
-    expect(box.x).toBe(900);
-    expect(box.y).toBe(50);
+    expect(box.x).toBe(888);
+    expect(box.y).toBe(72);
   });
 });
