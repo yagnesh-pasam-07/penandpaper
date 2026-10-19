@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_STACK_NAME, StackError } from "@/modules/drop/logic";
+import { MAX_NEXT_RANK, MAX_RANK, MAX_STACK_NAME, StackError } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
 import { changeStacks } from "@/modules/drop/server";
 
@@ -18,6 +18,9 @@ const op = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("crumple"), stack: id }),
   z.object({ kind: z.literal("schedule"), id, on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable() }),
   z.object({ kind: z.literal("ink"), thought: id, to: z.enum(["pen", "pencil"]) }),
+  z.object({ kind: z.literal("rank"), id, rank: z.number().int().min(1).max(MAX_RANK).nullable() }),
+  z.object({ kind: z.literal("order"), ids: z.array(id).max(MAX_RANK) }),
+  z.object({ kind: z.literal("nextRank"), ids: z.array(id).max(MAX_NEXT_RANK) }),
 ]);
 
 /** One change to today's paper: stack, take out, unstack, rename, crumple, fold (schedule) or ink. */

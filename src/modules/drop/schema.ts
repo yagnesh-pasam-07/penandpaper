@@ -1,4 +1,4 @@
-import { date, index, integer, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { date, index, integer, pgTable, real, smallint, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
 /** One paper per person per day (in DROP_TIMEZONE). */
@@ -49,6 +49,10 @@ export const dropStacks = pgTable(
     scheduledFor: date("scheduled_for", { mode: "string" }),
     /** Crumpled (thrown away): hidden everywhere, removed for good a week later. */
     crumpledAt: timestamp("crumpled_at", { withTimezone: true, mode: "string" }),
+    /** Numbered as a whole (1 is first); unique per paper among numbered ones, kept so by the update logic. */
+    rank: smallint("rank"),
+    /** Picked for tomorrow's top 3: arrives numbered. */
+    nextRank: smallint("next_rank"),
   },
   (t) => [index("drop_stacks_paper_idx").on(t.paperId)],
 );
@@ -85,6 +89,10 @@ export const dropThoughts = pgTable(
     scheduledFor: date("scheduled_for", { mode: "string" }),
     /** Crumpled (thrown away): hidden everywhere, removed for good a week later. */
     crumpledAt: timestamp("crumpled_at", { withTimezone: true, mode: "string" }),
+    /** Place in today's order (1 is first), if numbered; unique per paper among numbered ones, kept so by the update logic. */
+    rank: smallint("rank"),
+    /** Picked for tomorrow's top 3: arrives numbered. */
+    nextRank: smallint("next_rank"),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

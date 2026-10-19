@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { CloseIcon, PencilIcon, WhenIcon } from "@/components/icons";
 import { bubbleStyle } from "./bubble";
+import { RankMark } from "./rank-mark";
 import { HandText } from "./thought-bubble";
 
 export type StackMenuItem = { label: string; onSelect: () => void };
@@ -30,6 +31,8 @@ type Props = {
   menu?: StackMenuItem[];
   /** Plays on its way out. */
   leaving?: "crumple" | "fold" | null;
+  /** Numbered as a whole. */
+  rank?: number | null;
   /** The thoughts as compact rows, shown while it's open. */
   children?: ReactNode;
 };
@@ -49,7 +52,7 @@ const chip = "inline-flex h-6 items-center gap-1 rounded-full border border-line
  * card with a header and one compact row per thought, pushing what's below it
  * down. Esc, a click outside, or the header folds it back.
  */
-export function StackCard({ name, count, done, top, peek, open, onToggleOpen, target, carried, when, onRename, onWhen, menu, leaving, children }: Props) {
+export function StackCard({ name, count, done, top, peek, open, onToggleOpen, target, carried, when, onRename, onWhen, menu, leaving, rank, children }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const topButton = useRef<HTMLButtonElement>(null);
   const [draft, setDraft] = useState(name ?? "");
@@ -100,7 +103,7 @@ export function StackCard({ name, count, done, top, peek, open, onToggleOpen, ta
     ...(allDone ? { backgroundColor: "var(--soft)" } : {}),
     ...(target ? { outline: "2px solid color-mix(in srgb, var(--red-text) 55%, transparent)", outlineOffset: 3 } : {}),
   };
-  const summary = `${name ? `${name}, ` : ""}${count} thoughts${done ? `, ${done} done` : ""}${when ? `, ${when}` : ""}, ${open ? "expanded" : "collapsed"}`;
+  const summary = `${rank ? `Number ${rank}: ` : ""}${name ? `${name}, ` : ""}${count} thoughts${done ? `, ${done} done` : ""}${when ? `, ${when}` : ""}, ${open ? "expanded" : "collapsed"}`;
   const motion = leaving === "crumple" ? "crumple-away" : leaving === "fold" ? "fold-away" : "";
 
   const menuButton = menu && menu.length > 0 && (
@@ -141,6 +144,7 @@ export function StackCard({ name, count, done, top, peek, open, onToggleOpen, ta
       <div ref={box} role="group" aria-label={summary} style={{ ...card, transform: "none", borderRadius: 22 }} className={`paper-note flex w-[320px] max-w-full flex-col gap-2 p-2.5 ${motion}`}>
         {/* The header: clicking its empty part folds the stack back; dragging it moves the stack. */}
         <div onClick={(e) => e.target === e.currentTarget && onToggleOpen()} className="flex cursor-grab items-center gap-1.5 pl-1.5 active:cursor-grabbing">
+          {rank ? <RankMark n={rank} struck={allDone} className="-ml-1" /> : null}
           {onRename ? (
             <input
               value={draft}
@@ -230,13 +234,14 @@ export function StackCard({ name, count, done, top, peek, open, onToggleOpen, ta
             <HandText text={name ?? top.text} seed={top.seed} />
           </span>
           {when && <span className={chip}>{when}</span>}
-          {carried && (
+          {carried && !rank && (
             <span title={`Carried from ${carried}`} className="absolute top-2 left-2.5 text-[11px] leading-none text-mute">
               ↻
             </span>
           )}
           <span className="absolute -right-2 -bottom-2 flex h-6 min-w-6 items-center justify-center rounded-full border border-line bg-sheet px-1.5 text-[12px] font-semibold text-ink">{count}</span>
         </button>
+        {rank ? <RankMark n={rank} struck={allDone} className="absolute -top-4 -left-4 z-10" /> : null}
         {menuButton && (
           <span className="absolute -top-3 -right-2 opacity-0 transition-opacity group-focus-within/stack:opacity-100 group-hover/stack:opacity-100 max-sm:hidden">{menuButton}</span>
         )}

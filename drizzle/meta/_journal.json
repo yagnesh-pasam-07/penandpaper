@@ -43,6 +43,13 @@
       "when": 1792377645557,
       "tag": "0005_drop_when_pencil_crumple_clear",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792380932575,
+      "tag": "0006_drop_rank",
+      "breakpoints": true
     }
   ]
 }

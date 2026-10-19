@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEve
 import { CheckIcon, CloseIcon, PenIcon, PencilIcon, WhenIcon } from "@/components/icons";
 import { linkify } from "@/lib/linkify";
 import { bubbleStyle, rand } from "./bubble";
+import { RankMark } from "./rank-mark";
 
 type Props = {
   text: string;
@@ -32,6 +33,10 @@ type Props = {
   leaving?: "crumple" | "fold" | null;
   /** Plays on its way back (undo). */
   returning?: boolean;
+  /** Its place in today's order, if numbered: a red circled number at the corner. */
+  rank?: number | null;
+  /** Keys 1–6 on a selected thought set its number (0 clears). */
+  onRank?: (rank: number | null) => void;
   /** "Stack with…": the S key when it's selected, or a long press on a phone. */
   onStackWith?: () => void;
   /** "When": the W key or the calendar button. */
@@ -135,6 +140,8 @@ export function ThoughtBubble({
   target,
   leaving,
   returning,
+  rank,
+  onRank,
   onStackWith,
   onWhen,
   onInk,
@@ -318,8 +325,8 @@ export function ThoughtBubble({
     );
   }
 
-  const label = `${pencil ? "Idea: " : ""}${text}${done ? ", done" : ""}${when ? `, ${when}` : ""}`;
-  const keys = [onEdit && "Enter to edit", onStackWith && "S to stack", onWhen && "W for when", onDelete && "Delete to crumple"].filter(Boolean).join(", ");
+  const label = `${rank ? `Number ${rank}: ` : ""}${pencil ? "Idea: " : ""}${text}${done ? ", done" : ""}${when ? `, ${when}` : ""}`;
+  const keys = [onEdit && "Enter to edit", onRank && "1 to 6 to number", onStackWith && "S to stack", onWhen && "W for when", onDelete && "Delete to crumple"].filter(Boolean).join(", ");
 
   return (
     <div className={`group relative ${stream ? "w-full" : "max-w-[300px]"} ${motion}`}>
@@ -339,7 +346,8 @@ export function ThoughtBubble({
         onKeyDown={(e) => {
           if (readOnly || e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
           const k = e.key.toLowerCase();
-          const act = k === "enter" ? startEdit : k === "s" ? onStackWith : k === "w" ? onWhen : k === "delete" || k === "backspace" ? onDelete : undefined;
+          const digit = /^[0-6]$/.test(k) && onRank ? () => onRank(k === "0" ? null : Number(k)) : undefined;
+          const act = digit ?? (k === "enter" ? startEdit : k === "s" ? onStackWith : k === "w" ? onWhen : k === "delete" || k === "backspace" ? onDelete : undefined);
           if (!act) return;
           e.preventDefault();
           act();
@@ -369,12 +377,13 @@ export function ThoughtBubble({
             {stream && meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
           </span>
         ) : null}
-        {carried && !pencil && (
+        {carried && !pencil && !rank && (
           <span title={`Carried from ${carried}`} aria-label={`Carried from ${carried}`} className="absolute top-2 left-2.5 text-[11px] leading-none text-mute">
             ↻
           </span>
         )}
       </div>
+      {rank ? <RankMark n={rank} struck={done} className="absolute -top-4 -left-4 z-10" /> : null}
       {!stream && meta && (
         <span className="pointer-events-none absolute top-full left-1/2 mt-1.5 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap text-mute opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
           {meta}

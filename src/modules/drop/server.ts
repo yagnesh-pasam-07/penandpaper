@@ -42,6 +42,8 @@ function toThought(r: ThoughtRow): Thought {
     stackId: r.stackId,
     stackOrder: r.stackOrder,
     scheduledFor: r.scheduledFor,
+    rank: r.rank,
+    nextRank: r.nextRank,
   };
 }
 
@@ -54,6 +56,8 @@ function toStack(r: StackRow): Stack {
     createdAt: new Date(r.createdAt).toISOString(),
     carriedFrom: r.carriedFrom,
     scheduledFor: r.scheduledFor,
+    rank: r.rank,
+    nextRank: r.nextRank,
   };
 }
 
@@ -74,7 +78,7 @@ async function contentsOf(paper: { id: string; date: string; clearedAt?: string 
   const stacks = stackRows.map(toStack);
   const live = new Set(stacks.map((s) => s.id));
   // A thought whose stack was thrown away is simply loose.
-  const thoughts = thoughtRows.map(toThought).map((t) => (t.stackId && !live.has(t.stackId) ? { ...t, stackId: null, stackOrder: 0 } : t));
+  const thoughts = thoughtRows.map(toThought).map((t) => (t.stackId && !live.has(t.stackId) ? { ...t, stackId: null, stackOrder: 0, rank: null } : t));
   return { date: paper.date, thoughts, stacks, clearedAt: paper.clearedAt ?? null };
 }
 
@@ -141,7 +145,19 @@ async function ensureTodayPaper(userId: string): Promise<PaperRef> {
 }
 
 function stackRow(s: Stack, paperId: string, userId: string): typeof dropStacks.$inferInsert {
-  return { id: s.id, paperId, userId, name: s.name, x: s.x, y: s.y, createdAt: s.createdAt, carriedFrom: s.carriedFrom, scheduledFor: s.scheduledFor };
+  return {
+    id: s.id,
+    paperId,
+    userId,
+    name: s.name,
+    x: s.x,
+    y: s.y,
+    createdAt: s.createdAt,
+    carriedFrom: s.carriedFrom,
+    scheduledFor: s.scheduledFor,
+    rank: s.rank,
+    nextRank: s.nextRank,
+  };
 }
 
 function thoughtRow(t: Thought, paperId: string, userId: string): typeof dropThoughts.$inferInsert {
@@ -160,6 +176,8 @@ function thoughtRow(t: Thought, paperId: string, userId: string): typeof dropTho
     stackId: t.stackId,
     stackOrder: t.stackOrder,
     scheduledFor: t.scheduledFor,
+    rank: t.rank,
+    nextRank: t.nextRank,
   };
 }
 
@@ -176,11 +194,11 @@ async function saveChanges(paperId: string, userId: string, before: DropPaper, a
   if (added.length) queries.push(db.insert(dropStacks).values(added.map((s) => stackRow(s, paperId, userId))));
   for (const s of after.stacks) {
     const was = oldStacks.get(s.id);
-    if (was && (was.name !== s.name || was.x !== s.x || was.y !== s.y || was.scheduledFor !== s.scheduledFor)) {
+    if (was && (was.name !== s.name || was.x !== s.x || was.y !== s.y || was.scheduledFor !== s.scheduledFor || was.rank !== s.rank || was.nextRank !== s.nextRank)) {
       queries.push(
         db
           .update(dropStacks)
-          .set({ name: s.name, x: s.x, y: s.y, scheduledFor: s.scheduledFor })
+          .set({ name: s.name, x: s.x, y: s.y, scheduledFor: s.scheduledFor, rank: s.rank, nextRank: s.nextRank })
           .where(and(eq(dropStacks.id, s.id), eq(dropStacks.paperId, paperId))),
       );
     }
@@ -190,7 +208,15 @@ async function saveChanges(paperId: string, userId: string, before: DropPaper, a
     const t = kept.get(was.id);
     if (!t) continue;
     const changed =
-      t.stackId !== was.stackId || t.stackOrder !== was.stackOrder || t.x !== was.x || t.y !== was.y || t.scheduledFor !== was.scheduledFor || t.kind !== was.kind || t.status !== was.status;
+      t.stackId !== was.stackId ||
+      t.stackOrder !== was.stackOrder ||
+      t.x !== was.x ||
+      t.y !== was.y ||
+      t.scheduledFor !== was.scheduledFor ||
+      t.kind !== was.kind ||
+      t.status !== was.status ||
+      t.rank !== was.rank ||
+      t.nextRank !== was.nextRank;
     if (changed) {
       queries.push(
         db
@@ -203,6 +229,8 @@ async function saveChanges(paperId: string, userId: string, before: DropPaper, a
             scheduledFor: t.scheduledFor,
             kind: t.kind,
             status: t.status,
+            rank: t.rank,
+            nextRank: t.nextRank,
             ...(t.status !== was.status ? { doneAt: t.status === "done" ? sql`now()` : null } : {}),
           })
           .where(and(eq(dropThoughts.id, t.id), eq(dropThoughts.paperId, paperId))),
@@ -276,10 +304,9 @@ export async function crumpleThought(userId: string, id: string): Promise<boolea
     .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id), isNull(dropThoughts.crumpledAt)))
     .returning({ id: dropThoughts.id, stackId: dropThoughts.stackId });
   if (!rows.length) return false;
-  if (rows[0].stackId) {
-    const before = await contentsOf(today);
-    await saveChanges(today.id, userId, before, settleStacks(before));
-  }
+  // A stack of one dissolves, and the numbers close up.
+  const before = await contentsOf(today);
+  await saveChanges(today.id, userId, before, settleStacks(before));
   return true;
 }
 

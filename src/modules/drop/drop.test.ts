@@ -9,7 +9,10 @@ import {
   foldedItems,
   linkify,
   membersOf,
+  nextUp,
+  rankedIds,
   rollover,
+  tapRank,
   StackError,
   thisWeekend,
   visiblePaper,
@@ -33,10 +36,15 @@ const t = (id: string, text: string, status: "open" | "done", carriedFrom: strin
   stackId: null,
   stackOrder: 0,
   scheduledFor: null,
+  rank: null,
+  nextRank: null,
   ...more,
 });
 
-const stack = (id: string, more: Partial<Stack> = {}): Stack => ({ id, name: null, x: 0.5, y: 200, createdAt: "2026-10-17T05:00:00.000Z", carriedFrom: null, scheduledFor: null, ...more });
+/** Each id with its number, in rank order. */
+const ranks = (p: DropPaper) => rankedIds(p).map((id) => [id, p.thoughts.find((t) => t.id === id)?.rank ?? p.stacks.find((s) => s.id === id)?.rank]);
+
+const stack = (id: string, more: Partial<Stack> = {}): Stack => ({ id, name: null, x: 0.5, y: 200, createdAt: "2026-10-17T05:00:00.000Z", carriedFrom: null, scheduledFor: null, rank: null, nextRank: null, ...more });
 
 const paper = (thoughts: Thought[], stacks: Stack[] = []): DropPaper => ({ date: "2026-10-17", thoughts, stacks });
 
@@ -95,7 +103,7 @@ describe("stack changes", () => {
 
   it("drops a thought onto another: a stack at the target's spot", () => {
     const after = applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now);
-    expect(after.stacks).toEqual([{ id: "s1", name: null, x: 0.2, y: 100, createdAt: now, carriedFrom: null, scheduledFor: null }]);
+    expect(after.stacks).toEqual([{ id: "s1", name: null, x: 0.2, y: 100, createdAt: now, carriedFrom: null, scheduledFor: null, rank: null, nextRank: null }]);
     expect(membersOf(after, "s1").map((x) => x.id)).toEqual(["b", "a"]);
     expect(after.thoughts.find((x) => x.id === "a")).toMatchObject({ x: null, y: null });
   });
@@ -260,6 +268,61 @@ describe("clear desk", () => {
   });
 });
 
+describe("number it", () => {
+  const base = paper(["a", "b", "c", "d", "e", "f", "g"].map((id) => t(id, `thought ${id}`, "open")));
+  const tap = (p: DropPaper, id: string) => applyStackOp(p, tapRank(p, id));
+
+  it("numbers in the order tapped, and a second tap takes the number off and closes the gap", () => {
+    let p = tap(tap(tap(base, "c"), "a"), "e");
+    expect(ranks(p)).toEqual([["c", 1], ["a", 2], ["e", 3]]);
+    p = tap(p, "c");
+    expect(ranks(p)).toEqual([["a", 1], ["e", 2]]);
+  });
+
+  it("sets a number directly and shifts the others", () => {
+    let p = tap(tap(tap(base, "a"), "b"), "c");
+    p = applyStackOp(p, { kind: "rank", id: "c", rank: 1 });
+    expect(ranks(p)).toEqual([["c", 1], ["a", 2], ["b", 3]]);
+    p = applyStackOp(p, { kind: "rank", id: "d", rank: 2 });
+    expect(ranks(p)).toEqual([["c", 1], ["d", 2], ["a", 3], ["b", 4]]);
+    p = applyStackOp(p, { kind: "rank", id: "a", rank: null });
+    expect(ranks(p)).toEqual([["c", 1], ["d", 2], ["b", 3]]);
+  });
+
+  it("keeps it to six", () => {
+    let p = base;
+    for (const id of ["a", "b", "c", "d", "e", "f"]) p = tap(p, id);
+    expect(() => tap(p, "g")).toThrow("Keep it to your top 6.");
+  });
+
+  it("closes up when a numbered thought is crumpled, folded or stacked; a new stack takes the target's number", () => {
+    let p = { ...tap(tap(tap(base, "a"), "b"), "c"), date: "2026-10-19" };
+    p = applyStackOp(p, { kind: "schedule", id: "a", on: "2026-10-22" });
+    expect(ranks(p)).toEqual([["b", 1], ["c", 2]]);
+    p = applyStackOp(p, { kind: "stack", thought: "b", onto: "c", newStackId: "s1" });
+    expect(ranks(p)).toEqual([["s1", 1]]);
+  });
+
+  it("shows the first numbered thing not done yet as Next", () => {
+    let p = tap(tap(base, "b"), "a");
+    expect(nextUp(p)).toMatchObject({ id: "b", rank: 1 });
+    p = { ...p, thoughts: p.thoughts.map((x) => (x.id === "b" ? { ...x, status: "done" as const } : x)) };
+    expect(nextUp(p)).toMatchObject({ id: "a", rank: 2, label: "thought a" });
+  });
+
+  it("clears numbers at rollover, except tomorrow's top 3 picked at Clear desk", () => {
+    let p = tap(tap(tap(base, "a"), "b"), "c");
+    p = applyStackOp(p, { kind: "nextRank", ids: ["e", "a"] });
+    let n = 0;
+    const next = rollover(p, () => `n${++n}`).thoughts;
+    const byText = (s: string) => next.find((x) => x.text === s)!;
+    expect(byText("thought e").rank).toBe(1);
+    expect(byText("thought a").rank).toBe(2);
+    expect(byText("thought b").rank).toBeNull();
+    expect(next.every((x) => x.nextRank === null)).toBe(true);
+  });
+});
+
 describe("digest", () => {
   it("groups thoughts under their stack, then the loose ones", () => {
     const p = paper(
@@ -281,6 +344,15 @@ describe("digest", () => {
       { text: "a", done: false },
       { group: "Loose thoughts" },
       { text: "call bank", done: false },
+    ]);
+  });
+  it("lists numbered thoughts first, in order, with their numbers", () => {
+    const p = paper([t("a", "call bank", "open", null, { rank: 2 }), t("b", "pay rent", "done", null, { rank: 1 }), t("c", "renew passport", "open")]);
+    expect(digestItems(p)).toEqual([
+      { text: "1. pay rent", done: true },
+      { text: "2. call bank", done: false },
+      { group: "Loose thoughts" },
+      { text: "renew passport", done: false },
     ]);
   });
   it("puts ideas and what's coming up this week at the bottom", () => {
