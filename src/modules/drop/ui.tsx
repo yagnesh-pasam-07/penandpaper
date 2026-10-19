@@ -28,15 +28,27 @@ function useViewerTz(): string {
 
 /* ---------- Chrome ---------- */
 
-function DropHeader({ me, right }: { me: Me; right?: ReactNode }) {
+/** One slim row: logo, the day (when there is one), then History, theme and the account. */
+function DropHeader({ me, title, right }: { me: Me; title?: ReactNode; right?: ReactNode }) {
   const router = useRouter();
   const signOut = useStore((s) => s.signOut);
   return (
-    <header className="mx-auto flex w-full max-w-[1120px] items-center justify-between gap-3 px-4 pt-5 pb-2 sm:px-8">
-      <Link href="/drop" aria-label="Today's paper">
-        <Logo size="sm" />
+    <header className="mx-auto flex w-full max-w-[1120px] items-center gap-3 px-4 pt-4 pb-1 sm:px-8">
+      <Link href="/drop" aria-label="Today's paper" className="shrink-0">
+        <span className="max-sm:hidden">
+          <Logo size="sm" />
+        </span>
+        <span className="text-red-text sm:hidden">
+          <PenIcon size={22} />
+        </span>
       </Link>
-      <span className="flex items-center gap-1.5">
+      {title && (
+        <>
+          <span aria-hidden="true" className="h-5 w-px shrink-0 bg-line max-sm:hidden" />
+          <div className="flex min-w-0 items-baseline gap-2">{title}</div>
+        </>
+      )}
+      <span className="ml-auto flex shrink-0 items-center gap-1.5">
         {right}
         <ThemeToggle />
         <AccountMenu
@@ -376,17 +388,22 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
     <div className="flex min-h-dvh flex-col bg-bg">
       <DropHeader
         me={me}
+        title={
+          <>
+            <h1 className="font-hand text-[26px] leading-none font-bold">{weekday(paper.date)}</h1>
+            <span className="truncate text-[13px] text-mute" aria-live="polite">
+              {longDate(paper.date).replace(/^\w+, /, "").replace(/ \w+$/, (m) => m.slice(0, 4))}
+              {paper.thoughts.length ? ` · ${open} open${struck ? ` · ${struck} done` : ""}` : ""}
+            </span>
+          </>
+        }
         right={
           <Link href="/drop/history" className="rounded-lg px-2.5 py-2 text-sm font-medium text-mute hover:bg-soft hover:text-ink">
             History
           </Link>
         }
       />
-      <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-3 pb-10 sm:gap-5 sm:px-8">
-        <div className={`${COLUMN} flex items-baseline justify-between gap-3`}>
-          <h1 className="font-hand text-[40px] leading-none font-bold sm:text-5xl">{weekday(paper.date)}</h1>
-          <span className="text-sm text-mute">{longDate(paper.date).replace(/^\w+, /, "")}</span>
-        </div>
+      <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-2 pb-10 sm:px-8">
 
         <form
           onSubmit={(e) => {
@@ -427,16 +444,6 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
           </label>
         </form>
 
-        <div className={`${COLUMN} flex min-h-8 items-center justify-between gap-3`}>
-          <span className="text-sm text-mute" aria-live="polite">
-            {paper.thoughts.length === 0 ? "Nothing dropped yet today." : `${open} open${struck ? ` · ${struck} done today` : ""}`}
-          </span>
-          {arranged && (
-            <button type="button" onClick={tidy} className="hidden rounded-lg px-2.5 py-1.5 text-sm font-medium text-mute hover:bg-soft hover:text-ink sm:block">
-              Tidy up
-            </button>
-          )}
-        </div>
 
         {onSheet.length === 0 ? (
           <PaperSurface label="Today's paper" className={`${COLUMN} flex flex-1 items-center justify-center sm:min-h-[420px]`}>
@@ -465,47 +472,57 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
                 ),
               )}
             </PaperSurface>
-            <FreeCanvas
-              label="Today's paper"
-              className={`${COLUMN} max-sm:hidden`}
-              items={onSheet}
-              onArrange={onArrange}
-              raised={openStack}
-              canDropOn={(dragged) => byId.has(dragged)}
-              onDropOn={stackOnto}
-              onDetach={(id, at, pins) => {
-                stackOp({ kind: "takeOut", thought: id, x: at.x, y: at.y });
-                if (pins.length) onArrange(pins);
-              }}
-              renderGhost={(id) => {
-                const t = byId.get(id);
-                return t ? <ThoughtBubble {...bubbleProps(t, tz, false)} stream readOnly /> : null;
-              }}
-              render={(it, ctx) =>
-                it.kind === "thought" ? (
-                  <ThoughtBubble {...bubbleProps(it.thought, tz, fresh.has(it.id))} movable target={ctx.target} {...handlers(it.thought)} />
-                ) : (
-                  <StackCard
-                    name={it.stack.name}
-                    count={it.members.length}
-                    done={it.members.filter((m) => m.status === "done").length}
-                    top={topCard(it.members)}
-                    carried={it.stack.carriedFrom ? weekday(it.stack.carriedFrom).slice(0, 3) : undefined}
-                    open={openStack === it.id}
-                    onToggleOpen={() => setOpenStack(openStack === it.id ? null : it.id)}
-                    target={ctx.target}
-                    onRename={(name) => stackOp({ kind: "rename", stack: it.id, name })}
-                    menu={stackMenu(it.stack)}
-                  >
-                    {it.members.map((t) => (
-                      <div key={t.id} onPointerDown={ctx.grab(t.id)} className="cursor-grab touch-none active:cursor-grabbing">
-                        <ThoughtBubble {...bubbleProps(t, tz, false)} stream {...handlers(t)} />
-                      </div>
-                    ))}
-                  </StackCard>
-                )
-              }
-            />
+            <div className={`${COLUMN} relative max-sm:hidden`}>
+              {arranged && (
+                <button
+                  type="button"
+                  onClick={tidy}
+                  className="absolute top-2 right-2 z-10 rounded-lg px-2.5 py-1 text-[13px] font-medium text-mute hover:bg-soft hover:text-ink"
+                >
+                  Tidy up
+                </button>
+              )}
+              <FreeCanvas
+                label="Today's paper"
+                items={onSheet}
+                onArrange={onArrange}
+                raised={openStack}
+                canDropOn={(dragged) => byId.has(dragged)}
+                onDropOn={stackOnto}
+                onDetach={(id, at, pins) => {
+                  stackOp({ kind: "takeOut", thought: id, x: at.x, y: at.y });
+                  if (pins.length) onArrange(pins);
+                }}
+                renderGhost={(id) => {
+                  const t = byId.get(id);
+                  return t ? <ThoughtBubble {...bubbleProps(t, tz, false)} stream readOnly /> : null;
+                }}
+                render={(it, ctx) =>
+                  it.kind === "thought" ? (
+                    <ThoughtBubble {...bubbleProps(it.thought, tz, fresh.has(it.id))} movable target={ctx.target} {...handlers(it.thought)} />
+                  ) : (
+                    <StackCard
+                      name={it.stack.name}
+                      count={it.members.length}
+                      done={it.members.filter((m) => m.status === "done").length}
+                      top={topCard(it.members)}
+                      carried={it.stack.carriedFrom ? weekday(it.stack.carriedFrom).slice(0, 3) : undefined}
+                      open={openStack === it.id}
+                      onToggleOpen={() => setOpenStack(openStack === it.id ? null : it.id)}
+                      target={ctx.target}
+                      onRename={(name) => stackOp({ kind: "rename", stack: it.id, name })}
+                      menu={stackMenu(it.stack)}
+                    >
+                      {it.members.map((t) => (
+                        <div key={t.id} onPointerDown={ctx.grab(t.id)} className="cursor-grab touch-none active:cursor-grabbing">
+                          <ThoughtBubble {...bubbleProps(t, tz, false)} stream {...handlers(t)} />
+                        </div>
+                      ))}
+                    </StackCard>
+                  )
+                }
+              />
+            </div>
           </>
         )}
 
