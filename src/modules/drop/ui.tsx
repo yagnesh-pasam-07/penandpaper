@@ -79,10 +79,11 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
     live.current = change(live.current);
     setPaper(live.current);
   }, []);
-  // The writer: open, what's half-written in it (kept on close, and across reloads on this device), pen or pencil.
+  // The writer: open, what's half-written in it (kept on close, and across reloads on this device),
+  // and pen or pencil (pencil first: jot it down, ink it once it's a task).
   const [writing, setWriting] = useState(initial.thoughts.length === 0);
   const [draft, setDraft] = useState(readDraft);
-  const [kind, setKind] = useState<Kind>("pen");
+  const [kind, setKind] = useState<Kind>("pencil");
   useEffect(() => {
     try {
       if (draft) localStorage.setItem(DRAFT_KEY, draft);
