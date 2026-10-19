@@ -9,6 +9,8 @@ type Props = {
   text: string;
   done: boolean;
   shape: number;
+  /** Makes the hand-drawn outline; keep it stable for the same thought (e.g. when it was first dropped). */
+  seed?: string;
   /** Small line under the text: time dropped, "from Thu", … */
   meta?: ReactNode;
   /** Plays the drop animation (for a thought that just landed). */
@@ -50,43 +52,14 @@ export function LinkedText({ text }: { text: string }) {
   );
 }
 
-/** Burst lines, by angle. */
-const BURST = [-70, -35, 0, 35, 70, 110, 145];
-
-/**
- * A pen scribble over the whole thought, like crossing out a line on paper.
- * `draw` animates it in (just struck) with a little ink burst at the end;
- * otherwise it's simply there.
- */
-function Scribble({ draw }: { draw: boolean }) {
-  return (
-    <span aria-hidden="true" className="pointer-events-none absolute inset-0">
-      <svg viewBox="0 0 100 40" preserveAspectRatio="none" className={`scribble absolute inset-x-[6%] top-[18%] h-[64%] w-[88%] overflow-visible ${draw ? "draw" : ""}`}>
-        <path pathLength={1} vectorEffect="non-scaling-stroke" strokeWidth={2.6} d="M2 21C14 15 26 25 39 19S63 13 76 20 92 22 98 18" />
-        <path pathLength={1} vectorEffect="non-scaling-stroke" strokeWidth={2.2} d="M97 24C85 27 72 21 58 26S33 30 20 24 6 25 3 27" />
-        <path pathLength={1} vectorEffect="non-scaling-stroke" strokeWidth={1.8} d="M8 31C30 22 62 14 94 9" />
-      </svg>
-      {draw && (
-        <span className="ink-burst absolute top-[30%] right-[5%]">
-          {BURST.map((a) => (
-            <i key={a} style={{ ["--a" as string]: `${a}deg` }} />
-          ))}
-        </span>
-      )}
-    </span>
-  );
-}
-
 /**
  * One thought on paper. Click to edit, double-click (or swipe right on a phone)
  * to strike it out; Delete lives in the edit view and the hover buttons.
  */
-export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly, movable, onEdit, onToggle, onDelete }: Props) {
+export function ThoughtBubble({ text, done, shape, seed, meta, fresh, stream, readOnly, movable, onEdit, onToggle, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [dx, setDx] = useState(0);
-  // Struck in this session: draw the scribble in instead of just showing it.
-  const [justStruck, setJustStruck] = useState(false);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipe = useRef<{ x: number; y: number; swiped: boolean } | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
@@ -103,11 +76,6 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
   useEffect(() => () => {
     if (clickTimer.current) clearTimeout(clickTimer.current);
   }, []);
-
-  const toggle = () => {
-    setJustStruck(!done);
-    onToggle?.();
-  };
 
   const startEdit = () => {
     if (readOnly || !onEdit) return;
@@ -131,7 +99,7 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
   const onDoubleClick = () => {
     if (readOnly) return;
     if (clickTimer.current) clearTimeout(clickTimer.current);
-    toggle();
+    onToggle?.();
   };
 
   const onPointerDown = (e: ReactPointerEvent) => {
@@ -154,14 +122,14 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
     const s = swipe.current;
     if (s && dx >= SWIPE) {
       s.swiped = true;
-      toggle();
+      onToggle?.();
       setTimeout(() => (swipe.current = null), 50);
     } else swipe.current = null;
     setDx(0);
   };
 
-  const look = bubbleStyle(shape);
-  const shapeStyle = stream ? { ...look, borderRadius: "18px", transform: `translateX(${dx}px)` } : look;
+  const look = bubbleStyle(shape, false, seed);
+  const shapeStyle = stream ? { ...look, transform: `translateX(${dx}px)` } : look;
 
   if (editing) {
     return (
@@ -193,7 +161,7 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
             type="button"
             onClick={() => {
               setEditing(false);
-              toggle();
+              onToggle?.();
             }}
             className="h-9 rounded-[10px] border border-ink/20 px-3 text-sm font-medium"
           >
@@ -230,19 +198,18 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`relative flex flex-col gap-1.5 px-6 py-5 transition-[opacity,transform] ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"} ${done ? "opacity-75" : ""}`}
+        className={`flex flex-col gap-1.5 px-6 py-5 transition-[opacity,transform] ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"} ${done ? "opacity-60" : ""}`}
       >
-        <span className={`font-hand text-[22px] leading-snug font-semibold break-words whitespace-pre-wrap sm:text-[24px] ${done ? "text-mute" : ""}`}>
+        <span className={`font-hand text-[22px] leading-snug font-semibold break-words whitespace-pre-wrap sm:text-[24px] ${done ? "strike text-mute" : ""}`}>
           <LinkedText text={text} />
         </span>
         {meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
-        {done && <Scribble draw={justStruck} />}
       </div>
       {!readOnly && (
         <span className="absolute -top-3 -right-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-sm:hidden">
           <button
             type="button"
-            onClick={toggle}
+            onClick={onToggle}
             aria-label={done ? `Unstrike "${text}"` : `Strike out "${text}"`}
             className={`flex size-8 items-center justify-center rounded-full border border-line shadow-sm ${done ? "bg-red text-on-red" : "bg-sheet text-ink hover:bg-soft"}`}
           >
