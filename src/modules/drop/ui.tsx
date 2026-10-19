@@ -203,9 +203,10 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
       }
       // A selected thought keeps its own keys (S stack, W when, Delete crumple, 0–6 number).
       if (el?.closest("[data-keys]") && (["s", "w", "delete", "backspace"].includes(e.key.toLowerCase()) || /^[0-6]$/.test(e.key))) return;
-      if (e.key === "N" && e.shiftKey) {
+      if ((e.key === "N" && e.shiftKey) || /^[1-9]$/.test(e.key)) {
+        // Shift+N, or any number key: number mode.
         e.preventDefault();
-        setNumbering((on) => !on);
+        setNumbering((on) => (/^[1-9]$/.test(e.key) ? true : !on));
       } else if (e.key === "C" && e.shiftKey) {
         e.preventDefault();
         router.push("/drop/clear");
@@ -548,16 +549,7 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                 .replace(/ \w+$/, (m) => m.slice(0, 4))}
               {paper.thoughts.length ? ` · ${open} open${ideas ? ` · ${ideas} ${ideas === 1 ? "idea" : "ideas"}` : ""}${done ? ` · ${done} done` : ""}` : ""}
             </span>
-            {next && (
-              <button
-                type="button"
-                onClick={() => focusItem(next.id)}
-                title="Go to it"
-                className="flex min-w-0 items-center gap-1 rounded-lg px-1.5 text-[13px] text-mute hover:bg-soft hover:text-ink max-sm:hidden"
-              >
-                Next: <RankMark n={next.rank} className="size-7 text-[18px]" /> <span className="truncate font-medium text-ink">{next.label}</span>
-              </button>
-            )}
+
           </>
         }
         right={
@@ -579,9 +571,22 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
           </div>
         )}
 
+        {next && !numbering && (
+          <button
+            type="button"
+            onClick={() => focusItem(next.id)}
+            className={`${COLUMN} flex items-center gap-3 rounded-2xl border border-red-text/40 bg-red-soft/40 px-3 py-2 text-left hover:bg-red-soft/70`}
+          >
+            <span className="text-[12px] font-semibold tracking-[0.08em] text-red-text uppercase">Next up</span>
+            <RankMark n={next.rank} size="sm" />
+            <span className="min-w-0 flex-1 truncate font-note text-[19px] text-ink">{next.label}</span>
+            <span className="text-[13px] text-mute max-sm:hidden">Go to it →</span>
+          </button>
+        )}
+
         {numbering && (
           <div role="status" className={`${COLUMN} flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-red-text/30 bg-red-soft/50 px-4 py-2 text-sm`}>
-            <span className="flex-1 font-medium">Tap thoughts in order · Esc to finish</span>
+            <span className="flex-1 font-medium">Tap thoughts in order, most important first · Esc to finish</span>
             <button type="button" onClick={() => setOrdering(true)} className="h-9 rounded-lg px-3 font-medium text-mute hover:bg-sheet hover:text-ink">
               Help me order
             </button>
@@ -966,7 +971,7 @@ function StreamStack({
         style={{ ...look, transform: "none", boxShadow: `${look.boxShadow}, 4px 5px 0 -1px var(--soft)` }}
         className="paper-note flex w-full items-center gap-3 px-5 py-4 text-left"
       >
-        {stack.rank ? <RankMark n={stack.rank} className="-my-2 -ml-2" /> : null}
+        {stack.rank ? <RankMark n={stack.rank} size="sm" /> : null}
         <span className="hand min-w-0 flex-1 truncate font-note text-[19px] leading-snug">{stack.name ?? members[0]?.text}</span>
         {when && <span className="text-[12px] font-medium text-mute">{when}</span>}
         <span className="flex h-6 min-w-6 items-center justify-center rounded-full border border-line bg-sheet px-1.5 text-[12px] font-semibold">{members.length}</span>

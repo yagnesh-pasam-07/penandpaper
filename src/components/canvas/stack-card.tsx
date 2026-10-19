@@ -144,7 +144,7 @@ export function StackCard({ name, count, done, top, peek, open, onToggleOpen, ta
       <div ref={box} role="group" aria-label={summary} style={{ ...card, transform: "none", borderRadius: 22 }} className={`paper-note flex w-[320px] max-w-full flex-col gap-2 p-2.5 ${motion}`}>
         {/* The header: clicking its empty part folds the stack back; dragging it moves the stack. */}
         <div onClick={(e) => e.target === e.currentTarget && onToggleOpen()} className="flex cursor-grab items-center gap-1.5 pl-1.5 active:cursor-grabbing">
-          {rank ? <RankMark n={rank} struck={allDone} className="-ml-1" /> : null}
+          {rank ? <RankMark n={rank} struck={allDone} size="sm" className="-ml-1" /> : null}
           {onRename ? (
             <input
               value={draft}
@@ -241,7 +241,7 @@ export function StackCard({ name, count, done, top, peek, open, onToggleOpen, ta
           )}
           <span className="absolute -right-2 -bottom-2 flex h-6 min-w-6 items-center justify-center rounded-full border border-line bg-sheet px-1.5 text-[12px] font-semibold text-ink">{count}</span>
         </button>
-        {rank ? <RankMark n={rank} struck={allDone} className="absolute -top-4 -left-4 z-10" /> : null}
+        {rank ? <RankMark n={rank} struck={allDone} className="absolute -top-5 -left-5 z-10" /> : null}
         {menuButton && (
           <span className="absolute -top-3 -right-2 opacity-0 transition-opacity group-focus-within/stack:opacity-100 group-hover/stack:opacity-100 max-sm:hidden">{menuButton}</span>
         )}

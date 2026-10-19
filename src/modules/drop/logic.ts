@@ -336,6 +336,13 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
       break;
     }
   }
+  // Numbering sets the order on the sheet too: numbered ones move to the top
+  // row, first to last; the rest stay where they were put.
+  if (op.kind === "rank" || op.kind === "order") {
+    const lifted = new Set(rankedIds({ thoughts, stacks }));
+    thoughts = thoughts.map((t) => (lifted.has(t.id) ? { ...t, x: null, y: null } : t));
+    stacks = stacks.map((s) => (lifted.has(s.id) ? { ...s, x: null, y: null } : s));
+  }
   // Folded away: it gives up its place in today's order.
   if (op.kind === "schedule" && op.on && op.on > paper.date) {
     thoughts = thoughts.map((t) => (t.id === op.id ? { ...t, rank: null } : t));
