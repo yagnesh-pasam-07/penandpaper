@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { FreeCanvas, type Placement } from "@/components/canvas/free-canvas";
 import { PaperSurface } from "@/components/canvas/paper-surface";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { PenIcon } from "@/components/icons";
@@ -151,6 +152,8 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
       createdAt: new Date().toISOString(),
       doneAt: null,
       carriedFrom: null,
+      x: null,
+      y: null,
     };
     setPaper((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setFresh((f) => new Set(f).add(thought.id));
@@ -191,6 +194,23 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
         }),
     );
   };
+
+  /** Saves where thoughts were dragged (or, with null spots, sends them back into rows). */
+  const arrange = (placements: { id: string; x: number | null; y: number | null }[], body: object) => {
+    const before = paper.thoughts;
+    const at = new Map(placements.map((p) => [p.id, p]));
+    setPaper((p) => ({ ...p, thoughts: p.thoughts.map((t) => (at.has(t.id) ? { ...t, x: at.get(t.id)!.x, y: at.get(t.id)!.y } : t)) }));
+    void save(
+      () => call("/api/drop/arrange", { method: "POST", body: JSON.stringify(body) }),
+      () => setPaper((p) => ({ ...p, thoughts: before })),
+    );
+  };
+  const onArrange = (placements: Placement[]) => arrange(placements, { placements });
+  const tidy = () => {
+    const all = paper.thoughts.map((t) => ({ id: t.id, x: null, y: null }));
+    arrange(all, { tidy: true });
+  };
+  const arranged = paper.thoughts.some((t) => t.x !== null);
 
   // Newest first, right under the pen.
   const shown = [...paper.thoughts].reverse();
@@ -253,38 +273,53 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
           </label>
         </form>
 
-        <span className="text-sm text-mute" aria-live="polite">
-          {paper.thoughts.length === 0
-            ? "Nothing dropped yet today."
-            : `${dropped} dropped today${carried ? ` · ${carried} carried` : ""}${struck ? ` · ${struck} struck` : ""}`}
-        </span>
+        <div className="flex min-h-8 items-center justify-between gap-3">
+          <span className="text-sm text-mute" aria-live="polite">
+            {paper.thoughts.length === 0
+              ? "Nothing dropped yet today."
+              : `${dropped} dropped today${carried ? ` · ${carried} carried` : ""}${struck ? ` · ${struck} struck` : ""}`}
+          </span>
+          {arranged && (
+            <button type="button" onClick={tidy} className="hidden rounded-lg px-2.5 py-1.5 text-sm font-medium text-mute hover:bg-soft hover:text-ink sm:block">
+              Tidy up
+            </button>
+          )}
+        </div>
 
-        <PaperSurface
-          label="Today's paper"
-          className={`flex flex-1 flex-col gap-3 sm:min-h-[420px] sm:flex-row sm:flex-wrap sm:content-start sm:items-start sm:justify-center sm:gap-x-8 sm:gap-y-7 sm:py-8 ${shown.length ? "" : "items-center justify-center"}`}
-        >
-          {shown.length === 0 ? (
-            <span className="flex flex-col items-center gap-1 py-16 text-center sm:m-auto">
+        {shown.length === 0 ? (
+          <PaperSurface label="Today's paper" className="flex flex-1 items-center justify-center sm:min-h-[420px]">
+            <span className="flex flex-col items-center gap-1 py-16 text-center">
               <span className="font-hand text-[34px] font-bold">A fresh sheet.</span>
               <span className="text-mute">Type anything above and press Enter.</span>
             </span>
-          ) : (
-            shown.map((t) => (
-              <ThoughtBubbleResponsive
-                key={t.id}
-                thought={t}
-                fresh={fresh.has(t.id)}
-                meta={meta(t, tz)}
-                onEdit={(value) => patch(t.id, { text: value })}
-                onToggle={() => patch(t.id, { status: t.status === "done" ? "open" : "done" })}
-                onDelete={() => remove(t.id)}
-              />
-            ))
-          )}
-        </PaperSurface>
+          </PaperSurface>
+        ) : (
+          <>
+            <PaperSurface label="Today's paper" className="flex flex-1 flex-col gap-3 sm:hidden">
+              {shown.map((t) => (
+                <ThoughtBubble key={t.id} {...bubbleProps(t, tz, fresh.has(t.id))} stream onEdit={(v) => patch(t.id, { text: v })} onToggle={() => patch(t.id, { status: t.status === "done" ? "open" : "done" })} onDelete={() => remove(t.id)} />
+              ))}
+            </PaperSurface>
+            <FreeCanvas
+              label="Today's paper"
+              className="max-sm:hidden"
+              items={shown}
+              onArrange={onArrange}
+              render={(t) => (
+                <ThoughtBubble
+                  {...bubbleProps(t, tz, fresh.has(t.id))}
+                  movable
+                  onEdit={(v) => patch(t.id, { text: v })}
+                  onToggle={() => patch(t.id, { status: t.status === "done" ? "open" : "done" })}
+                  onDelete={() => remove(t.id)}
+                />
+              )}
+            />
+          </>
+        )}
 
         <p className="hidden text-center text-[13px] text-mute sm:block">
-          Space or just type to write · Enter to drop · Esc to step out · double-click to strike · emailed at 9 PM
+          Space or just type to write · Enter to drop · drag to arrange · double-click to strike · emailed at 9 PM
         </p>
         <p className="text-center text-[13px] text-mute sm:hidden">Tap to edit · swipe right to strike · emailed at 9 PM</p>
       </main>
@@ -301,33 +336,8 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
   );
 }
 
-/** Floating bubble on wide screens, full-width card in the phone stream. */
-function ThoughtBubbleResponsive({
-  thought,
-  fresh,
-  meta: line,
-  onEdit,
-  onToggle,
-  onDelete,
-}: {
-  thought: Thought;
-  fresh: boolean;
-  meta: string;
-  onEdit?: (v: string) => void;
-  onToggle?: () => void;
-  onDelete?: () => void;
-}) {
-  const common = { text: thought.text, done: thought.status === "done", shape: thought.shape, meta: line, fresh, onEdit, onToggle, onDelete, readOnly: !onEdit };
-  return (
-    <>
-      <div className="w-full sm:hidden">
-        <ThoughtBubble {...common} stream />
-      </div>
-      <div className="hidden sm:block">
-        <ThoughtBubble {...common} />
-      </div>
-    </>
-  );
+function bubbleProps(t: Thought, tz: string, fresh: boolean) {
+  return { text: t.text, done: t.status === "done", shape: t.shape, meta: meta(t, tz), fresh };
 }
 
 /* ---------- History ---------- */
@@ -378,14 +388,17 @@ export function HistoryPaper({ me, paper }: { me: Me; paper: DropPaper }) {
           </Link>
         </div>
         <span className="text-sm text-mute">Read-only · {paper.thoughts.filter((t) => t.status === "done").length} of {paper.thoughts.length} struck</span>
-        <PaperSurface
-          label={`Paper for ${longDate(paper.date)}`}
-          className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:content-start sm:items-start sm:justify-center sm:gap-x-8 sm:gap-y-7 sm:py-8"
-        >
+        <PaperSurface label={`Paper for ${longDate(paper.date)}`} className="flex flex-col gap-3 sm:hidden">
           {paper.thoughts.map((t) => (
-            <ThoughtBubbleResponsive key={t.id} thought={t} fresh={false} meta={meta(t, tz)} />
+            <ThoughtBubble key={t.id} {...bubbleProps(t, tz, false)} stream readOnly />
           ))}
         </PaperSurface>
+        <FreeCanvas
+          label={`Paper for ${longDate(paper.date)}`}
+          className="max-sm:hidden"
+          items={paper.thoughts}
+          render={(t) => <ThoughtBubble {...bubbleProps(t, tz, false)} readOnly />}
+        />
       </main>
     </div>
   );

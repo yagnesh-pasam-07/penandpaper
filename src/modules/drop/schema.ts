@@ -1,4 +1,4 @@
-import { date, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { date, index, integer, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
 /** One paper per person per day (in DROP_TIMEZONE). */
@@ -35,6 +35,9 @@ export const dropThoughts = pgTable(
     doneAt: timestamp("done_at", { withTimezone: true, mode: "string" }),
     /** The day it was first dropped, when it rolled over from an earlier paper. */
     carriedFrom: date("carried_from", { mode: "string" }),
+    /** Where it was dragged on the sheet: centre x as a share of the width, y in px. Null until moved. */
+    x: real("x"),
+    y: real("y"),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

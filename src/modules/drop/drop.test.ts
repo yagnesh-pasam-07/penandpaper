@@ -9,6 +9,8 @@ const t = (id: string, text: string, status: "open" | "done", carriedFrom: strin
   createdAt: "2026-10-17T04:00:00.000Z",
   doneAt: status === "done" ? "2026-10-17T09:00:00.000Z" : null,
   carriedFrom,
+  x: null,
+  y: null,
 });
 
 describe("rollover", () => {

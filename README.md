@@ -24,6 +24,7 @@ Two modules share one app, one sign-in and one database:
 - **Daily paper**: each day (in `DROP_TIMEZONE`, default IST) is a fresh paper. Unstruck thoughts from the last paper roll over on the first open of the day, marked "from Sat".
 - **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
 - **History**: `/drop/history` lists past papers; each opens read-only.
+- **Arrange**: drag a thought anywhere on the sheet. It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
 - **Keyboard first**: Space, or simply typing, puts the cursor in the drop box from anywhere on the page; Enter drops; Esc clears, and a second Esc steps out.
 - **Phone**: the canvas becomes a vertical stream with the same input.
 - Sign-in required: signed-out visits go to `/signup?next=/drop`.
