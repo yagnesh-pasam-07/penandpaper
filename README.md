@@ -19,14 +19,14 @@ Two modules share one app, one sign-in and one database:
 | --- | --- | --- |
 | ![Drop on a phone](docs/images/drop-phone.png) | ![Past papers](docs/images/drop-history.png) | ![Drop in the dark theme](docs/images/drop-today-dark.jpg) |
 
-- **Canvas home**: `/drop` opens straight to today's paper with the input focused. Enter drops a thought; it appears instantly (saved in the background) with a soft drop animation.
+- **Canvas home**: `/drop` opens straight to today's paper. Press Space, start typing, or tap the floating **Write…** pen to open the writer (it opens by itself on an empty paper). Enter drops the thought and keeps the writer open for the next; Shift+Enter is a new line; Esc or a click outside closes it and keeps any unfinished text as a draft. Each note flies from the writer to its place on the sheet.
 - **Bubbles**: hand-cut notes, each with its own imperfect outline (seeded by when it was dropped, so it keeps its shape across days) and a faint ink edge, with the time it was dropped shown on hover and a small ↻ on carried ones. Click to edit; double-click (or swipe right on a phone) to strike out: one thin red pen line draws across the words, which stay readable, and a moment later the thought sinks into a **Done today** row of small chips (↺ brings one back); delete from the edit view or the hover buttons. Links are clickable.
 - **Daily paper**: each day (in `DROP_TIMEZONE`, default IST) is a fresh paper. Unstruck thoughts from the last paper roll over on the first open of the day, marked "from Sat".
 - **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
 - **History**: `/drop/history` lists past papers; each opens read-only.
 - **Arrange**: new drops land in a row right under the input; arranged thoughts keep their shape below. Drag a thought anywhere on the sheet (it stays within the page column). It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
 - **Stacks**: drag a thought onto another and they pile up like sticky notes (a soft red outline shows where it'll land); drag more on to add. Click a stack to fan it out, drag one out to loosen it (a stack of one dissolves), name it from the label area, or Unstack / Crumple stack (with Undo) from its menu. Done thoughts sink to the bottom; a fully done stack moves to Done today. Keyboard: select a thought (Tab) and press S for "Stack with…"; on a phone, hold a thought. Stacks carry over with their open thoughts, and the 9 PM email groups by stack.
-- **Keyboard first**: Space, or simply typing, puts the cursor in the drop box from anywhere on the page; Enter drops; Esc clears, and a second Esc steps out.
+- **Keyboard first**: Space, or simply typing, opens the writer from anywhere on the page (the first letter goes in); Enter drops; Esc closes.
 - **Phone**: the canvas becomes a vertical stream with the same input.
 - Sign-in required: signed-out visits go to `/signup?next=/drop`.
 
