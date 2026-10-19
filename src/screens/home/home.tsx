@@ -241,7 +241,12 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
               Contact
             </a>
           )}
-          <span className="ml-auto">Made with pen &amp; paper in Hyderabad</span>
+          <span className="ml-auto">
+            Creator:{" "}
+            <a href="https://www.linkedin.com/in/yagneshpasam/" target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline-offset-2 hover:underline">
+              Yagnesh Pasam
+            </a>
+          </span>
         </div>
       </footer>
     </div>
