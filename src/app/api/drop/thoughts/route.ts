@@ -7,6 +7,7 @@ const body = z.object({
   id: z.string().regex(/^[a-z0-9-]{6,40}$/),
   text: z.string().trim().min(1).max(MAX_THOUGHT),
   shape: z.number().int().min(0).max(5),
+  kind: z.enum(["pen", "pencil"]).default("pen"),
 });
 
 export async function POST(request: Request) {

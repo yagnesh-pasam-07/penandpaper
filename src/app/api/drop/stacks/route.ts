@@ -16,9 +16,11 @@ const op = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("rename"), stack: id, name: z.string().max(MAX_STACK_NAME * 2).nullable() }),
   z.object({ kind: z.literal("crumple"), stack: id }),
+  z.object({ kind: z.literal("schedule"), id, on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable() }),
+  z.object({ kind: z.literal("ink"), thought: id, to: z.enum(["pen", "pencil"]) }),
 ]);
 
-/** One change to today's stacks: make, join, take out, unstack, rename or crumple. */
+/** One change to today's paper: stack, take out, unstack, rename, crumple, fold (schedule) or ink. */
 export async function POST(request: Request) {
   const user = await requireUser();
   if (user instanceof Response) return user;

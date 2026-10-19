@@ -8,7 +8,7 @@ type Mail = {
   heading: string;
   lines: string[];
   /** A checklist: done items struck out, open ones highlighted; a `group` row starts a titled group. */
-  items?: ({ text: string; done: boolean } | { group: string })[];
+  items?: ({ text: string; done: boolean; quiet?: boolean } | { group: string })[];
   cta: { label: string; url: string };
   scheduledAt?: string;
 };
@@ -31,7 +31,9 @@ ${items
   .map((i) =>
     "group" in i
       ? `<tr><td style="font-size:13px;font-weight:600;letter-spacing:0.02em;color:#5F5B54;padding:14px 0 4px">${esc(i.group)}</td></tr>`
-      : i.done
+      : i.quiet
+        ? `<tr><td style="font-size:15px;line-height:1.5;padding:4px 10px;color:#8A857C">${esc(i.text)}</td></tr>`
+        : i.done
       ? `<tr><td style="font-size:16px;line-height:1.5;padding:6px 10px;color:#5F5B54"><s style="text-decoration-color:#C8382F">${esc(i.text)}</s></td></tr>`
       : `<tr><td style="font-size:16px;line-height:1.5;padding:6px 10px;color:#1E1D1A;background:#FFF1BF;border-radius:8px">${esc(i.text)}</td></tr><tr><td style="height:4px"></td></tr>`,
   )

@@ -1,8 +1,8 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { PenIcon } from "@/components/icons";
-import { MAX_THOUGHT } from "./logic";
+import { PenIcon, PencilIcon } from "@/components/icons";
+import { MAX_THOUGHT, type Kind } from "./logic";
 
 /** The floating pen at the bottom of the page: opens the writer. */
 export const PenButton = forwardRef<HTMLButtonElement, { onOpen: () => void; hidden: boolean }>(function PenButton({ onOpen, hidden }, ref) {
@@ -45,20 +45,27 @@ function useKeyboardInset(active: boolean): number {
 /**
  * The writer: a focused card for putting thoughts down, with the sheet still
  * visible behind. Enter drops and keeps it open for the next; Shift+Enter is a
- * new line; Esc or a click outside closes it (unfinished text is kept).
+ * new line; Tab switches pen (a task) and pencil (an idea); Esc or a click
+ * outside closes it (unfinished text is kept).
  */
 export function Writer({
   draft,
   onDraft,
+  kind,
+  onKind,
   onDrop,
   onClose,
 }: {
   draft: string;
   onDraft: (text: string) => void;
+  kind: Kind;
+  onKind: (kind: Kind) => void;
   /** The written text, and where on screen it was written (the note flies from there). */
   onDrop: (text: string, from: { x: number; y: number }) => void;
   onClose: () => void;
 }) {
+  const pencil = kind === "pencil";
+  const flip = () => onKind(pencil ? "pen" : "pencil");
   const card = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const inset = useKeyboardInset(true);
@@ -108,10 +115,19 @@ export function Writer({
         style={{ marginBottom: inset }}
         className="flex w-full flex-col gap-2 rounded-t-[22px] border border-line bg-sheet px-5 pt-4 pb-3 shadow-[0_30px_70px_-30px_var(--shadow)] sm:w-[560px] sm:max-w-[calc(100vw-32px)] sm:rounded-[22px]"
       >
-        <label className="flex items-start gap-3">
-          <span className="mt-2.5 shrink-0 text-red-text">
-            <PenIcon size={22} />
-          </span>
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              flip();
+              area.current?.focus();
+            }}
+            aria-label={pencil ? "Writing in pencil (an idea). Switch to pen" : "Writing in pen (a task). Switch to pencil"}
+            title="Tab switches pen and pencil"
+            className={`mt-1.5 flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-soft ${pencil ? "text-graphite" : "text-red-text"}`}
+          >
+            {pencil ? <PencilIcon size={20} /> : <PenIcon size={22} />}
+          </button>
           <textarea
             ref={area}
             value={draft}
@@ -119,10 +135,15 @@ export function Writer({
             rows={Math.min(6, Math.max(2, draft.split("\n").length, Math.ceil(draft.length / 44)))}
             aria-label="Thought"
             enterKeyHint="send"
-            placeholder="What's on your mind?"
+            placeholder={pencil ? "Jot an idea…" : "What's on your mind?"}
             onChange={(e) => onDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              if (e.key === "Tab" && !e.shiftKey) {
+                // Tab here switches the pen, it doesn't leave the box.
+                e.preventDefault();
+                e.stopPropagation();
+                flip();
+              } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 send();
               } else if (e.key === "Escape") {
@@ -130,11 +151,11 @@ export function Writer({
                 onClose();
               }
             }}
-            className="ruled-line min-h-[72px] flex-1 resize-none bg-transparent font-hand text-[26px] leading-[36px] text-ink outline-none placeholder:font-sans placeholder:text-lg placeholder:text-mute focus-visible:outline-none"
+            className={`ruled-line hand min-h-[72px] flex-1 resize-none bg-transparent font-note text-[22px] leading-[36px] caret-ink outline-none placeholder:font-sans placeholder:text-lg placeholder:text-mute focus-visible:outline-none ${pencil ? "font-light text-graphite" : "text-ink"}`}
           />
-        </label>
-        <div className="flex items-center justify-between gap-3 pl-9 text-[13px] text-mute">
-          <span className="max-sm:hidden">Enter to drop · Shift+Enter new line · Esc to close</span>
+        </div>
+        <div className="flex items-center justify-between gap-3 pl-12 text-[13px] text-mute">
+          <span className="max-sm:hidden">Enter to drop · Tab {pencil ? "pen" : "pencil"} · Esc to close</span>
           <span className="sm:hidden">Enter to drop</span>
           <span className="flex items-center gap-1">
             <button type="button" onClick={onClose} className="h-9 rounded-lg px-3 font-medium hover:bg-soft hover:text-ink">
