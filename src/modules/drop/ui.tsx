@@ -340,7 +340,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
 }
 
 function bubbleProps(t: Thought, tz: string, fresh: boolean) {
-  return { text: t.text, done: t.status === "done", shape: t.shape, meta: meta(t, tz), fresh };
+  return { text: t.text, done: t.status === "done", shape: t.shape, seed: t.createdAt, meta: meta(t, tz), fresh };
 }
 
 /* ---------- History ---------- */
