@@ -11,9 +11,20 @@ export const dropPapers = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     date: date("date", { mode: "string" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** When the desk was cleared that evening, if it was. */
+    clearedAt: timestamp("cleared_at", { withTimezone: true, mode: "string" }),
   },
   (t) => [uniqueIndex("drop_papers_user_date_uq").on(t.userId, t.date)],
 );
+
+/** Small per-person settings and one-time hints for Drop. */
+export const dropPrefs = pgTable("drop_prefs", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** The "drag one note onto another" hint was dismissed, or a first stack was made. */
+  stackHintDoneAt: timestamp("stack_hint_done_at", { withTimezone: true, mode: "string" }),
+});
 
 /** Thoughts piled together on one paper, like sticky notes. */
 export const dropStacks = pgTable(
@@ -34,6 +45,10 @@ export const dropStacks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
     /** The day it was first made, when it rolled over from an earlier paper. */
     carriedFrom: date("carried_from", { mode: "string" }),
+    /** Folded away till this day. */
+    scheduledFor: date("scheduled_for", { mode: "string" }),
+    /** Crumpled (thrown away): hidden everywhere, removed for good a week later. */
+    crumpledAt: timestamp("crumpled_at", { withTimezone: true, mode: "string" }),
   },
   (t) => [index("drop_stacks_paper_idx").on(t.paperId)],
 );
@@ -52,6 +67,8 @@ export const dropThoughts = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     text: text("text").notNull(),
     status: text("status", { enum: ["open", "done"] }).notNull().default("open"),
+    /** Pen is a task; pencil is a loose idea. */
+    kind: text("kind", { enum: ["pen", "pencil"] }).notNull().default("pen"),
     shape: integer("shape").notNull().default(0),
     /** When it was first dropped; kept when it rolls over. */
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
@@ -64,6 +81,10 @@ export const dropThoughts = pgTable(
     stackId: text("stack_id").references(() => dropStacks.id, { onDelete: "set null" }),
     /** Place in its stack; higher is nearer the top. */
     stackOrder: integer("stack_order").notNull().default(0),
+    /** Folded away till this day. */
+    scheduledFor: date("scheduled_for", { mode: "string" }),
+    /** Crumpled (thrown away): hidden everywhere, removed for good a week later. */
+    crumpledAt: timestamp("crumpled_at", { withTimezone: true, mode: "string" }),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

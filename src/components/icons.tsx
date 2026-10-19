@@ -122,11 +122,24 @@ export function PaperPlaneIcon() {
   );
 }
 
-export function SquiggleArrow() {
+
+/** A wooden pencil: ideas, kept loose. */
+export function PencilIcon({ size = 16 }: IconProps) {
   return (
-    <svg width="56" height="20" viewBox="0 0 56 20" fill="none" aria-hidden="true" className="text-mute">
-      <path d="M2 12c14-8 30-8 48-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M44 4l7 6-8 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={1.7} {...stroke}>
+      <path d="M4 20l1.2-4.6L15.6 5a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z" />
+      <path d="M13.8 6.8l3.4 3.4" />
+      <path d="M4 20l4.6-1.2" />
+    </svg>
+  );
+}
+
+/** A small calendar page: when it's for. */
+export function WhenIcon({ size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={1.8} {...stroke}>
+      <rect x="4" y="5.5" width="16" height="14" rx="2.5" />
+      <path d="M8 3.5v4M16 3.5v4M4 10h16" />
     </svg>
   );
 }

@@ -16,7 +16,7 @@ export const BUBBLE_SHAPES: { rotate: number; tint: string }[] = [
 ];
 
 /** 0..1, the same for the same text everywhere. */
-function rand(seed: string, salt: number): number {
+export function rand(seed: string, salt: number): number {
   let h = 0x811c9dc5 ^ salt;
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193) >>> 0;
   h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
@@ -38,13 +38,23 @@ export function handRadius(seed: string): string {
   return `${h.map((n) => `${n}%`).join(" ")} / ${v.map((n) => `${n}%`).join(" ")}`;
 }
 
-export function bubbleStyle(shape: number, lifted = false, seed = String(shape)): CSSProperties {
+/**
+ * A note's look. Pen notes carry their tint; pencil ideas are plain paper
+ * with a soft graphite smudge round the edge. Both get the paper's grain and
+ * a faint lit top edge, like a real sheet.
+ */
+export function bubbleStyle(shape: number, lifted = false, seed = String(shape), kind: "pen" | "pencil" = "pen"): CSSProperties {
   const s = BUBBLE_SHAPES[Math.abs(shape) % BUBBLE_SHAPES.length];
+  const pencil = kind === "pencil";
+  const edge = pencil
+    ? "inset 0 0 0 1px color-mix(in srgb, var(--graphite) 28%, transparent), 0 0 6px color-mix(in srgb, var(--graphite) 14%, transparent)"
+    : // A faint ink edge, like the outline of a sketched note (lighter than the fill in the dark theme).
+      "inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent), inset 0 1px 0 color-mix(in srgb, white 35%, transparent)";
   return {
     borderRadius: handRadius(seed),
-    background: s.tint,
-    // A faint ink edge, like the outline of a sketched note (lighter than the fill in the dark theme).
-    boxShadow: `inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent)${lifted ? ", 0 24px 40px -18px var(--shadow)" : ""}`,
+    backgroundColor: pencil ? "var(--sheet)" : s.tint,
+    backgroundImage: "var(--grain)",
+    boxShadow: `${edge}${lifted ? ", 0 24px 40px -18px var(--shadow)" : ", 0 1px 2px -1px var(--shadow)"}`,
     transform: lifted ? "rotate(-7deg)" : `rotate(${s.rotate}deg)`,
   };
 }

@@ -2,7 +2,7 @@
 
 Plan the day, on paper. Live at **https://penandpaper-app.vercel.app**.
 
-Two modules share one app, one sign-in and one database:
+Two modules share one app, one sign-in and one database. The public homepage (`/`) lets visitors try Drop without an account (kept in their browser, moved onto their paper when they sign up); signed-in visitors go straight to `/drop`.
 
 | Module | What it does | Where |
 | --- | --- | --- |
@@ -26,6 +26,11 @@ Two modules share one app, one sign-in and one database:
 - **History**: `/drop/history` lists past papers; each opens read-only.
 - **Arrange**: new drops land in a row right under the input; arranged thoughts keep their shape below. Drag a thought anywhere on the sheet (it stays within the page column). It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
 - **Stacks**: drag a thought onto another and they pile up like sticky notes (a soft red outline shows where it'll land); drag more on to add. Click a stack to fan it out, drag one out to loosen it (a stack of one dissolves), name it from the label area, or Unstack / Crumple stack (with Undo) from its menu. Done thoughts sink to the bottom; a fully done stack moves to Done today. Keyboard: select a thought (Tab) and press S for "Stack with…"; on a phone, hold a thought. Stacks carry over with their open thoughts, and the 9 PM email groups by stack.
+- **Pencil or pen**: Tab in the writer switches. Pencil is an idea (graphite, untinted, never struck, carried quietly); pen is a task. Ink it / Pencil it from a note's toolbar. Counts read "5 open · 3 ideas · 2 done".
+- **Fold till later**: W (or the calendar button) on a thought or stack: Today, Tomorrow, This weekend, or a date. It folds out of sight ("Folded till Sat · Undo") and appears on that day's paper marked with its day; "N folded for later" lists them. The 9 PM email lists the next 7 days under "Coming up".
+- **Crumple**: ✕, Delete, swipe left, or the editor all crumple (with a 6-second Undo). Crumpled thoughts are hidden everywhere and swept up for good after 7 days by the nightly cron.
+- **Clear desk** (`/drop/clear`, Shift+C, or the 9 PM email's button): each open task, one card at a time: Tomorrow (T), Keep as idea (K), Crumple (X), Done already (D), ← Back; swipes on a phone. Ends with a DESK CLEARED stamp, also shown on that day in History.
+- **Handwriting**: notes in Kalam (the most legible of Caveat, Kalam, Patrick Hand, Gochi Hand and Nanum Pen Script at 18–24px; Caveat stays for headings), with a tiny per-word wobble seeded per note, ink write-on when dropped, paper grain, and Telugu (Gurajada) / Hindi (Kalam) handwriting.
 - **Keyboard first**: Space, or simply typing, opens the writer from anywhere on the page (the first letter goes in); Enter drops; Esc closes.
 - **Phone**: the canvas becomes a vertical stream with the same input.
 - Sign-in required: signed-out visits go to `/signup?next=/drop`.

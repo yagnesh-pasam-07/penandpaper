@@ -36,6 +36,13 @@
       "when": 1792375841811,
       "tag": "0004_drop_stacks",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792377645557,
+      "tag": "0005_drop_when_pencil_crumple_clear",
+      "breakpoints": true
     }
   ]
 }

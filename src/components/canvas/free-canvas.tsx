@@ -68,7 +68,7 @@ export function FreeCanvas<T extends Item>({
   onDetach?: (sub: string, at: { x: number; y: number }, pinned: Placement[]) => void;
   /** What follows the pointer while a card from inside an item is dragged. */
   renderGhost?: (sub: string) => ReactNode;
-  /** Shown above the rest (an open stack). */
+  /** Open in place (a stack): drawn above the rest, and whatever sits below it moves down to make room. */
   raised?: string | null;
   className?: string;
   minHeight?: number;
@@ -77,6 +77,8 @@ export function FreeCanvas<T extends Item>({
   const nodes = useRef(new Map<string, HTMLElement>());
   const [width, setWidth] = useState(0);
   const [sizes, setSizes] = useState<Record<string, Size>>({});
+  // Each item's size while not open, so an open one can push the rest down by exactly how much it grew.
+  const [closedSizes, setClosedSizes] = useState<Record<string, Size>>({});
   const [drag, setDrag] = useState<Drag | null>(null);
   const justDragged = useRef(false);
 
@@ -88,15 +90,22 @@ export function FreeCanvas<T extends Item>({
       const next: Record<string, Size> = {};
       nodes.current.forEach((el, id) => (next[id] = { w: el.offsetWidth, h: el.offsetHeight }));
       setSizes((prev) => (same(prev, next) ? prev : next));
+      setClosedSizes((prev) => {
+        const merged = { ...prev };
+        for (const [id, size] of Object.entries(next)) if (id !== raised) merged[id] = size;
+        return same(prev, merged) ? prev : merged;
+      });
     };
     read();
     const ro = new ResizeObserver(read);
     if (sheet.current) ro.observe(sheet.current);
     nodes.current.forEach((el) => ro.observe(el));
     return () => ro.disconnect();
-  }, [items]);
+  }, [items, raised]);
 
-  const placedIn = items.map((it) => ({ id: it.id, size: sizes[it.id] ?? GUESS, at: it.x === null || it.y === null ? null : { x: it.x, y: it.y } }));
+  // The open one is laid out at its closed size; the push-down below accounts for the rest.
+  const sizeOf = (id: string) => (id === raised ? (closedSizes[id] ?? sizes[id]) : sizes[id]) ?? GUESS;
+  const placedIn = items.map((it) => ({ id: it.id, size: sizeOf(it.id), at: it.x === null || it.y === null ? null : { x: it.x, y: it.y } }));
   // The arranged group's shift holds still until a new drop arrives (which
   // pushes it down to make room), so dragging never makes the sheet jump.
   const flowing = placedIn.filter((it) => !it.at).map((it) => it.id);
@@ -104,6 +113,18 @@ export function FreeCanvas<T extends Item>({
   const fresh = !held || flowing.some((id) => !held.ids.includes(id));
   const { boxes, lift } = layout(placedIn, width, fresh ? undefined : held.lift);
   if (fresh && width > 0) setHeld({ ids: flowing, lift });
+  // Spots as they'd be saved: before anything is pushed out of an open stack's way.
+  const base = new Map(boxes);
+  const open = raised ? boxes.get(raised) : undefined;
+  const grown = raised && open ? (sizes[raised]?.h ?? open.h) - open.h : 0;
+  if (raised && open && grown > 0) {
+    const bottom = open.y + open.h / 2;
+    for (const [id, b] of boxes) {
+      if (id !== raised && b.y - b.h / 2 >= bottom - 4) boxes.set(id, { ...b, y: b.y + grown });
+    }
+    const real = sizes[raised];
+    boxes.set(raised, { ...open, w: real?.w ?? open.w, h: open.h + grown, y: open.y - open.h / 2 + (open.h + grown) / 2 });
+  }
 
   let guides: { x?: number; y?: number } = {};
   let ghost: Box | null = null;
@@ -121,9 +142,9 @@ export function FreeCanvas<T extends Item>({
   const height = Math.max(minHeight, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
-  const latest = useRef({ boxes, items, width, lift, onArrange, canDropOn, onDropOn, onDetach });
+  const latest = useRef({ boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach });
   useLayoutEffect(() => {
-    latest.current = { boxes, items, width, lift, onArrange, canDropOn, onDropOn, onDetach };
+    latest.current = { boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach };
   });
 
   // Saved spots are relative to the arranged group, not the screen.
@@ -134,7 +155,7 @@ export function FreeCanvas<T extends Item>({
     latest.current.items
       .filter((it) => it.id !== except && (it.x === null || it.y === null))
       .flatMap((it) => {
-        const b = latest.current.boxes.get(it.id);
+        const b = latest.current.base.get(it.id);
         return b ? [{ id: it.id, ...saved(b) }] : [];
       });
 

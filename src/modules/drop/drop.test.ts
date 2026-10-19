@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { digestItems } from "./digest";
-import { applyStackOp, droppedToday, linkify, membersOf, rollover, StackError, type DropPaper, type Stack, type Thought } from "./logic";
+import {
+  applyStackOp,
+  counts,
+  deskCards,
+  deskSummary,
+  droppedToday,
+  foldedItems,
+  linkify,
+  membersOf,
+  rollover,
+  StackError,
+  thisWeekend,
+  visiblePaper,
+  whenLabel,
+  type DropPaper,
+  type Stack,
+  type Thought,
+} from "./logic";
 
 const t = (id: string, text: string, status: "open" | "done", carriedFrom: string | null = null, more: Partial<Thought> = {}): Thought => ({
   id,
   text,
   status,
+  kind: "pen",
   shape: 1,
   createdAt: "2026-10-17T04:00:00.000Z",
   doneAt: status === "done" ? "2026-10-17T09:00:00.000Z" : null,
@@ -14,10 +32,11 @@ const t = (id: string, text: string, status: "open" | "done", carriedFrom: strin
   y: null,
   stackId: null,
   stackOrder: 0,
+  scheduledFor: null,
   ...more,
 });
 
-const stack = (id: string, more: Partial<Stack> = {}): Stack => ({ id, name: null, x: 0.5, y: 200, createdAt: "2026-10-17T05:00:00.000Z", carriedFrom: null, ...more });
+const stack = (id: string, more: Partial<Stack> = {}): Stack => ({ id, name: null, x: 0.5, y: 200, createdAt: "2026-10-17T05:00:00.000Z", carriedFrom: null, scheduledFor: null, ...more });
 
 const paper = (thoughts: Thought[], stacks: Stack[] = []): DropPaper => ({ date: "2026-10-17", thoughts, stacks });
 
@@ -76,7 +95,7 @@ describe("stack changes", () => {
 
   it("drops a thought onto another: a stack at the target's spot", () => {
     const after = applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now);
-    expect(after.stacks).toEqual([{ id: "s1", name: null, x: 0.2, y: 100, createdAt: now, carriedFrom: null }]);
+    expect(after.stacks).toEqual([{ id: "s1", name: null, x: 0.2, y: 100, createdAt: now, carriedFrom: null, scheduledFor: null }]);
     expect(membersOf(after, "s1").map((x) => x.id)).toEqual(["b", "a"]);
     expect(after.thoughts.find((x) => x.id === "a")).toMatchObject({ x: null, y: null });
   });
@@ -132,6 +151,115 @@ describe("stack changes", () => {
   });
 });
 
+/** The next day's paper, as the server builds it: carried copies plus whatever moved across. */
+function nextPaper(prev: DropPaper, date: string, newId: () => string): DropPaper {
+  const r = rollover(prev, newId);
+  const since = (x: { carriedFrom: string | null }) => x.carriedFrom ?? prev.date;
+  const movedStacks = prev.stacks.filter((s) => r.move.stacks.includes(s.id)).map((s) => ({ ...s, carriedFrom: since(s) }));
+  const moved = prev.thoughts.flatMap((t) => {
+    if (t.stackId && r.move.stacks.includes(t.stackId)) return [{ ...t, carriedFrom: since(t) }];
+    const m = r.move.thoughts.find((x) => x.id === t.id);
+    return m ? [{ ...t, stackId: m.stackId, carriedFrom: m.carriedFrom }] : [];
+  });
+  return { date, thoughts: [...r.thoughts, ...moved], stacks: [...r.stacks, ...movedStacks] };
+}
+
+describe("folding till later (scheduling)", () => {
+  const mon = "2026-10-19";
+  const tue = "2026-10-20";
+  const base = paper([t("a", "call bank", "open"), t("m", "milk", "open"), t("e", "eggs", "open"), t("x", "pay rent", "open")]);
+  const today = { ...base, date: mon };
+  const stacked = applyStackOp(today, { kind: "stack", thought: "e", onto: "m", newStackId: "s1" }, "2026-10-19T08:00:00.000Z");
+  let folded = applyStackOp(stacked, { kind: "schedule", id: "a", on: tue });
+  folded = applyStackOp(folded, { kind: "schedule", id: "s1", on: tue });
+
+  it("folds a thought and a stack away from today", () => {
+    const shown = visiblePaper(folded);
+    expect(shown.thoughts.map((x) => x.id)).toEqual(["x"]);
+    expect(shown.stacks).toEqual([]);
+    expect(foldedItems(folded).map((f) => [f.label, f.on])).toEqual([
+      ["Stack of 2", tue],
+      ["call bank", tue],
+    ]);
+    expect(counts(folded).open).toBe(1);
+  });
+
+  it("brings them onto tomorrow's paper (same ids, stack intact), marked scheduled", () => {
+    let n = 0;
+    const next = nextPaper(folded, tue, () => `n${++n}`);
+    const shown = visiblePaper(next);
+    expect(shown.thoughts.find((x) => x.id === "a")).toMatchObject({ scheduledFor: tue });
+    expect(shown.stacks.map((x) => x.id)).toEqual(["s1"]);
+    expect(membersOf(shown, "s1")).toHaveLength(2);
+    // The one left open today carries over as usual.
+    expect(shown.thoughts.some((x) => x.text === "pay rent" && x.carriedFrom === mon)).toBe(true);
+  });
+
+  it("keeps folding forward until the day comes, then carries like any other", () => {
+    const later = applyStackOp({ ...base, date: mon }, { kind: "schedule", id: "a", on: "2026-10-22" });
+    let n = 0;
+    const tuePaper = nextPaper(later, tue, () => `n${++n}`);
+    expect(visiblePaper(tuePaper).thoughts.some((x) => x.id === "a")).toBe(false);
+    const thu = nextPaper(nextPaper(tuePaper, "2026-10-21", () => `n${++n}`), "2026-10-22", () => `n${++n}`);
+    expect(visiblePaper(thu).thoughts.find((x) => x.id === "a")).toMatchObject({ scheduledFor: "2026-10-22" });
+    const fri = nextPaper(thu, "2026-10-23", () => `n${++n}`);
+    expect(fri.thoughts.find((x) => x.text === "call bank")).toMatchObject({ scheduledFor: null, carriedFrom: mon });
+  });
+
+  it("refuses a day in the past", () => {
+    expect(() => applyStackOp(today, { kind: "schedule", id: "a", on: "2026-10-18" })).toThrow(StackError);
+  });
+
+  it("reads days as people say them", () => {
+    expect(whenLabel(mon, mon)).toBe("Today");
+    expect(whenLabel(tue, mon)).toBe("Tomorrow");
+    expect(whenLabel("2026-10-24", mon)).toBe("Sat");
+    expect(whenLabel("2026-11-02", mon)).toBe("Mon, 2 Nov");
+    expect(thisWeekend(mon)).toBe("2026-10-24");
+    expect(thisWeekend("2026-10-24")).toBe("2026-10-24");
+  });
+});
+
+describe("pencil and pen", () => {
+  const p = paper([t("i", "weekend photo walk", "open", null, { kind: "pencil" }), t("a", "call bank", "open"), t("b", "renew passport", "done")]);
+
+  it("counts only pen as open, and ideas apart", () => {
+    expect(counts(p)).toEqual({ open: 1, ideas: 1, done: 1 });
+  });
+  it("inks an idea into a task, and pencils a task (struck or not) back into an idea", () => {
+    expect(applyStackOp(p, { kind: "ink", thought: "i", to: "pen" }).thoughts[0].kind).toBe("pen");
+    expect(applyStackOp(p, { kind: "ink", thought: "b", to: "pencil" }).thoughts[2]).toMatchObject({ kind: "pencil", status: "open", doneAt: null });
+  });
+  it("carries pencil ideas over quietly, still in pencil", () => {
+    const next = rollover(p, () => "n").thoughts;
+    expect(next.find((x) => x.text === "weekend photo walk")).toMatchObject({ kind: "pencil" });
+  });
+});
+
+describe("clear desk", () => {
+  const p = paper(
+    [
+      t("a", "call bank", "open"),
+      t("i", "idea", "open", null, { kind: "pencil" }),
+      t("d", "done one", "done"),
+      t("f", "later", "open", null, { scheduledFor: "2026-10-30" }),
+      t("m", "milk", "open", null, { stackId: "s1", stackOrder: 1 }),
+      t("e", "eggs", "done", null, { stackId: "s1" }),
+    ],
+    [stack("s1", { name: "Groceries" })],
+  );
+  it("reviews open pen thoughts only (not ideas, done or folded), stacks as one card", () => {
+    expect(deskCards(p)).toEqual([
+      { kind: "stack", id: "s1", label: "Groceries", open: [{ id: "m", text: "milk" }] },
+      { kind: "thought", id: "a", text: "call bank" },
+    ]);
+  });
+  it("sums up the decisions in plain words", () => {
+    expect(deskSummary(["tomorrow", "tomorrow", "keep", "crumple"])).toBe("2 to tomorrow · 1 kept as an idea · 1 crumpled");
+    expect(deskSummary([])).toBe("Nothing left on your desk.");
+  });
+});
+
 describe("digest", () => {
   it("groups thoughts under their stack, then the loose ones", () => {
     const p = paper(
@@ -153,6 +281,16 @@ describe("digest", () => {
       { text: "a", done: false },
       { group: "Loose thoughts" },
       { text: "call bank", done: false },
+    ]);
+  });
+  it("puts ideas and what's coming up this week at the bottom", () => {
+    const p = { ...paper([t("l", "call bank", "open"), t("i", "photo walk", "open", null, { kind: "pencil" }), t("f", "pay rent", "open", null, { scheduledFor: "2026-10-20" })]), date: "2026-10-19" };
+    expect(digestItems(p)).toEqual([
+      { text: "call bank", done: false },
+      { group: "Ideas" },
+      { text: "photo walk", done: false, quiet: true },
+      { group: "Coming up" },
+      { text: "Tomorrow · pay rent", done: false, quiet: true },
     ]);
   });
 });
