@@ -43,8 +43,8 @@ export function bubbleStyle(shape: number, lifted = false, seed = String(shape))
   return {
     borderRadius: handRadius(seed),
     background: s.tint,
-    // A faint ink edge, like the outline of a sketched note.
-    boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 14%, transparent)${lifted ? ", 0 24px 40px -18px var(--shadow)" : ""}`,
+    // A faint ink edge, like the outline of a sketched note (lighter than the fill in the dark theme).
+    boxShadow: `inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent)${lifted ? ", 0 24px 40px -18px var(--shadow)" : ""}`,
     transform: lifted ? "rotate(-7deg)" : `rotate(${s.rotate}deg)`,
   };
 }

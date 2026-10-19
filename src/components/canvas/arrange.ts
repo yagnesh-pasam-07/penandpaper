@@ -25,70 +25,54 @@ const right = (b: Box) => b.x + b.w / 2;
 const top = (b: Box) => b.y - b.h / 2;
 const bottom = (b: Box) => b.y + b.h / 2;
 
-function overlaps(a: Box, b: Box, margin = 12): boolean {
-  return left(a) < right(b) + margin && right(a) + margin > left(b) && top(a) < bottom(b) + margin && bottom(a) + margin > top(b);
-}
-
 /**
- * Where every bubble goes. Moved ones keep their spot; the rest flow in rows
- * around them, in the order given (centred rows when nothing has been moved).
+ * Where every bubble goes. Bubbles nobody has moved (new drops) flow in
+ * centred rows at the top, right under the input; the arranged ones keep their
+ * shape below them. `lift` is how far the arranged group was shifted to sit
+ * there (display y = saved y + lift); pass it back to hold the group still,
+ * e.g. while dragging.
  */
 export function layout(
   items: { id: string; size: Size; at: Point | null }[],
   width: number,
-): Map<string, Box> {
-  const out = new Map<string, Box>();
-  const placed: Box[] = [];
-  for (const it of items) {
-    if (!it.at) continue;
-    const box = clamp({ x: it.at.x * width, y: it.at.y, ...it.size }, width);
-    out.set(it.id, box);
-    placed.push(box);
-  }
+  lift?: number,
+): { boxes: Map<string, Box>; lift: number } {
+  const boxes = new Map<string, Box>();
 
-  const free = items.filter((it) => !it.at);
   const rows: (Box & { id: string })[][] = [];
   let row: (Box & { id: string })[] = [];
   let x = PAD;
-  let y = PAD;
+  let y = EDGE_TOP;
   let rowH = 0;
-  const newRow = () => {
-    if (row.length) rows.push(row);
-    row = [];
-    x = PAD;
-    y += rowH + GAP_Y;
-    rowH = 0;
-  };
-  for (const it of free) {
+  for (const it of items) {
+    if (it.at) continue;
     const { w, h } = it.size;
-    for (let guard = 0; guard < 500; guard++) {
-      if (x + w > width - PAD && row.length) {
-        newRow();
-        continue;
-      }
-      const box = { x: x + w / 2, y: y + h / 2, w, h };
-      const hit = placed.find((p) => overlaps(box, p));
-      if (!hit) {
-        row.push({ ...box, id: it.id });
-        x += w + GAP_X;
-        rowH = Math.max(rowH, h);
-        break;
-      }
-      x = right(hit) + GAP_X;
-      if (x + w > width - PAD) {
-        rowH = Math.max(rowH, 1);
-        newRow();
-      }
+    if (x + w > width - PAD && row.length) {
+      rows.push(row);
+      row = [];
+      x = PAD;
+      y += rowH + GAP_Y;
+      rowH = 0;
     }
+    row.push({ id: it.id, x: x + w / 2, y: y + h / 2, w, h });
+    x += w + GAP_X;
+    rowH = Math.max(rowH, h);
   }
   if (row.length) rows.push(row);
-
   for (const r of rows) {
-    // Nothing moved yet: centre each row, like a fresh sheet.
-    const shift = placed.length ? 0 : (width - (right(r[r.length - 1]) - left(r[0]))) / 2 - left(r[0]);
-    for (const { id, ...b } of r) out.set(id, { ...b, x: b.x + shift });
+    const shift = (width - (right(r[r.length - 1]) - left(r[0]))) / 2 - left(r[0]);
+    for (const { id, ...b } of r) boxes.set(id, clamp({ ...b, x: b.x + shift }, width));
   }
-  return out;
+  const flowBottom = rows.length ? y + rowH + GAP_Y : EDGE_TOP;
+
+  const placed = items.filter((it) => it.at);
+  const tops = placed.map((it) => it.at!.y - it.size.h / 2);
+  const natural = tops.length ? flowBottom - Math.min(...tops) : 0;
+  const shift = lift ?? natural;
+  for (const it of placed) {
+    boxes.set(it.id, clamp({ x: it.at!.x * width, y: it.at!.y + shift, ...it.size }, width));
+  }
+  return { boxes, lift: shift };
 }
 
 /** Keeps a bubble wholly on the sheet. */

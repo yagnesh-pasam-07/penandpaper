@@ -61,10 +61,14 @@ export function FreeCanvas<T extends Item>({
     return () => ro.disconnect();
   }, [items]);
 
-  const boxes = layout(
-    items.map((it) => ({ id: it.id, size: sizes[it.id] ?? GUESS, at: it.x === null || it.y === null ? null : { x: it.x, y: it.y } })),
-    width,
-  );
+  const placedIn = items.map((it) => ({ id: it.id, size: sizes[it.id] ?? GUESS, at: it.x === null || it.y === null ? null : { x: it.x, y: it.y } }));
+  // The arranged group's shift holds still until a new drop arrives (which
+  // pushes it down to make room), so dragging never makes the sheet jump.
+  const flowing = placedIn.filter((it) => !it.at).map((it) => it.id);
+  const [held, setHeld] = useState<{ ids: string[]; lift: number } | null>(null);
+  const fresh = !held || flowing.some((id) => !held.ids.includes(id));
+  const { boxes, lift } = layout(placedIn, width, fresh ? undefined : held.lift);
+  if (fresh && width > 0) setHeld({ ids: flowing, lift });
 
   let guides: { x?: number; y?: number } = {};
   if (drag?.moving) {
@@ -80,23 +84,25 @@ export function FreeCanvas<T extends Item>({
   const height = Math.max(minHeight, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
-  const latest = useRef({ boxes, items, width, onArrange });
+  const latest = useRef({ boxes, items, width, lift, onArrange });
   useLayoutEffect(() => {
-    latest.current = { boxes, items, width, onArrange };
+    latest.current = { boxes, items, width, lift, onArrange };
   });
 
   /** Where a release would settle the drag, and the bubbles that were still flowing, pinned in place. */
   const settle = (d: Drag): Placement[] => {
-    const { boxes: now, items: all, width: w } = latest.current;
+    const { boxes: now, items: all, width: w, lift: shift } = latest.current;
+    // Saved spots are relative to the group, not the screen.
+    const saved = (b: Box) => ({ x: b.x / w, y: Math.round(b.y - shift) });
     const others = [...now].filter(([id]) => id !== d.id).map(([, b]) => b);
     const { box } = snap({ ...d.start, x: d.start.x + d.dx, y: d.start.y + d.dy }, others, w);
     const pinned = all
       .filter((it) => it.id !== d.id && (it.x === null || it.y === null))
       .flatMap((it) => {
         const b = now.get(it.id);
-        return b ? [{ id: it.id, x: b.x / w, y: Math.round(b.y) }] : [];
+        return b ? [{ id: it.id, ...saved(b) }] : [];
       });
-    return [{ id: d.id, x: box.x / w, y: Math.round(box.y) }, ...pinned];
+    return [{ id: d.id, ...saved(box) }, ...pinned];
   };
 
   const down = (id: string) => (e: ReactPointerEvent<HTMLDivElement>) => {

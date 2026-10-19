@@ -11,8 +11,10 @@ type Props = {
   shape: number;
   /** Makes the hand-drawn outline; keep it stable for the same thought (e.g. when it was first dropped). */
   seed?: string;
-  /** Small line under the text: time dropped, "from Thu", … */
+  /** When it was dropped; on the sheet it shows on hover, in the phone stream under the text. */
   meta?: ReactNode;
+  /** The day it was first dropped, when it rolled over: shown as a small mark. */
+  carried?: string;
   /** Plays the drop animation (for a thought that just landed). */
   fresh?: boolean;
   /** Full-width card for the phone stream instead of a floating bubble. */
@@ -58,7 +60,7 @@ export function LinkedText({ text }: { text: string }) {
  * One thought on paper. Click to edit, double-click (or swipe right on a phone)
  * to strike it out; Delete lives in the edit view and the hover buttons.
  */
-export function ThoughtBubble({ text, done, shape, seed, meta, fresh, stream, readOnly, movable, small, onEdit, onToggle, onDelete }: Props) {
+export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, stream, readOnly, movable, small, onEdit, onToggle, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [dx, setDx] = useState(0);
@@ -202,15 +204,26 @@ export function ThoughtBubble({ text, done, shape, seed, meta, fresh, stream, re
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`flex flex-col gap-1.5 transition-[background-color,transform] duration-300 ${small ? "px-4 py-3" : "px-6 py-5"} ${done ? "is-done" : ""} ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
+        className={`relative flex flex-col gap-1.5 transition-[background-color,transform] duration-300 ${small ? "px-4 py-3" : "px-6 py-5"} ${done ? "is-done" : ""} ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
       >
         <span className={`font-hand leading-snug font-semibold break-words whitespace-pre-wrap ${small ? "text-[18px]" : "text-[22px] sm:text-[24px]"}`}>
           <span className="pen-strike">
             <LinkedText text={text} />
           </span>
         </span>
-        {meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
+        {stream && meta && !small && <span className="font-mono text-[11px] text-mute">{meta}</span>}
+        {carried && !small && (
+          <span title={`Carried from ${carried}`} aria-label={`Carried from ${carried}`} className="absolute top-2 left-2.5 text-[11px] leading-none text-mute">
+            ↻
+          </span>
+        )}
       </div>
+      {!stream && meta && !small && (
+        <span className="pointer-events-none absolute top-full left-1/2 mt-1.5 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap text-mute opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+          {meta}
+          {carried ? ` · from ${carried}` : ""}
+        </span>
+      )}
       {!readOnly && (
         <span className="absolute -top-3 -right-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-sm:hidden">
           <button
