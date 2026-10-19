@@ -4,7 +4,7 @@ import { noStore, requireUser } from "@/modules/drop/http";
 import { changeStacks } from "@/modules/drop/server";
 
 const id = z.string().regex(/^[a-z0-9-]{6,40}$/);
-const spot = { x: z.number().min(0).max(1).nullable(), y: z.number().min(0).max(20000).nullable() };
+const spot = { x: z.number().min(0).max(1).nullable(), y: z.number().min(-20000).max(20000).nullable() };
 
 const op = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("stack"), thought: id, onto: id, newStackId: id }),
@@ -12,7 +12,7 @@ const op = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("unstack"),
     stack: id,
-    spots: z.array(z.object({ id, x: z.number().min(0).max(1), y: z.number().min(0).max(20000) })).max(500),
+    spots: z.array(z.object({ id, x: z.number().min(0).max(1), y: z.number().min(-20000).max(20000) })).max(500),
   }),
   z.object({ kind: z.literal("rename"), stack: id, name: z.string().max(MAX_STACK_NAME * 2).nullable() }),
   z.object({ kind: z.literal("crumple"), stack: id }),
