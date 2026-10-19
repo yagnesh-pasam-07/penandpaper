@@ -88,7 +88,7 @@ export function Avatar({
     <span
       aria-hidden="true"
       style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
-      className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${tint ? `${tintBg[tint]} text-ink` : "bg-ink text-bg"} ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${tint ? `${tintBg[tint]} text-ink` : "border border-line bg-soft text-ink"} ${className}`}
     >
       {name.charAt(0).toUpperCase()}
     </span>

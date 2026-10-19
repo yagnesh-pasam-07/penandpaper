@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import { FreeCanvas, type Placement } from "@/components/canvas/free-canvas";
 import { PaperSurface } from "@/components/canvas/paper-surface";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
-import { PenIcon } from "@/components/icons";
+import { CloseIcon, PenIcon } from "@/components/icons";
 import { AccountMenu, Logo, ThemeToggle } from "@/components/ui";
 import { uid } from "@/lib/mutations";
 import { useStore } from "@/lib/store";
@@ -51,8 +51,7 @@ function DropHeader({ me, right }: { me: Me; right?: ReactNode }) {
 }
 
 function meta(t: Thought, tz: string): string {
-  const time = clock(new Date(t.createdAt), tz);
-  return t.carriedFrom ? `${time} · from ${weekday(t.carriedFrom).slice(0, 3)}` : time;
+  return clock(new Date(t.createdAt), tz);
 }
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
@@ -235,8 +234,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
     onDelete: () => remove(t.id),
   });
   const struck = paper.thoughts.filter((t) => t.status === "done").length;
-  const carried = paper.thoughts.filter((t) => t.carriedFrom).length;
-  const dropped = paper.thoughts.length - carried;
+  const open = paper.thoughts.length - struck;
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
@@ -297,7 +295,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
           <span className="text-sm text-mute" aria-live="polite">
             {paper.thoughts.length === 0
               ? "Nothing dropped yet today."
-              : `${dropped} dropped today${carried ? ` · ${carried} carried` : ""}${struck ? ` · ${struck} struck` : ""}`}
+              : `${open} open${struck ? ` · ${struck} done today` : ""}`}
           </span>
           {arranged && (
             <button type="button" onClick={tidy} className="hidden rounded-lg px-2.5 py-1.5 text-sm font-medium text-mute hover:bg-soft hover:text-ink sm:block">
@@ -307,7 +305,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
         </div>
 
         {onSheet.length === 0 ? (
-          <PaperSurface label="Today's paper" className="flex flex-1 items-center justify-center sm:min-h-[420px]">
+          <PaperSurface label="Today's paper" className={`${COLUMN} flex flex-1 items-center justify-center sm:min-h-[420px]`}>
             <span className="flex flex-col items-center gap-1 py-16 text-center">
               <span className="font-hand text-[34px] font-bold">{shown.length ? "All struck. A clean sheet." : "A fresh sheet."}</span>
               <span className="text-mute">Type anything above and press Enter.</span>
@@ -322,7 +320,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
             </PaperSurface>
             <FreeCanvas
               label="Today's paper"
-              className="max-sm:hidden"
+              className={`${COLUMN} max-sm:hidden`}
               items={onSheet}
               onArrange={onArrange}
               render={(t) => <ThoughtBubble {...bubbleProps(t, tz, fresh.has(t.id))} movable {...handlers(t)} />}
@@ -333,13 +331,31 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
         {doneRow.length > 0 && (
           <section aria-label="Done today" className={`${COLUMN} flex flex-col gap-3`}>
             <h2 className="text-sm font-medium text-mute">Done today · {doneRow.length}</h2>
-            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-start sm:gap-3">
+            <ul className="flex flex-wrap gap-2">
               {doneRow.map((t) => (
-                <div key={t.id} className="w-full sm:w-auto">
-                  <ThoughtBubble {...bubbleProps(t, tz, false)} small {...handlers(t)} />
-                </div>
+                <li key={t.id} className="group is-done flex max-w-full items-center gap-1 rounded-full border border-line bg-soft py-1 pr-1 pl-3.5">
+                  <span className="pen-strike truncate font-hand text-[17px] leading-tight">{t.text}</span>
+                  <button
+                    type="button"
+                    onClick={() => patch(t.id, { status: "open" })}
+                    aria-label={`Bring back "${t.text}"`}
+                    title="Bring back"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] text-mute hover:bg-sheet hover:text-ink"
+                  >
+                    ↺
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(t.id)}
+                    aria-label={`Delete "${t.text}"`}
+                    title="Delete"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full text-mute opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-sheet hover:text-red-text max-sm:opacity-100"
+                  >
+                    <CloseIcon size={10} />
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           </section>
         )}
 
@@ -362,7 +378,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
 }
 
 function bubbleProps(t: Thought, tz: string, fresh: boolean) {
-  return { text: t.text, done: t.status === "done", shape: t.shape, seed: t.createdAt, meta: meta(t, tz), fresh };
+  return { text: t.text, done: t.status === "done", shape: t.shape, seed: t.createdAt, meta: meta(t, tz), carried: t.carriedFrom ? weekday(t.carriedFrom).slice(0, 3) : undefined, fresh };
 }
 
 /* ---------- History ---------- */
@@ -413,14 +429,14 @@ export function HistoryPaper({ me, paper }: { me: Me; paper: DropPaper }) {
           </Link>
         </div>
         <span className={`${COLUMN} text-sm text-mute`}>Read-only · {paper.thoughts.filter((t) => t.status === "done").length} of {paper.thoughts.length} struck</span>
-        <PaperSurface label={`Paper for ${longDate(paper.date)}`} className="flex flex-col gap-3 sm:hidden">
+        <PaperSurface label={`Paper for ${longDate(paper.date)}`} className={`${COLUMN} flex flex-col gap-3 sm:hidden`}>
           {paper.thoughts.map((t) => (
             <ThoughtBubble key={t.id} {...bubbleProps(t, tz, false)} stream readOnly />
           ))}
         </PaperSurface>
         <FreeCanvas
           label={`Paper for ${longDate(paper.date)}`}
-          className="max-sm:hidden"
+          className={`${COLUMN} max-sm:hidden`}
           items={paper.thoughts}
           render={(t) => <ThoughtBubble {...bubbleProps(t, tz, false)} readOnly />}
         />

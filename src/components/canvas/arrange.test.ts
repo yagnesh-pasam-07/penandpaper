@@ -5,7 +5,7 @@ const size = { w: 200, h: 100 };
 
 describe("layout", () => {
   it("flows unmoved bubbles into centred rows", () => {
-    const boxes = layout(
+    const { boxes } = layout(
       ["a", "b", "c"].map((id) => ({ id, size, at: null })),
       1000,
     );
@@ -16,21 +16,31 @@ describe("layout", () => {
     expect(a.x - a.w / 2).toBeCloseTo((1000 - (3 * 200 + 2 * 32)) / 2);
   });
 
-  it("keeps a moved bubble where it was put and flows the rest around it", () => {
-    const boxes = layout(
+  it("puts new drops right under the input and the arranged group below them", () => {
+    const { boxes, lift } = layout(
       [
-        { id: "moved", size, at: { x: 0.15, y: 80 } },
-        { id: "free", size, at: null },
+        { id: "moved", size, at: { x: 0.15, y: 400 } },
+        { id: "other", size, at: { x: 0.6, y: 520 } },
+        { id: "new", size, at: null },
       ],
       1000,
     );
-    expect(boxes.get("moved")).toMatchObject({ x: 150, y: 80 });
-    const free = boxes.get("free")!;
-    expect(free.x - free.w / 2).toBeGreaterThanOrEqual(250);
+    const fresh = boxes.get("new")!;
+    const moved = boxes.get("moved")!;
+    expect(fresh.y - fresh.h / 2).toBe(22);
+    expect(moved.y - moved.h / 2).toBeGreaterThan(fresh.y + fresh.h / 2);
+    // The group keeps its shape.
+    expect(boxes.get("other")!.y - moved.y).toBe(120);
+    expect(moved.y).toBe(400 + lift);
+  });
+
+  it("holds the group still when given a lift", () => {
+    const { boxes } = layout([{ id: "a", size, at: { x: 0.5, y: 300 } }], 1000, 0);
+    expect(boxes.get("a")!.y).toBe(300);
   });
 
   it("wraps to a new row when the sheet is full", () => {
-    const boxes = layout(
+    const { boxes } = layout(
       ["a", "b"].map((id) => ({ id, size, at: null })),
       300,
     );
