@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { users } from "@/db/schema";
 import { uid } from "@/lib/mutations";
@@ -24,6 +24,8 @@ function toThought(r: ThoughtRow): Thought {
     createdAt: new Date(r.createdAt).toISOString(),
     doneAt: r.doneAt ? new Date(r.doneAt).toISOString() : null,
     carriedFrom: r.carriedFrom,
+    x: r.x,
+    y: r.y,
   };
 }
 
@@ -64,7 +66,7 @@ async function ensureTodayPaper(userId: string): Promise<{ id: string; date: str
     const carried = rollover({ date: prev.date, thoughts: await thoughtsOf(prev.id) }, uid);
     if (carried.length) {
       await db.insert(dropThoughts).values(
-        carried.map((t) => ({ id: t.id, paperId: created.id, userId, text: t.text, status: t.status, shape: t.shape, createdAt: t.createdAt, carriedFrom: t.carriedFrom })),
+        carried.map((t) => ({ id: t.id, paperId: created.id, userId, text: t.text, status: t.status, shape: t.shape, createdAt: t.createdAt, carriedFrom: t.carriedFrom, x: t.x, y: t.y })),
       );
     }
   }
@@ -111,6 +113,33 @@ export async function deleteThought(userId: string, id: string): Promise<boolean
     .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)))
     .returning({ id: dropThoughts.id });
   return rows.length > 0;
+}
+
+/**
+ * Moves thoughts on today's paper; a null spot sends one back into the flow.
+ * Thoughts that aren't on today's paper are skipped. Returns how many moved.
+ */
+export async function arrangeThoughts(userId: string, placements: { id: string; x: number | null; y: number | null }[]): Promise<number> {
+  const today = await ensureTodayPaper(userId);
+  if (!placements.length) return 0;
+  const ids = placements.map((p) => p.id);
+  const xs = sql.join(placements.map((p) => sql`when ${p.id} then ${p.x}::real`), sql` `);
+  const ys = sql.join(placements.map((p) => sql`when ${p.id} then ${p.y}::real`), sql` `);
+  const rows = await db
+    .update(dropThoughts)
+    .set({ x: sql`case ${dropThoughts.id} ${xs} end`, y: sql`case ${dropThoughts.id} ${ys} end` })
+    .where(and(inArray(dropThoughts.id, ids), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)))
+    .returning({ id: dropThoughts.id });
+  return rows.length;
+}
+
+/** Sends every thought on today's paper back into the flow. */
+export async function tidyToday(userId: string): Promise<void> {
+  const today = await ensureTodayPaper(userId);
+  await db
+    .update(dropThoughts)
+    .set({ x: null, y: null })
+    .where(and(eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)));
 }
 
 export type PaperSummary = { date: string; total: number; done: number };

@@ -16,6 +16,8 @@ type Props = {
   /** Full-width card for the phone stream instead of a floating bubble. */
   stream?: boolean;
   readOnly?: boolean;
+  /** On a sheet where it can be dragged: shows a grab cursor. */
+  movable?: boolean;
   onEdit?: (text: string) => void;
   onToggle?: () => void;
   onDelete?: () => void;
@@ -52,7 +54,7 @@ export function LinkedText({ text }: { text: string }) {
  * One thought on paper. Click to edit, double-click (or swipe right on a phone)
  * to strike it out; Delete lives in the edit view and the hover buttons.
  */
-export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly, onEdit, onToggle, onDelete }: Props) {
+export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly, movable, onEdit, onToggle, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [dx, setDx] = useState(0);
@@ -99,7 +101,8 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
   };
 
   const onPointerDown = (e: ReactPointerEvent) => {
-    if (readOnly || e.pointerType === "mouse") return;
+    // Swipe to strike only in the phone stream; on the sheet a touch drags.
+    if (readOnly || !stream || e.pointerType === "mouse") return;
     swipe.current = { x: e.clientX, y: e.clientY, swiped: false };
   };
   const onPointerMove = (e: ReactPointerEvent) => {
@@ -128,7 +131,7 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
 
   if (editing) {
     return (
-      <div style={shapeStyle} className={`flex flex-col gap-2.5 p-4 ${stream ? "w-full" : "w-[min(100%,320px)]"}`}>
+      <div style={shapeStyle} className={`flex flex-col gap-2.5 p-4 ${stream ? "w-full" : "w-[320px] max-w-full"}`}>
         <label className="sr-only" htmlFor={fieldId}>
           Edit thought
         </label>
@@ -193,7 +196,7 @@ export function ThoughtBubble({ text, done, shape, meta, fresh, stream, readOnly
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`flex flex-col gap-1.5 px-6 py-5 transition-[opacity,transform] ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : "cursor-text touch-pan-y select-none"} ${done ? "opacity-60" : ""}`}
+        className={`flex flex-col gap-1.5 px-6 py-5 transition-[opacity,transform] ${stream ? "items-start text-left" : "items-center text-center"} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"} ${done ? "opacity-60" : ""}`}
       >
         <span className={`font-hand text-[22px] leading-snug font-semibold break-words whitespace-pre-wrap sm:text-[24px] ${done ? "strike text-mute" : ""}`}>
           <LinkedText text={text} />

@@ -10,6 +10,9 @@ export type Thought = {
   doneAt: string | null;
   /** YYYY-MM-DD it was first dropped, when it rolled over to a later paper. */
   carriedFrom: string | null;
+  /** Spot on the sheet once dragged (x: share of width, y: px); null while it flows. */
+  x: number | null;
+  y: number | null;
 };
 
 export type DropPaper = { date: string; thoughts: Thought[] };
