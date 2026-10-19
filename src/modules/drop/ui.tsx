@@ -77,6 +77,8 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
   const [text, setText] = useState("");
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
+  // Just struck: stays on the sheet long enough to see the pen line, then sinks to "done today".
+  const [settling, setSettling] = useState<Set<string>>(new Set());
   const pending = useRef(0);
   // Saves go out one at a time, in order: drops land in the order typed, and
   // an edit never overtakes the drop it edits.
@@ -176,6 +178,14 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
     if (!before) return;
     const after = { ...before, ...change, doneAt: change.status === "done" ? new Date().toISOString() : change.status === "open" ? null : before.doneAt };
     setPaper((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? after : t)) }));
+    if (change.status === "done") {
+      setSettling((s) => new Set(s).add(id));
+      setTimeout(() => setSettling((s) => {
+        const next = new Set(s);
+        next.delete(id);
+        return next;
+      }), 900);
+    }
     void save(
       () => call(`/api/drop/thoughts/${id}`, { method: "PATCH", body: JSON.stringify(change) }),
       () => setPaper((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? before : t)) })),
@@ -215,8 +225,15 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
   };
   const arranged = paper.thoughts.some((t) => t.x !== null);
 
-  // Newest first, right under the pen.
+  // Newest first, right under the pen. Done ones get out of the way.
   const shown = [...paper.thoughts].reverse();
+  const onSheet = shown.filter((t) => t.status === "open" || settling.has(t.id));
+  const doneRow = shown.filter((t) => t.status === "done" && !settling.has(t.id));
+  const handlers = (t: Thought) => ({
+    onEdit: (v: string) => patch(t.id, { text: v }),
+    onToggle: () => patch(t.id, { status: t.status === "done" ? "open" : "done" }),
+    onDelete: () => remove(t.id),
+  });
   const struck = paper.thoughts.filter((t) => t.status === "done").length;
   const carried = paper.thoughts.filter((t) => t.carriedFrom).length;
   const dropped = paper.thoughts.length - carried;
@@ -289,36 +306,41 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
           )}
         </div>
 
-        {shown.length === 0 ? (
+        {onSheet.length === 0 ? (
           <PaperSurface label="Today's paper" className="flex flex-1 items-center justify-center sm:min-h-[420px]">
             <span className="flex flex-col items-center gap-1 py-16 text-center">
-              <span className="font-hand text-[34px] font-bold">A fresh sheet.</span>
+              <span className="font-hand text-[34px] font-bold">{shown.length ? "All struck. A clean sheet." : "A fresh sheet."}</span>
               <span className="text-mute">Type anything above and press Enter.</span>
             </span>
           </PaperSurface>
         ) : (
           <>
             <PaperSurface label="Today's paper" className="flex flex-1 flex-col gap-3 sm:hidden">
-              {shown.map((t) => (
-                <ThoughtBubble key={t.id} {...bubbleProps(t, tz, fresh.has(t.id))} stream onEdit={(v) => patch(t.id, { text: v })} onToggle={() => patch(t.id, { status: t.status === "done" ? "open" : "done" })} onDelete={() => remove(t.id)} />
+              {onSheet.map((t) => (
+                <ThoughtBubble key={t.id} {...bubbleProps(t, tz, fresh.has(t.id))} stream {...handlers(t)} />
               ))}
             </PaperSurface>
             <FreeCanvas
               label="Today's paper"
               className="max-sm:hidden"
-              items={shown}
+              items={onSheet}
               onArrange={onArrange}
-              render={(t) => (
-                <ThoughtBubble
-                  {...bubbleProps(t, tz, fresh.has(t.id))}
-                  movable
-                  onEdit={(v) => patch(t.id, { text: v })}
-                  onToggle={() => patch(t.id, { status: t.status === "done" ? "open" : "done" })}
-                  onDelete={() => remove(t.id)}
-                />
-              )}
+              render={(t) => <ThoughtBubble {...bubbleProps(t, tz, fresh.has(t.id))} movable {...handlers(t)} />}
             />
           </>
+        )}
+
+        {doneRow.length > 0 && (
+          <section aria-label="Done today" className={`${COLUMN} flex flex-col gap-3`}>
+            <h2 className="text-sm font-medium text-mute">Done today · {doneRow.length}</h2>
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-start sm:gap-3">
+              {doneRow.map((t) => (
+                <div key={t.id} className="w-full sm:w-auto">
+                  <ThoughtBubble {...bubbleProps(t, tz, false)} small {...handlers(t)} />
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         <p className="hidden text-center text-[13px] text-mute sm:block">
