@@ -15,6 +15,9 @@ import { MAX_THOUGHT, type DropPaper, type Thought } from "./logic";
 
 type Me = { name: string; email: string };
 
+/** The reading column for headings and the input; the sheet itself spreads wider. */
+const COLUMN = "mx-auto w-full max-w-[1056px]";
+
 const noSubscribe = () => () => {};
 /** The viewer's time zone; "UTC" while the server renders, so hydration matches. */
 function useViewerTz(): string {
@@ -228,8 +231,8 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
           </Link>
         }
       />
-      <main className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-4 px-4 pt-3 pb-10 sm:gap-5 sm:px-8">
-        <div className="flex items-baseline justify-between gap-3">
+      <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-3 pb-10 sm:gap-5 sm:px-8">
+        <div className={`${COLUMN} flex items-baseline justify-between gap-3`}>
           <h1 className="font-hand text-[40px] leading-none font-bold sm:text-5xl">{weekday(paper.date)}</h1>
           <span className="text-sm text-mute">{longDate(paper.date).replace(/^\w+, /, "")}</span>
         </div>
@@ -239,7 +242,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
             e.preventDefault();
             drop();
           }}
-          className="sticky top-2 z-10"
+          className={`${COLUMN} sticky top-2 z-40`}
         >
           <label className="flex h-[60px] items-center gap-3 rounded-2xl border-[1.5px] border-ink bg-sheet px-5 text-red-text shadow-[0_10px_30px_-22px_var(--shadow)]">
             <PenIcon size={22} />
@@ -273,7 +276,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
           </label>
         </form>
 
-        <div className="flex min-h-8 items-center justify-between gap-3">
+        <div className={`${COLUMN} flex min-h-8 items-center justify-between gap-3`}>
           <span className="text-sm text-mute" aria-live="polite">
             {paper.thoughts.length === 0
               ? "Nothing dropped yet today."
@@ -380,14 +383,14 @@ export function HistoryPaper({ me, paper }: { me: Me; paper: DropPaper }) {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <DropHeader me={me} />
-      <main className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-5 px-4 pt-3 pb-12 sm:px-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
+      <main className="flex w-full flex-1 flex-col gap-5 px-4 pt-3 pb-12 sm:px-8">
+        <div className={`${COLUMN} flex flex-wrap items-baseline justify-between gap-3`}>
           <h1 className="font-hand text-[40px] leading-none font-bold">{shortDate(paper.date)}</h1>
           <Link href="/drop/history" className="text-sm font-semibold">
             ← All papers
           </Link>
         </div>
-        <span className="text-sm text-mute">Read-only · {paper.thoughts.filter((t) => t.status === "done").length} of {paper.thoughts.length} struck</span>
+        <span className={`${COLUMN} text-sm text-mute`}>Read-only · {paper.thoughts.filter((t) => t.status === "done").length} of {paper.thoughts.length} struck</span>
         <PaperSurface label={`Paper for ${longDate(paper.date)}`} className="flex flex-col gap-3 sm:hidden">
           {paper.thoughts.map((t) => (
             <ThoughtBubble key={t.id} {...bubbleProps(t, tz, false)} stream readOnly />

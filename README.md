@@ -20,11 +20,11 @@ Two modules share one app, one sign-in and one database:
 | ![Drop on a phone](docs/images/drop-phone.png) | ![Past papers](docs/images/drop-history.png) | ![Drop in the dark theme](docs/images/drop-today-dark.jpg) |
 
 - **Canvas home**: `/drop` opens straight to today's paper with the input focused. Enter drops a thought; it appears instantly (saved in the background) with a soft drop animation.
-- **Bubbles**: text plus the time it was dropped. Click to edit, double-click (or swipe right on a phone) to strike out, delete from the edit view or the hover buttons. Links are clickable.
+- **Bubbles**: quiet notes and pills (told apart by tint, so a busy day stays readable), with the time it was dropped. Click to edit; double-click (or swipe right on a phone) to strike it out: a pen scribble is drawn across the whole thought with a small ink burst; delete from the edit view or the hover buttons. Links are clickable.
 - **Daily paper**: each day (in `DROP_TIMEZONE`, default IST) is a fresh paper. Unstruck thoughts from the last paper roll over on the first open of the day, marked "from Sat".
 - **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
 - **History**: `/drop/history` lists past papers; each opens read-only.
-- **Arrange**: drag a thought anywhere on the sheet. It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
+- **Arrange**: the sheet spans the full window width. Drag a thought anywhere on it. It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
 - **Keyboard first**: Space, or simply typing, puts the cursor in the drop box from anywhere on the page; Enter drops; Esc clears, and a second Esc steps out.
 - **Phone**: the canvas becomes a vertical stream with the same input.
 - Sign-in required: signed-out visits go to `/signup?next=/drop`.
