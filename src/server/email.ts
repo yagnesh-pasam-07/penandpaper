@@ -7,8 +7,8 @@ type Mail = {
   subject: string;
   heading: string;
   lines: string[];
-  /** A checklist: done items struck out, open ones highlighted. */
-  items?: { text: string; done: boolean }[];
+  /** A checklist: done items struck out, open ones highlighted; a `group` row starts a titled group. */
+  items?: ({ text: string; done: boolean } | { group: string })[];
   cta: { label: string; url: string };
   scheduledAt?: string;
 };
@@ -29,7 +29,9 @@ function render({ heading, lines, items = [], cta }: Mail): { html: string; text
 ${lines.map((l) => `<tr><td style="font-size:16px;line-height:1.5;color:#5F5B54;padding-bottom:6px">${esc(l)}</td></tr>`).join("")}
 ${items
   .map((i) =>
-    i.done
+    "group" in i
+      ? `<tr><td style="font-size:13px;font-weight:600;letter-spacing:0.02em;color:#5F5B54;padding:14px 0 4px">${esc(i.group)}</td></tr>`
+      : i.done
       ? `<tr><td style="font-size:16px;line-height:1.5;padding:6px 10px;color:#5F5B54"><s style="text-decoration-color:#C8382F">${esc(i.text)}</s></td></tr>`
       : `<tr><td style="font-size:16px;line-height:1.5;padding:6px 10px;color:#1E1D1A;background:#FFF1BF;border-radius:8px">${esc(i.text)}</td></tr><tr><td style="height:4px"></td></tr>`,
   )
@@ -37,7 +39,7 @@ ${items
 <tr><td style="padding-top:18px"><a href="${esc(cta.url)}" style="display:inline-block;background:#C8382F;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:16px;padding:14px 22px;border-radius:12px">${esc(cta.label)}</a></td></tr>
 <tr><td style="font-size:13px;color:#5F5B54;padding-top:18px;word-break:break-all">Or open: ${esc(cta.url)}</td></tr>
 </table></td></tr></table></body></html>`;
-  const text = [heading, "", ...lines, ...items.map((i) => (i.done ? `✓ ${i.text} (done)` : `• ${i.text}`)), "", `${cta.label}: ${cta.url}`].join("\n");
+  const text = [heading, "", ...lines, ...items.map((i) => ("group" in i ? `\n${i.group}` : i.done ? `✓ ${i.text} (done)` : `• ${i.text}`)), "", `${cta.label}: ${cta.url}`].join("\n");
   return { html, text };
 }
 

@@ -1,5 +1,6 @@
 import { appUrl } from "@/lib/env";
 import { longDate } from "@/lib/time";
+import { digestItems } from "@/modules/drop/digest";
 import { digestsFor, dropToday } from "@/modules/drop/server";
 import { sendMail } from "@/server/email";
 
@@ -20,8 +21,6 @@ export async function GET(request: Request) {
     const done = paper.thoughts.length - open;
     const carried = paper.thoughts.filter((t) => t.carriedFrom).length;
     const dropped = paper.thoughts.length - carried;
-    // Open ones first: they're what tomorrow starts with.
-    const items = [...paper.thoughts].sort((a, b) => (a.status === b.status ? 0 : a.status === "open" ? -1 : 1));
     const ok = await sendMail({
       to: email,
       subject: `Your paper for ${longDate(date)}`,
@@ -30,7 +29,7 @@ export async function GET(request: Request) {
         `${dropped} dropped today${carried ? `, ${carried} carried over` : ""}. ${done} struck out, ${open} still open.`,
         ...(open ? ["Open ones roll over to tomorrow's paper."] : []),
       ],
-      items: items.map((t) => ({ text: t.text, done: t.status === "done" })),
+      items: digestItems(paper),
       cta: { label: "Open my paper", url: `${appUrl}/drop` },
     });
     if (ok) sent += 1;
