@@ -289,6 +289,15 @@ describe("number it", () => {
     expect(ranks(p)).toEqual([["c", 1], ["d", 2], ["b", 3]]);
   });
 
+  it("moves numbered ones into the top row (their placed spots let go), in order", () => {
+    const placed = paper([t("a", "a", "open", null, { x: 0.8, y: 300 }), t("b", "b", "open", null, { x: 0.2, y: 120 })]);
+    const p = applyStackOp(applyStackOp(placed, { kind: "rank", id: "b", rank: 1 }), { kind: "rank", id: "a", rank: 2 });
+    expect(p.thoughts.map((x) => [x.id, x.x, x.y, x.rank])).toEqual([
+      ["a", null, null, 2],
+      ["b", null, null, 1],
+    ]);
+  });
+
   it("keeps it to six", () => {
     let p = base;
     for (const id of ["a", "b", "c", "d", "e", "f"]) p = tap(p, id);

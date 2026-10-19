@@ -383,7 +383,7 @@ export function ThoughtBubble({
           </span>
         )}
       </div>
-      {rank ? <RankMark n={rank} struck={done} className="absolute -top-4 -left-4 z-10" /> : null}
+      {rank ? <RankMark n={rank} struck={done} className="absolute -top-5 -left-5 z-10" /> : null}
       {!stream && meta && (
         <span className="pointer-events-none absolute top-full left-1/2 mt-1.5 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap text-mute opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
           {meta}

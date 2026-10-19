@@ -180,7 +180,7 @@ export function ClearDesk({ initial, me }: { initial: DropPaper; me: Me }) {
                       aria-pressed={n > 0}
                       className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-left ${n ? "border-red-text/50 bg-red-soft/40" : "border-line bg-sheet hover:bg-soft"}`}
                     >
-                      <span className="flex size-9 shrink-0 items-center justify-center">{n ? <RankMark n={n} /> : null}</span>
+                      <span className="flex size-9 shrink-0 items-center justify-center">{n ? <RankMark n={n} size="sm" /> : null}</span>
                       <span className="min-w-0 flex-1 truncate font-note text-[18px]">{c.kind === "thought" ? c.text : `${c.label} · ${c.open.length}`}</span>
                     </button>
                   </li>
