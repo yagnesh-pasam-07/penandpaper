@@ -642,9 +642,6 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
           </section>
         )}
 
-        <p className="hidden text-center text-[13px] text-mute sm:block">
-          Space or just type to write · drag onto another to stack · double-click to strike · W when · emailed at 9 PM
-        </p>
         <p className="text-center text-[13px] text-mute sm:hidden">Tap to edit · swipe right to strike, left to crumple · hold to stack</p>
       </main>
 
