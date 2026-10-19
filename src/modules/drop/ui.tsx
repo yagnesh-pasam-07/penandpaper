@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import { bubbleStyle } from "@/components/canvas/bubble";
 import { FreeCanvas, type Placement } from "@/components/canvas/free-canvas";
 import { PaperSurface } from "@/components/canvas/paper-surface";
+import { Fly } from "@/components/canvas/fly";
 import { StackCard } from "@/components/canvas/stack-card";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { CloseIcon, PenIcon } from "@/components/icons";
@@ -13,7 +14,8 @@ import { AccountMenu, Logo, ThemeToggle } from "@/components/ui";
 import { uid } from "@/lib/mutations";
 import { useStore } from "@/lib/store";
 import { browserTz, clock, longDate, shortDate, weekday } from "@/lib/time";
-import { applyStackOp, MAX_THOUGHT, membersOf, settleStacks, stackLabel, type DropPaper, type Stack, type StackOp, type Thought } from "./logic";
+import { applyStackOp, membersOf, settleStacks, stackLabel, type DropPaper, type Stack, type StackOp, type Thought } from "./logic";
+import { PenButton, Writer } from "./writer";
 
 type Me = { name: string; email: string };
 
@@ -104,6 +106,16 @@ function sheetItems(paper: DropPaper): SheetItem[] {
 
 const isOpenItem = (it: SheetItem) => (it.kind === "thought" ? it.thought.status === "open" : it.members.some((m) => m.status === "open"));
 
+const DRAFT_KEY = "pp-drop-draft";
+
+function readDraft(): string {
+  try {
+    return localStorage.getItem(DRAFT_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 /** Undo window for crumpling a stack. */
 const UNDO_MS = 6000;
 
@@ -117,7 +129,20 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
     live.current = change(live.current);
     setPaper(live.current);
   }, []);
-  const [text, setText] = useState("");
+  // The writer: open, and what's half-written in it (kept on close, and across reloads on this device).
+  const [writing, setWriting] = useState(initial.thoughts.length === 0);
+  const [draft, setDraft] = useState(readDraft);
+  useEffect(() => {
+    try {
+      if (draft) localStorage.setItem(DRAFT_KEY, draft);
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch {}
+  }, [draft]);
+  // Where each new note was written, so it can fly from there to its place.
+  const [flights, setFlights] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const penButton = useRef<HTMLButtonElement>(null);
+  // The draft lives in this browser only, so the writer appears once the page is live.
+  const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -131,8 +156,6 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   // Crumples waiting out their undo window; sent at once if the page goes away.
   const waiting = useRef(new Map<string, () => void>());
-  const input = useRef<HTMLInputElement>(null);
-  const [focused, setFocused] = useState(true);
   const tz = useViewerTz();
 
   /** Queues a save in the background; on failure, undoes it on screen and says so. */
@@ -184,30 +207,38 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // Keyboard first: Space (or simply typing) puts the cursor in the drop box
-  // from anywhere on the page, so a thought never needs the mouse.
+  // Keyboard first: Space, or simply typing, opens the writer from anywhere on
+  // the page (the first letter goes into it), so a thought never needs the mouse.
   useEffect(() => {
+    const open = (first?: string) => {
+      if (first) setDraft((d) => d + first);
+      setWriting(true);
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
       // A selected thought keeps S ("Stack with…") for itself.
       if (el?.closest("[data-keys]") && e.key.toLowerCase() === "s") return;
-      const box = input.current;
-      if (!box) return;
       if (e.key === " ") {
         // A focused button or link keeps Space for itself.
         if (el?.closest("button, a, summary")) return;
         e.preventDefault();
-        box.focus();
+        open();
       } else if (e.key.length === 1) {
-        // Focus moves before the key lands, so the letter is typed into the box.
-        box.focus();
+        e.preventDefault();
+        open(e.key);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  const closeWriter = () => {
+    setWriting(false);
+    // Back to where writing started.
+    requestAnimationFrame(() => penButton.current?.focus());
+  };
 
   const settle = (ids: string[]) => {
     setSettling((s) => new Set([...s, ...ids]));
@@ -222,9 +253,7 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
     );
   };
 
-  const drop = () => {
-    const value = text.trim().slice(0, MAX_THOUGHT);
-    if (!value) return;
+  const drop = (value: string, from: { x: number; y: number }) => {
     const thought: Thought = {
       id: uid(),
       text: value,
@@ -240,13 +269,13 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
     };
     update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setFresh((f) => new Set(f).add(thought.id));
-    setText("");
-    input.current?.focus();
+    setFlights((m) => new Map(m).set(thought.id, from));
+    setDraft("");
     void save(
       () => call("/api/drop/thoughts", { method: "POST", body: JSON.stringify({ id: thought.id, text: thought.text, shape: thought.shape }) }),
       () => {
         update((p) => ({ ...p, thoughts: p.thoughts.filter((t) => t.id !== thought.id) }));
-        setText((current) => current || value);
+        setDraft((current) => current || value);
       },
     );
   };
@@ -403,53 +432,12 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
           </Link>
         }
       />
-      <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-2 pb-10 sm:px-8">
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            drop();
-          }}
-          className={`${COLUMN} sticky top-2 z-40`}
-        >
-          <label className="flex h-[60px] items-center gap-3 rounded-2xl border-[1.5px] border-ink bg-sheet px-5 text-red-text shadow-[0_10px_30px_-22px_var(--shadow)]">
-            <PenIcon size={22} />
-            <input
-              ref={input}
-              aria-label="Drop a thought"
-              value={text}
-              maxLength={MAX_THOUGHT}
-              autoFocus
-              autoComplete="off"
-              enterKeyHint="send"
-              onChange={(e) => setText(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              onKeyDown={(e) => {
-                if (e.key !== "Escape") return;
-                // First Esc clears; the next one steps out so Space works again.
-                if (text) setText("");
-                else e.currentTarget.blur();
-              }}
-              placeholder="What's on your mind?"
-              className="min-w-0 flex-1 bg-transparent text-lg text-ink outline-none placeholder:text-mute focus-visible:outline-none"
-            />
-            <span className="hidden text-[13px] text-mute sm:inline" aria-hidden="true">
-              {focused ? "Enter to drop" : (
-                <>
-                  <kbd className="rounded-md border border-line bg-soft px-1.5 py-0.5 font-sans text-[12px]">Space</kbd> to write
-                </>
-              )}
-            </span>
-          </label>
-        </form>
-
-
+      <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-3 pb-28 sm:px-8">
         {onSheet.length === 0 ? (
           <PaperSurface label="Today's paper" className={`${COLUMN} flex flex-1 items-center justify-center sm:min-h-[420px]`}>
             <span className="flex flex-col items-center gap-1 py-16 text-center">
               <span className="font-hand text-[34px] font-bold">{items.length ? "All struck. A clean sheet." : "A fresh sheet."}</span>
-              <span className="text-mute">Type anything above and press Enter.</span>
+              <span className="text-mute">Press Space, or tap Write…, and put it down.</span>
             </span>
           </PaperSurface>
         ) : (
@@ -457,7 +445,9 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
             <PaperSurface label="Today's paper" className={`${COLUMN} flex flex-1 flex-col gap-3 sm:hidden`}>
               {onSheet.map((it) =>
                 it.kind === "thought" ? (
-                  <ThoughtBubble key={it.id} {...bubbleProps(it.thought, tz, fresh.has(it.id))} stream {...handlers(it.thought)} />
+                  <Fly key={it.id} from={flights.get(it.id)}>
+                    <ThoughtBubble {...bubbleProps(it.thought, tz, fresh.has(it.id) && !flights.has(it.id))} stream {...handlers(it.thought)} />
+                  </Fly>
                 ) : (
                   <StreamStack
                     key={it.id}
@@ -499,7 +489,9 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
                 }}
                 render={(it, ctx) =>
                   it.kind === "thought" ? (
-                    <ThoughtBubble {...bubbleProps(it.thought, tz, fresh.has(it.id))} movable target={ctx.target} {...handlers(it.thought)} />
+                    <Fly from={flights.get(it.id)}>
+                      <ThoughtBubble {...bubbleProps(it.thought, tz, fresh.has(it.id) && !flights.has(it.id))} movable target={ctx.target} {...handlers(it.thought)} />
+                    </Fly>
                   ) : (
                     <StackCard
                       name={it.stack.name}
@@ -553,10 +545,13 @@ export function DropCanvas({ initial, me }: { initial: DropPaper; me: Me }) {
         )}
 
         <p className="hidden text-center text-[13px] text-mute sm:block">
-          Space or just type to write · Enter to drop · drag onto another to stack · double-click to strike · emailed at 9 PM
+          Space or just type to write · drag onto another to stack · double-click to strike · emailed at 9 PM
         </p>
         <p className="text-center text-[13px] text-mute sm:hidden">Tap to edit · swipe right to strike · hold to stack · emailed at 9 PM</p>
       </main>
+
+      <PenButton ref={penButton} hidden={writing} onOpen={() => setWriting(true)} />
+      {writing && hydrated && <Writer draft={draft} onDraft={setDraft} onDrop={drop} onClose={closeWriter} />}
 
       {picking && (
         <StackPicker

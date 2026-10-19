@@ -116,6 +116,13 @@ body {
   .pen-strike { transition: none; }
 }
 
+/* The writer's faint ruled lines, one per line of handwriting. */
+.ruled-line {
+  background-image: linear-gradient(transparent 35px, var(--line) 35px, var(--line) 36px, transparent 36px);
+  background-size: 100% 36px;
+  background-attachment: local;
+}
+
 .dot-grid {
   background-image: radial-gradient(var(--line) 1.2px, transparent 1.2px);
   background-size: 24px 24px;
