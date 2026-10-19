@@ -15,6 +15,29 @@ export const dropPapers = pgTable(
   (t) => [uniqueIndex("drop_papers_user_date_uq").on(t.userId, t.date)],
 );
 
+/** Thoughts piled together on one paper, like sticky notes. */
+export const dropStacks = pgTable(
+  "drop_stacks",
+  {
+    /** Made in the browser, like a thought's. */
+    id: text("id").primaryKey(),
+    paperId: uuid("paper_id")
+      .notNull()
+      .references(() => dropPapers.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name"),
+    /** Spot on the sheet, like a thought's (x: share of width, y: px); null while it flows. */
+    x: real("x"),
+    y: real("y"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    /** The day it was first made, when it rolled over from an earlier paper. */
+    carriedFrom: date("carried_from", { mode: "string" }),
+  },
+  (t) => [index("drop_stacks_paper_idx").on(t.paperId)],
+);
+
 export const dropThoughts = pgTable(
   "drop_thoughts",
   {
@@ -38,6 +61,9 @@ export const dropThoughts = pgTable(
     /** Where it was dragged on the sheet: centre x as a share of the width, y in px. Null until moved. */
     x: real("x"),
     y: real("y"),
+    stackId: text("stack_id").references(() => dropStacks.id, { onDelete: "set null" }),
+    /** Place in its stack; higher is nearer the top. */
+    stackOrder: integer("stack_order").notNull().default(0),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

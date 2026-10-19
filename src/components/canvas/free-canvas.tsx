@@ -6,35 +6,70 @@ import { layout, snap, type Box, type Point, type Size } from "./arrange";
 type Item = { id: string; x: number | null; y: number | null };
 export type Placement = { id: string; x: number; y: number };
 
+/** What an item needs to know while it renders. */
+export type CanvasCtx = {
+  /** Something dragged over this item would land on it if let go now. */
+  target: boolean;
+  /** Starts dragging a card from inside this item (out of an open stack, say). */
+  grab: (sub: string) => (e: ReactPointerEvent<HTMLElement>) => void;
+};
+
 /** Before a bubble is measured. */
 const GUESS: Size = { w: 220, h: 110 };
 /** Pointer travel (px) before a press becomes a drag, so clicks still edit. */
 const DRAG_START = 5;
 
-type Drag = { id: string; pointer: number; from: Point; start: Box; dx: number; dy: number; moving: boolean };
+type Drag = {
+  id: string;
+  /** Dragged from inside another item, not an item on the sheet itself. */
+  sub: boolean;
+  pointer: number;
+  from: Point;
+  start: Box;
+  dx: number;
+  dy: number;
+  moving: boolean;
+  /** What it would land on. */
+  target: string | null;
+};
 
 /**
  * The dotted sheet with bubbles placed anywhere. Drag one and it snaps, like a
  * magnet, to a neighbour's centre or edges (guide lines show it), otherwise to
- * the dots. Bubbles nobody has moved flow in rows around the moved ones.
+ * the dots. Let go over another item and it lands on it instead (`onDropOn`),
+ * which is how stacks are made. Bubbles nobody has moved flow in rows.
  */
 export function FreeCanvas<T extends Item>({
   items,
   label,
   render,
   onArrange,
+  canDropOn,
+  onDropOn,
+  onDetach,
+  renderGhost,
+  raised,
   className = "",
   minHeight = 420,
 }: {
   items: T[];
   label: string;
-  render: (item: T) => ReactNode;
+  render: (item: T, ctx: CanvasCtx) => ReactNode;
   /**
    * Called after a drag with the moved bubble, plus every bubble that was still
    * flowing (pinned where it sits, so moving one never shuffles the others).
    * Leave out for a read-only sheet.
    */
   onArrange?: (placements: Placement[]) => void;
+  /** Whether the dragged one may land on that item. */
+  canDropOn?: (dragged: string, target: string) => boolean;
+  onDropOn?: (dragged: string, target: string) => void;
+  /** A card dragged out of an item, let go on open sheet: where it landed, plus the flowing ones pinned. */
+  onDetach?: (sub: string, at: { x: number; y: number }, pinned: Placement[]) => void;
+  /** What follows the pointer while a card from inside an item is dragged. */
+  renderGhost?: (sub: string) => ReactNode;
+  /** Shown above the rest (an open stack). */
+  raised?: string | null;
   className?: string;
   minHeight?: number;
 }) {
@@ -71,53 +106,67 @@ export function FreeCanvas<T extends Item>({
   if (fresh && width > 0) setHeld({ ids: flowing, lift });
 
   let guides: { x?: number; y?: number } = {};
+  let ghost: Box | null = null;
   if (drag?.moving) {
     const others = [...boxes].filter(([id]) => id !== drag.id).map(([, b]) => b);
     const raw = { ...drag.start, x: drag.start.x + drag.dx, y: drag.start.y + drag.dy };
-    const snapped = snap(raw, others, width);
-    guides = snapped.guides;
-    // Follows the pointer; the magnet shows as guide lines, then settles on release.
-    boxes.set(drag.id, raw);
+    // Over a drop target the magnet lets go: it's landing on that, not lining up.
+    if (!drag.target) guides = snap(raw, others, width).guides;
+    // Follows the pointer, then settles on release.
+    if (drag.sub) ghost = raw;
+    else boxes.set(drag.id, raw);
   }
 
   const bottoms = [...boxes.values()].map((b) => b.y + b.h / 2 + 32).filter(Number.isFinite);
   const height = Math.max(minHeight, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
-  const latest = useRef({ boxes, items, width, lift, onArrange });
+  const latest = useRef({ boxes, items, width, lift, onArrange, canDropOn, onDropOn, onDetach });
   useLayoutEffect(() => {
-    latest.current = { boxes, items, width, lift, onArrange };
+    latest.current = { boxes, items, width, lift, onArrange, canDropOn, onDropOn, onDetach };
   });
 
-  /** Where a release would settle the drag, and the bubbles that were still flowing, pinned in place. */
-  const settle = (d: Drag): Placement[] => {
-    const { boxes: now, items: all, width: w, lift: shift } = latest.current;
-    // Saved spots are relative to the group, not the screen.
-    const saved = (b: Box) => ({ x: b.x / w, y: Math.round(b.y - shift) });
-    const others = [...now].filter(([id]) => id !== d.id).map(([, b]) => b);
-    const { box } = snap({ ...d.start, x: d.start.x + d.dx, y: d.start.y + d.dy }, others, w);
-    const pinned = all
-      .filter((it) => it.id !== d.id && (it.x === null || it.y === null))
+  // Saved spots are relative to the arranged group, not the screen.
+  const saved = (b: Box) => ({ x: b.x / latest.current.width, y: Math.round(b.y - latest.current.lift) });
+
+  /** The bubbles still flowing, pinned where they sit (so moving one never shuffles the others). */
+  const pins = (except: string): Placement[] =>
+    latest.current.items
+      .filter((it) => it.id !== except && (it.x === null || it.y === null))
       .flatMap((it) => {
-        const b = now.get(it.id);
+        const b = latest.current.boxes.get(it.id);
         return b ? [{ id: it.id, ...saved(b) }] : [];
       });
-    return [{ id: d.id, ...saved(box) }, ...pinned];
+
+  /** Where a drag lets go: snapped against the others. */
+  const landing = (d: Drag): Box => {
+    const others = [...latest.current.boxes].filter(([id]) => id !== d.id).map(([, b]) => b);
+    return snap({ ...d.start, x: d.start.x + d.dx, y: d.start.y + d.dy }, others, latest.current.width).box;
   };
 
-  const down = (id: string) => (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!onArrange || e.button !== 0 || drag) return;
-    if ((e.target as HTMLElement).closest("button, a, textarea, input")) return;
-    const start = boxes.get(id);
-    if (!start) return;
-    let d: Drag = { id, pointer: e.pointerId, from: { x: e.clientX, y: e.clientY }, start, dx: 0, dy: 0, moving: false };
-    setDrag(d);
+  /** The item under the pointer that the dragged one may land on; the top one wins. */
+  const hit = (dragged: string, at: Point): string | null => {
+    const { boxes: now, items: all, canDropOn: may } = latest.current;
+    if (!may) return null;
+    for (const it of [...all].reverse()) {
+      const b = now.get(it.id);
+      if (!b || it.id === dragged || !may(dragged, it.id)) continue;
+      if (Math.abs(at.x - b.x) <= b.w / 2 && Math.abs(at.y - b.y) <= b.h / 2) return it.id;
+    }
+    return null;
+  };
 
+  const begin = (first: Drag) => {
+    let d = first;
+    setDrag(d);
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== d.pointer) return;
       const dx = ev.clientX - d.from.x;
       const dy = ev.clientY - d.from.y;
-      d = { ...d, dx, dy, moving: d.moving || Math.hypot(dx, dy) > DRAG_START };
+      const moving = d.moving || Math.hypot(dx, dy) > DRAG_START;
+      const rect = sheet.current?.getBoundingClientRect();
+      const target = moving && rect ? hit(d.id, { x: ev.clientX - rect.left, y: ev.clientY - rect.top }) : null;
+      d = { ...d, dx, dy, moving, target };
       if (d.moving) ev.preventDefault();
       setDrag(d);
     };
@@ -126,16 +175,39 @@ export function FreeCanvas<T extends Item>({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
       window.removeEventListener("pointercancel", stop);
-      if (ev.type === "pointerup" && d.moving && latest.current.width > 0) {
+      const { width: w, onArrange: arrange, onDropOn: dropOn, onDetach: detach } = latest.current;
+      if (ev.type === "pointerup" && d.moving && w > 0) {
         justDragged.current = true;
         setTimeout(() => (justDragged.current = false), 0);
-        latest.current.onArrange?.(settle(d));
+        if (d.target) dropOn?.(d.id, d.target);
+        else if (d.sub) detach?.(d.id, saved(landing(d)), pins(d.id));
+        else arrange?.([{ id: d.id, ...saved(landing(d)) }, ...pins(d.id)]);
       }
       setDrag(null);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", stop);
     window.addEventListener("pointercancel", stop);
+  };
+
+  const down = (id: string) => (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!onArrange || e.button !== 0 || drag) return;
+    if ((e.target as HTMLElement).closest("button:not([data-drag]), a, textarea, input")) return;
+    const start = boxes.get(id);
+    if (!start) return;
+    begin({ id, sub: false, pointer: e.pointerId, from: { x: e.clientX, y: e.clientY }, start, dx: 0, dy: 0, moving: false, target: null });
+  };
+
+  const grab = (sub: string) => (e: ReactPointerEvent<HTMLElement>) => {
+    if (!onDetach || e.button !== 0 || drag) return;
+    if ((e.target as HTMLElement).closest("button:not([data-drag]), a, textarea, input")) return;
+    // The card's own drag, not its stack's.
+    e.stopPropagation();
+    const rect = sheet.current?.getBoundingClientRect();
+    if (!rect) return;
+    const card = e.currentTarget.getBoundingClientRect();
+    const start = { x: card.left - rect.left + card.width / 2, y: card.top - rect.top + card.height / 2, w: e.currentTarget.offsetWidth, h: e.currentTarget.offsetHeight };
+    begin({ id: sub, sub: true, pointer: e.pointerId, from: { x: e.clientX, y: e.clientY }, start, dx: 0, dy: 0, moving: false, target: null });
   };
 
   return (
@@ -149,7 +221,8 @@ export function FreeCanvas<T extends Item>({
       {guides.y !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 h-px bg-red-text/60" style={{ top: guides.y }} />}
       {items.map((it) => {
         const b = boxes.get(it.id);
-        const dragging = drag?.moving && drag.id === it.id;
+        const dragging = drag?.moving && !drag.sub && drag.id === it.id;
+        const target = drag?.moving === true && drag.target === it.id;
         return (
           <div
             key={it.id}
@@ -163,17 +236,28 @@ export function FreeCanvas<T extends Item>({
               if (justDragged.current) e.stopPropagation();
             }}
             style={{
-              transform: b ? `translate(${b.x - b.w / 2}px, ${b.y - b.h / 2}px)${dragging ? " scale(1.04)" : ""}` : undefined,
+              transform: b ? `translate(${b.x - b.w / 2}px, ${b.y - b.h / 2 - (target ? 3 : 0)}px)${dragging ? " scale(1.04)" : ""}` : undefined,
               visibility: width && b ? undefined : "hidden",
             }}
             className={`absolute top-0 left-0 w-max max-w-[320px] ${onArrange ? "touch-none" : ""} ${
-              dragging ? "z-30 cursor-grabbing drop-shadow-[0_18px_22px_var(--shadow)]" : "z-0 transition-transform duration-200 ease-out"
+              dragging
+                ? "z-30 cursor-grabbing opacity-90 drop-shadow-[0_18px_22px_var(--shadow)]"
+                : `${raised === it.id ? "z-20" : "z-0"} transition-transform duration-200 ease-out motion-reduce:transition-none`
             }`}
           >
-            {render(it)}
+            {render(it, { target, grab })}
           </div>
         );
       })}
+      {ghost && drag && renderGhost && (
+        <div
+          aria-hidden="true"
+          style={{ transform: `translate(${ghost.x - ghost.w / 2}px, ${ghost.y - ghost.h / 2}px) scale(1.04)`, width: ghost.w }}
+          className="pointer-events-none absolute top-0 left-0 z-40 opacity-90 drop-shadow-[0_18px_22px_var(--shadow)]"
+        >
+          {renderGhost(drag.id)}
+        </div>
+      )}
     </section>
   );
 }

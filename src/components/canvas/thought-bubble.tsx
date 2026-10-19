@@ -24,12 +24,18 @@ type Props = {
   movable?: boolean;
   /** Smaller, for the "done today" row. */
   small?: boolean;
+  /** Something dragged over it would land here: a soft red outline and a slight lift. */
+  target?: boolean;
+  /** "Stack with…": the S key when it's selected, or a long press on a phone. */
+  onStackWith?: () => void;
   onEdit?: (text: string) => void;
   onToggle?: () => void;
   onDelete?: () => void;
 };
 
 const SWIPE = 64;
+/** How long a finger rests before a press opens "Stack with…". */
+const LONG_PRESS = 480;
 
 /** Text with http(s) links made clickable; clicking a link never starts editing. */
 export function LinkedText({ text }: { text: string }) {
@@ -60,12 +66,13 @@ export function LinkedText({ text }: { text: string }) {
  * One thought on paper. Click to edit, double-click (or swipe right on a phone)
  * to strike it out; Delete lives in the edit view and the hover buttons.
  */
-export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, stream, readOnly, movable, small, onEdit, onToggle, onDelete }: Props) {
+export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, stream, readOnly, movable, small, target, onStackWith, onEdit, onToggle, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [dx, setDx] = useState(0);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipe = useRef<{ x: number; y: number; swiped: boolean } | null>(null);
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const fieldId = useId();
 
@@ -79,7 +86,13 @@ export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, s
 
   useEffect(() => () => {
     if (clickTimer.current) clearTimeout(clickTimer.current);
+    if (press.current) clearTimeout(press.current);
   }, []);
+
+  const endPress = () => {
+    if (press.current) clearTimeout(press.current);
+    press.current = null;
+  };
 
   const startEdit = () => {
     if (readOnly || !onEdit) return;
@@ -110,11 +123,21 @@ export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, s
     // Swipe to strike only in the phone stream; on the sheet a touch drags.
     if (readOnly || !stream || e.pointerType === "mouse") return;
     swipe.current = { x: e.clientX, y: e.clientY, swiped: false };
+    if (onStackWith) {
+      press.current = setTimeout(() => {
+        press.current = null;
+        // Counts as handled, so letting go doesn't also open the editor.
+        if (swipe.current) swipe.current.swiped = true;
+        navigator.vibrate?.(10);
+        onStackWith();
+      }, LONG_PRESS);
+    }
   };
   const onPointerMove = (e: ReactPointerEvent) => {
     const s = swipe.current;
     if (!s) return;
     const x = e.clientX - s.x;
+    if (Math.hypot(x, e.clientY - s.y) > 8) endPress();
     if (Math.abs(e.clientY - s.y) > 30) {
       swipe.current = null;
       setDx(0);
@@ -123,6 +146,7 @@ export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, s
     setDx(Math.max(0, Math.min(x, SWIPE * 1.4)));
   };
   const onPointerUp = () => {
+    endPress();
     const s = swipe.current;
     if (s && dx >= SWIPE) {
       s.swiped = true;
@@ -134,7 +158,10 @@ export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, s
 
   const look = bubbleStyle(shape, false, seed);
   // Done stops shouting: the tint goes neutral, the outline stays.
-  const settled = done ? { ...look, background: "var(--soft)" } : look;
+  const settled = {
+    ...(done ? { ...look, background: "var(--soft)" } : look),
+    ...(target ? { outline: "2px solid color-mix(in srgb, var(--red-text) 55%, transparent)", outlineOffset: 3 } : {}),
+  };
   const shapeStyle = stream ? { ...settled, transform: `translateX(${dx}px)` } : settled;
 
   if (editing) {
@@ -200,6 +227,20 @@ export function ThoughtBubble({ text, done, shape, seed, meta, carried, fresh, s
         style={shapeStyle}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
+        // Selectable from the keyboard: Enter edits, S stacks it with another.
+        tabIndex={readOnly ? undefined : 0}
+        data-keys={readOnly ? undefined : ""}
+        aria-label={readOnly ? undefined : `${text}${done ? ", done" : ""}. Enter to edit${onStackWith ? ", S to stack" : ""}.`}
+        onKeyDown={(e) => {
+          if (readOnly || e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
+          if (e.key === "Enter") {
+            e.preventDefault();
+            startEdit();
+          } else if ((e.key === "s" || e.key === "S") && onStackWith) {
+            e.preventDefault();
+            onStackWith();
+          }
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

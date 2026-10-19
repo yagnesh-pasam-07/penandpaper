@@ -25,6 +25,7 @@ Two modules share one app, one sign-in and one database:
 - **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
 - **History**: `/drop/history` lists past papers; each opens read-only.
 - **Arrange**: new drops land in a row right under the input; arranged thoughts keep their shape below. Drag a thought anywhere on the sheet (it stays within the page column). It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
+- **Stacks**: drag a thought onto another and they pile up like sticky notes (a soft red outline shows where it'll land); drag more on to add. Click a stack to fan it out, drag one out to loosen it (a stack of one dissolves), name it from the label area, or Unstack / Crumple stack (with Undo) from its menu. Done thoughts sink to the bottom; a fully done stack moves to Done today. Keyboard: select a thought (Tab) and press S for "Stack with…"; on a phone, hold a thought. Stacks carry over with their open thoughts, and the 9 PM email groups by stack.
 - **Keyboard first**: Space, or simply typing, puts the cursor in the drop box from anywhere on the page; Enter drops; Esc clears, and a second Esc steps out.
 - **Phone**: the canvas becomes a vertical stream with the same input.
 - Sign-in required: signed-out visits go to `/signup?next=/drop`.
