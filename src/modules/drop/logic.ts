@@ -25,6 +25,10 @@ export type Thought = {
   stackOrder: number;
   /** YYYY-MM-DD it's folded away till; it shows from that day on. */
   scheduledFor: string | null;
+  /** Its place in today's order (1 is first), if numbered. A few are; most aren't. */
+  rank: number | null;
+  /** Picked for tomorrow's top 3 at Clear desk: arrives with this number. */
+  nextRank: number | null;
 };
 
 /** Thoughts piled together like sticky notes. Lives on one paper; its thoughts point at it. */
@@ -38,6 +42,9 @@ export type Stack = {
   carriedFrom: string | null;
   /** YYYY-MM-DD the whole stack is folded away till. */
   scheduledFor: string | null;
+  /** Numbered as a whole. */
+  rank: number | null;
+  nextRank: number | null;
 };
 
 export type DropPaper = {
@@ -55,6 +62,10 @@ export const MAX_THOUGHT = 1000;
 export const MAX_STACK_NAME = 60;
 /** Crumpled thoughts are kept this long (for undo and mistakes), then removed for good. */
 export const CRUMPLE_KEEP_DAYS = 7;
+/** Numbering is for a few: past six it stops being an order. */
+export const MAX_RANK = 6;
+/** Clear desk's "tomorrow's top 3". */
+export const MAX_NEXT_RANK = 3;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -145,15 +156,16 @@ export function rollover(previous: DropPaper, newId: () => string): Rollover {
     if (foldedStacks.has(s.id) || carryable.filter((t) => t.stackId === s.id).length < 2) continue;
     const id = newId();
     copied.set(s.id, id);
-    stacks.push({ ...s, id, scheduledFor: null, carriedFrom: s.carriedFrom ?? day });
+    // Numbers belong to a paper: only tomorrow's picks arrive numbered.
+    stacks.push({ ...s, id, scheduledFor: null, carriedFrom: s.carriedFrom ?? day, rank: s.nextRank, nextRank: null });
   }
   const thoughts = carryable.map((t): Thought => {
-    const carried = { ...t, id: newId(), doneAt: null, scheduledFor: null, carriedFrom: t.carriedFrom ?? day };
+    const carried = { ...t, id: newId(), doneAt: null, scheduledFor: null, carriedFrom: t.carriedFrom ?? day, rank: t.stackId ? null : t.nextRank, nextRank: null };
     if (!t.stackId) return carried;
     const stackId = copied.get(t.stackId);
     if (stackId) return { ...carried, stackId };
     const was = previous.stacks.find((s) => s.id === t.stackId);
-    return { ...carried, stackId: null, stackOrder: 0, x: was?.x ?? null, y: was?.y ?? null };
+    return { ...carried, stackId: null, stackOrder: 0, x: was?.x ?? null, y: was?.y ?? null, rank: was?.nextRank ?? null };
   });
 
   const move: Rollover["move"] = { stacks: [...foldedStacks], thoughts: [] };
@@ -161,7 +173,7 @@ export function rollover(previous: DropPaper, newId: () => string): Rollover {
     if (!isFolded(t, day) || inFoldedStack(t)) continue;
     move.thoughts.push({ id: t.id, stackId: t.stackId ? (copied.get(t.stackId) ?? null) : null, carriedFrom: t.carriedFrom ?? day });
   }
-  return { thoughts, stacks, move };
+  return { ...renumberList(thoughts, stacks), move };
 }
 
 export { linkify, type TextPart } from "@/lib/linkify";
@@ -207,7 +219,13 @@ export type StackOp =
   /** Fold a thought or stack away till a day (or bring it back: null). */
   | { kind: "schedule"; id: string; on: string | null }
   /** Ink a pencil idea into a task, or pencil a task back into an idea. */
-  | { kind: "ink"; thought: string; to: Kind };
+  | { kind: "ink"; thought: string; to: Kind }
+  /** Give a thought or stack a place in the order (the others shift), or take its number away (null). */
+  | { kind: "rank"; id: string; rank: number | null }
+  /** Number these, in this order; everything else loses its number. */
+  | { kind: "order"; ids: string[] }
+  /** Tomorrow's top 3, in order (from Clear desk). */
+  | { kind: "nextRank"; ids: string[] };
 
 export class StackError extends Error {}
 
@@ -246,7 +264,8 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
         put(moving.id, { stackId: into, stackOrder: topOf(into) + 1, x: null, y: null });
       } else {
         if (stacks.some((s) => s.id === op.newStackId) || thoughts.some((t) => t.id === op.newStackId)) throw new StackError("That id is taken.");
-        stacks = [...stacks, { id: op.newStackId, name: null, x: target!.x, y: target!.y, createdAt: now, carriedFrom: null, scheduledFor: null }];
+        // The new stack takes the target's spot, and its number.
+        stacks = [...stacks, { id: op.newStackId, name: null, x: target!.x, y: target!.y, createdAt: now, carriedFrom: null, scheduledFor: null, rank: target!.rank, nextRank: null }];
         put(target!.id, { stackId: op.newStackId, stackOrder: 0, x: null, y: null });
         put(moving.id, { stackId: op.newStackId, stackOrder: 1, x: null, y: null });
       }
@@ -293,22 +312,102 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
       put(t.id, op.to === "pencil" ? { kind: "pencil", status: "open", doneAt: null } : { kind: "pen" });
       break;
     }
+    case "rank": {
+      const order = rankedIds({ thoughts, stacks });
+      const at = order.indexOf(op.id);
+      if (!thoughts.some((t) => t.id === op.id && !t.stackId) && !stacks.some((s) => s.id === op.id)) throw new StackError("Only a loose thought or a stack can be numbered.");
+      if (at === -1 && op.rank !== null && order.length >= MAX_RANK) throw new StackError(`Keep it to your top ${MAX_RANK}.`);
+      if (at !== -1) order.splice(at, 1);
+      if (op.rank !== null) order.splice(Math.max(0, Math.min(op.rank - 1, order.length)), 0, op.id);
+      ({ thoughts, stacks } = withRanks({ thoughts, stacks }, order));
+      break;
+    }
+    case "order": {
+      const ids = [...new Set(op.ids)].filter((id) => thoughts.some((t) => t.id === id && !t.stackId) || stacks.some((s) => s.id === id));
+      if (ids.length > MAX_RANK) throw new StackError(`Keep it to your top ${MAX_RANK}.`);
+      ({ thoughts, stacks } = withRanks({ thoughts, stacks }, ids));
+      break;
+    }
+    case "nextRank": {
+      const ids = [...new Set(op.ids)].slice(0, MAX_NEXT_RANK);
+      const pick = (id: string) => (ids.includes(id) ? ids.indexOf(id) + 1 : null);
+      thoughts = thoughts.map((t) => ({ ...t, nextRank: pick(t.id) }));
+      stacks = stacks.map((s) => ({ ...s, nextRank: pick(s.id) }));
+      break;
+    }
+  }
+  // Folded away: it gives up its place in today's order.
+  if (op.kind === "schedule" && op.on && op.on > paper.date) {
+    thoughts = thoughts.map((t) => (t.id === op.id ? { ...t, rank: null } : t));
+    stacks = stacks.map((s) => (s.id === op.id ? { ...s, rank: null } : s));
   }
   return settleStacks({ ...paper, thoughts, stacks });
 }
 
-/** A stack with one thought left dissolves into it (at the stack's spot); an empty stack goes. */
+/**
+ * A stack with one thought left dissolves into it (at the stack's spot, with
+ * its number); an empty stack goes. Then the numbers close up: 1, 2, 3…
+ */
 export function settleStacks(paper: DropPaper): DropPaper {
   let thoughts = paper.thoughts;
   const stacks = paper.stacks.filter((s) => {
     const members = thoughts.filter((t) => t.stackId === s.id);
     if (members.length >= 2) return true;
     if (members.length === 1) {
-      thoughts = thoughts.map((t) => (t.id === members[0].id ? { ...t, stackId: null, stackOrder: 0, x: s.x, y: s.y } : t));
+      thoughts = thoughts.map((t) => (t.id === members[0].id ? { ...t, stackId: null, stackOrder: 0, x: s.x, y: s.y, rank: s.rank } : t));
     }
     return false;
   });
-  return { ...paper, thoughts, stacks };
+  return { ...paper, ...renumberList(thoughts, stacks) };
+}
+
+/* ---------- Numbering ---------- */
+
+/** Loose thoughts and stacks that carry a number, first to last. */
+export function rankedIds(paper: Pick<DropPaper, "thoughts" | "stacks">): string[] {
+  const all = [
+    ...paper.thoughts.filter((t) => t.rank !== null && !t.stackId).map((t) => ({ id: t.id, rank: t.rank! })),
+    ...paper.stacks.filter((s) => s.rank !== null).map((s) => ({ id: s.id, rank: s.rank! })),
+  ];
+  return all.sort((a, b) => a.rank - b.rank).map((x) => x.id);
+}
+
+function withRanks(paper: { thoughts: Thought[]; stacks: Stack[] }, order: string[]): { thoughts: Thought[]; stacks: Stack[] } {
+  const rankOf = (id: string) => (order.includes(id) ? order.indexOf(id) + 1 : null);
+  return {
+    thoughts: paper.thoughts.map((t) => ({ ...t, rank: t.stackId ? null : rankOf(t.id) })),
+    stacks: paper.stacks.map((s) => ({ ...s, rank: rankOf(s.id) })),
+  };
+}
+
+/** Numbers close up after something leaves (1, 3 → 1, 2); a thought inside a stack has none of its own. */
+function renumberList(thoughts: Thought[], stacks: Stack[]): { thoughts: Thought[]; stacks: Stack[] } {
+  const live = { thoughts: thoughts.map((t) => (t.stackId ? { ...t, rank: null } : t)), stacks };
+  return withRanks(live, rankedIds(live));
+}
+
+/** In number mode, a tap: the next number if it has none, otherwise its number comes off. */
+export function tapRank(paper: DropPaper, id: string): StackOp {
+  const order = rankedIds(paper);
+  return { kind: "rank", id, rank: order.includes(id) ? null : order.length + 1 };
+}
+
+export type NextUp = { id: string; rank: number; label: string };
+
+/** The first numbered thing that isn't done yet: "Next: ② call naga". */
+export function nextUp(paper: DropPaper): NextUp | null {
+  const shown = visiblePaper(paper);
+  for (const id of rankedIds(shown)) {
+    const t = shown.thoughts.find((x) => x.id === id);
+    if (t) {
+      if (t.status === "open") return { id, rank: t.rank!, label: t.text };
+      continue;
+    }
+    const s = shown.stacks.find((x) => x.id === id);
+    const open = s ? membersOf(shown, s.id).filter((m) => m.status === "open") : [];
+    if (s && open.length) return { id, rank: s.rank!, label: stackLabel(s, open.length) };
+  }
+  return null;
 }
 
 /* ---------- Clear desk ---------- */

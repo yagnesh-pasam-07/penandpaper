@@ -26,6 +26,8 @@ const thought = (text: string, i: number, kind: Thought["kind"] = "pen"): Though
   stackId: null,
   stackOrder: 0,
   scheduledFor: null,
+  rank: null,
+  nextRank: null,
 });
 
 /** What a first visit starts with. */

@@ -7,7 +7,8 @@ import { HandText } from "@/components/canvas/thought-bubble";
 import { shortDate } from "@/lib/time";
 import { btn } from "@/components/ui";
 import { call, DeskStamp, DropHeader, type Me } from "./chrome";
-import { deskCards, deskSummary, type DeskCard, type DeskChoice, type DropPaper } from "./logic";
+import { RankMark } from "@/components/canvas/rank-mark";
+import { deskCards, deskSummary, MAX_NEXT_RANK, type DeskCard, type DeskChoice, type DropPaper } from "./logic";
 
 const CHOICES: { choice: DeskChoice; key: string; label: string; hint: string }[] = [
   { choice: "tomorrow", key: "t", label: "→ Tomorrow", hint: "T" },
@@ -34,6 +35,9 @@ export function ClearDesk({ initial, me }: { initial: DropPaper; me: Me }) {
   const [finished, setFinished] = useState(() => deskCards(initial).length === 0);
   const [error, setError] = useState("");
   const [drag, setDrag] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null);
+  // The last step: which of tomorrow's thoughts start tomorrow numbered 1, 2, 3.
+  const [picking, setPicking] = useState(false);
+  const [top, setTop] = useState<string[]>([]);
   // Crumples wait here until the end (or the page closing), so Back can undo them.
   const crumples = useRef(new Map<number, () => Promise<unknown>>());
   const empty = cards.length === 0;
@@ -88,8 +92,10 @@ export function ClearDesk({ initial, me }: { initial: DropPaper; me: Me }) {
       }
       const next = [...choices.slice(0, step), choice];
       setChoices(next);
-      if (step + 1 >= cards.length) void finish();
-      else setStep(step + 1);
+      if (step + 1 < cards.length) setStep(step + 1);
+      // Anything going to tomorrow? Pick its top 3 first.
+      else if (next.includes("tomorrow")) setPicking(true);
+      else void finish();
     },
     [card, cards.length, choices, finish, finished, step],
   );
@@ -115,9 +121,17 @@ export function ClearDesk({ initial, me }: { initial: DropPaper; me: Me }) {
     setCards([...cards.slice(0, step), ...loose, ...cards.slice(step + 1)]);
   };
 
+  const tomorrow = cards.filter((_, i) => choices[i] === "tomorrow");
+  const pickTop = (id: string) => setTop((t) => (t.includes(id) ? t.filter((x) => x !== id) : t.length < MAX_NEXT_RANK ? [...t, id] : t));
+  const finishTop = async () => {
+    if (top.length) await send(call("/api/drop/stacks", { method: "POST", body: JSON.stringify({ kind: "nextRank", ids: top }) }));
+    setPicking(false);
+    void finish();
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || finished) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || finished || picking) return;
       if (e.key === "ArrowLeft" || e.key === "Backspace") {
         e.preventDefault();
         back();
@@ -131,7 +145,7 @@ export function ClearDesk({ initial, me }: { initial: DropPaper; me: Me }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [back, decide, finished]);
+  }, [back, decide, finished, picking]);
 
   // Swipes on a phone: right = tomorrow, left = crumple, up = keep as idea.
   const onDown = (e: ReactPointerEvent) => e.pointerType !== "mouse" && setDrag({ x: e.clientX, y: e.clientY, dx: 0, dy: 0 });
@@ -151,7 +165,40 @@ export function ClearDesk({ initial, me }: { initial: DropPaper; me: Me }) {
     <div className="flex min-h-dvh flex-col bg-bg">
       <DropHeader me={me} title={<h1 className="font-hand text-[26px] leading-none font-bold">Clear desk</h1>} />
       <main className="mx-auto flex w-full max-w-[640px] flex-1 flex-col items-center justify-center gap-7 px-4 pt-6 pb-16 text-center">
-        {finished ? (
+        {picking && !finished ? (
+          <div className="flex w-full max-w-[460px] flex-col items-center gap-5">
+            <h2 className="font-hand text-[34px] leading-tight font-bold">Pick tomorrow&apos;s top 3</h2>
+            <p className="text-mute">Tap in order. They&apos;ll be waiting tomorrow, numbered.</p>
+            <ul className="flex w-full flex-col gap-2">
+              {tomorrow.map((c) => {
+                const n = top.indexOf(c.id) + 1;
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => pickTop(c.id)}
+                      aria-pressed={n > 0}
+                      className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-left ${n ? "border-red-text/50 bg-red-soft/40" : "border-line bg-sheet hover:bg-soft"}`}
+                    >
+                      <span className="flex size-9 shrink-0 items-center justify-center">{n ? <RankMark n={n} /> : null}</span>
+                      <span className="min-w-0 flex-1 truncate font-note text-[18px]">{c.kind === "thought" ? c.text : `${c.label} · ${c.open.length}`}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex gap-2">
+              {!top.length && (
+                <button type="button" onClick={() => void finishTop()} className="h-12 rounded-2xl px-4 font-medium text-mute hover:bg-soft">
+                  Skip
+                </button>
+              )}
+              <button type="button" onClick={() => void finishTop()} disabled={!top.length} className={`${btn.primary} disabled:opacity-40`}>
+                Done
+              </button>
+            </div>
+          </div>
+        ) : finished ? (
           <div className="flex flex-col items-center gap-6" aria-live="polite">
             <DeskStamp date={today} animate />
             <p className="font-hand text-[30px] leading-tight font-bold">{deskSummary(choices)}</p>
