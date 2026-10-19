@@ -1,17 +1,18 @@
 import type { CSSProperties } from "react";
 
 /**
- * Hand-drawn bubble looks, shared by every module that puts thoughts on paper
- * (Drop's personal paper, the team planner). Pick one by a stored number so a
- * thought keeps its look across reloads.
+ * Bubble looks, shared by every module that puts thoughts on paper (Drop's
+ * personal paper, the team planner). Kept quiet on purpose: a full day can
+ * hold dozens of thoughts, so they're notes and pills with a slight tilt, told
+ * apart by tint. Picked by a stored number so a thought keeps its look.
  */
 export const BUBBLE_SHAPES: { radius: string; rotate: number; tint: string }[] = [
-  { radius: "58% 42% 55% 45% / 50% 58% 42% 50%", rotate: -3, tint: "var(--t1)" },
-  { radius: "50%", rotate: 2, tint: "var(--t2)" },
-  { radius: "20px", rotate: -1, tint: "var(--t3)" },
-  { radius: "999px 999px 20px 20px", rotate: 3, tint: "var(--t5)" },
-  { radius: "40% 60% 35% 65% / 60% 40% 60% 40%", rotate: -2, tint: "var(--t4)" },
-  { radius: "58% 42% 55% 45% / 50% 58% 42% 50%", rotate: 4, tint: "var(--t2)" },
+  { radius: "18px", rotate: -1, tint: "var(--t1)" },
+  { radius: "999px", rotate: 0.6, tint: "var(--t2)" },
+  { radius: "18px", rotate: 1, tint: "var(--t3)" },
+  { radius: "22px 22px 22px 6px", rotate: -0.6, tint: "var(--t5)" },
+  { radius: "999px", rotate: -0.8, tint: "var(--t4)" },
+  { radius: "22px 22px 6px 22px", rotate: 0.8, tint: "var(--t2)" },
 ];
 
 export function bubbleStyle(shape: number, lifted = false): CSSProperties {
