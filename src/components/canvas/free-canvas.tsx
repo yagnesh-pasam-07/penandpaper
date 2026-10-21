@@ -371,7 +371,8 @@ export function FreeCanvas<T extends Item>({
             }}
             className={`group/item absolute top-0 left-0 w-max max-w-[320px] ${faded ? "opacity-30" : ""} ${onArrange ? "touch-none" : ""} ${
               dragging
-                ? "z-30 cursor-grabbing opacity-90 drop-shadow-[0_18px_22px_var(--shadow)]"
+                ? // Lifted off the sheet: a pencil thought rides on a scrap of white paper.
+                  "z-30 cursor-grabbing opacity-95 drop-shadow-[0_18px_22px_var(--shadow)] [&_.is-pencil]:rounded-md! [&_.is-pencil]:bg-sheet!"
                 : `${raised === it.id ? "z-20" : "z-0"} transition-transform duration-200 ease-out motion-reduce:transition-none`
             }`}
           >

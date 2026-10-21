@@ -636,7 +636,7 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   /** The place (1-based) a note held over the Tomorrow strip would take, or null when it isn't over it. */
   const stripPlace = (id: string, at: { x: number; y: number }): number | null => {
     const r = strip.current?.getBoundingClientRect();
-    if (!shaping || !r || at.x < r.left || at.x > r.right || at.y < r.top - 24 || at.y > r.bottom + 24) return null;
+    if (!r || at.x < r.left || at.x > r.right || at.y < r.top - 24 || at.y > r.bottom + 24) return null;
     const rows = [...(strip.current?.querySelectorAll<HTMLElement>("[data-row]") ?? [])].filter((el) => el.dataset.row !== id);
     // Rows read left to right, top to bottom: it goes before the first one it's held ahead of.
     const before = rows.findIndex((el) => {
@@ -651,6 +651,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
     const place = stripPlace(id, at);
     setLanding(null);
     if (place === null) return false;
+    // Dragging one in from the evening ask is how shaping starts.
+    setShaping(true);
     shapeAt(id, place);
     return true;
   };
@@ -766,7 +768,12 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   // A pencil thought's weight: written again, and joined to others, make it matter more.
   const joins = new Map<string, number>();
   for (const l of paper.links ?? []) for (const end of [l.from, l.to]) joins.set(end, (joins.get(end) ?? 0) + 1);
-  const weightOf = (t: Thought) => Math.min(3, Math.min(2, t.echoes?.length ?? 0) + Math.min(2, joins.get(t.id) ?? 0));
+  const weightOf = (t: Thought) => {
+    const score = Math.min(2, t.echoes?.length ?? 0) + Math.min(2, joins.get(t.id) ?? 0);
+    // Nothing has come back to it and it's been left a night or more: written lightly.
+    if (!score) return pencilFade(t, paper.date) < 1 ? 0 : 1;
+    return Math.min(3, 1 + score);
+  };
   const showHint = hint && paper.stacks.length === 0 && looseOpen >= 3;
   // Clear desk shows in the evening (or once the paper fills up); Shift+C always works.
   const evening = mounted && new Date().getHours() >= 18;
@@ -808,23 +815,34 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                 .replace(/^\w+, /, "")
                 .replace(/ \w+$/, (m) => m.slice(0, 4))}
               {shaping
-                ? ` · shaping · ${tomorrow.length} in ink, ${pencilOpen} in pencil`
-                : paper.thoughts.length
+                ? " · shaping"
+                : showAsk
+                  ? ` · ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ${pencilOpen} ${pencilOpen === 1 ? "thought" : "thoughts"} in pencil`
+                  : paper.thoughts.length
                   ? ` · ${open} open${ideas ? ` · ${ideas} in pencil` : ""}${done ? ` · ${done} done` : ""}`
                   : ""}
             </span>
-            {showAsk && (
-              <button type="button" onClick={() => setShaping(true)} className="shrink-0 rounded-lg px-2 py-1 text-[13px] text-mute hover:bg-soft hover:text-ink">
-                {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · shape today? <kbd className="rounded border border-line px-1 font-sans text-[11px] font-semibold text-ink">S</kbd>
-              </button>
-            )}
 
           </>
         }
         right={
-          <Link href="/drop/history" className="rounded-lg px-2.5 py-2 text-sm font-medium text-mute hover:bg-soft hover:text-ink">
-            History
-          </Link>
+          <>
+            {shaping ? (
+              <button type="button" onClick={doneShaping} className="h-[34px] rounded-[10px] bg-ink px-4 text-sm font-semibold text-bg">
+                Done · Esc
+              </button>
+            ) : (
+              showAsk && (
+                <button type="button" onClick={() => setShaping(true)} className="inline-flex h-9 items-center gap-2 rounded-full bg-ink pr-1.5 pl-3.5 text-sm font-semibold text-bg">
+                  Shape today
+                  <kbd className="rounded-md bg-bg/20 px-[7px] py-0.5 font-sans text-[12px]">S</kbd>
+                </button>
+              )
+            )}
+            <Link href="/drop/history" className="rounded-lg px-2.5 py-2 text-sm font-medium text-mute hover:bg-soft hover:text-ink">
+              History
+            </Link>
+          </>
         }
       />
       <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-3 pb-28 sm:px-8">
@@ -1109,15 +1127,14 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
               />
             )}
             </div>
-            {(shaping || tomorrowItems.length > 0) && (
+            {(shaping || showAsk || tomorrowItems.length > 0) && (
               <TomorrowStrip
                 stripRef={strip}
                 items={tomorrowItems}
-                shaping={shaping}
+                shaping={shaping || showAsk}
                 day={weekday(addDays(paper.date, 1))}
                 traced={traced}
                 landing={landing}
-                onDone={doneShaping}
                 onMove={(id, at) => shapeAt(id, at)}
                 onRemove={(id) => shapeAt(id, null)}
               />
@@ -1523,7 +1540,6 @@ function TomorrowStrip({
   day,
   traced,
   landing,
-  onDone,
   onMove,
   onRemove,
 }: {
@@ -1534,7 +1550,6 @@ function TomorrowStrip({
   traced: Set<string>;
   /** Where a note held over the strip would land (1-based), while dragging. */
   landing: number | null;
-  onDone: () => void;
   onMove: (id: string, at: number) => void;
   onRemove: (id: string) => void;
 }) {
@@ -1551,14 +1566,9 @@ function TomorrowStrip({
       aria-label="Tomorrow"
       className={`rounded-[20px] px-[18px] pt-4 pb-[18px] ${items.length || !shaping ? "bg-soft shadow-[inset_0_0_0_1px_var(--line)]" : "border-2 border-dashed border-ink/25"} ${landing !== null ? "shadow-[inset_0_0_0_2px_var(--red-text)]" : ""}`}
     >
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-baseline gap-2.5">
         <h2 className="font-hand text-[28px] leading-none font-bold">{shaping ? "Tomorrow" : `${day}, in ink`}</h2>
-        {shaping && items.length === 0 && <span className="text-[12px] text-mute">drag thoughts here</span>}
-        {shaping && (
-          <button type="button" onClick={onDone} title="Esc" className="ml-auto h-8 rounded-lg bg-ink px-3.5 text-[13px] font-semibold text-bg">
-            Done
-          </button>
-        )}
+        {shaping && <span className="text-[12px] text-mute">{items.length ? `${items.length} in ink` : "drag in the few that matter, in order"}</span>}
       </div>
       {items.length === 0 ? (
         <ol className="mt-3 flex gap-3">

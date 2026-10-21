@@ -41,7 +41,10 @@ type Props = {
   image?: string | null;
   /** Earlier days these words were written afresh: earlier copies show through underneath, like pressing hard on a pad. */
   echoes?: string[];
-  /** How much a pencil thought matters, 0–3 (written again, joined to others): written bigger and pressed harder. */
+  /**
+   * How much a pencil thought matters: 0 barely (small, light), 1 an ordinary
+   * thought, 2 and 3 written again or joined to others (bigger, pressed harder, darker).
+   */
   weight?: number;
   /** "Connect to…": the L key. */
   onConnect?: () => void;
@@ -154,7 +157,7 @@ export function ThoughtBubble({
   onRank,
   image,
   echoes,
-  weight = 0,
+  weight = 1,
   onConnect,
   onThread,
   onStackWith,
@@ -278,10 +281,7 @@ export function ThoughtBubble({
   const shapeStyle = stream ? { ...settled, transform: `translateX(${dx}px)` } : settled;
   const pressed = Math.min(2, echoes?.length ?? 0);
   // Pencil with no box: its value shows in the hand itself (size, pressure, darkness).
-  const heft = pencil && !image ? Math.max(0, Math.min(3, weight)) : 0;
-  const heftStyle: CSSProperties | undefined = heft
-    ? { fontSize: `${(1 + heft * 0.14).toFixed(2)}em`, fontWeight: 300 + heft * 133, color: `color-mix(in srgb, var(--ink) ${30 + heft * 23}%, var(--graphite))` }
-    : undefined;
+  const heftStyle: CSSProperties | undefined = pencil && !image ? PENCIL_WEIGHT[Math.max(0, Math.min(3, Math.round(weight)))] : undefined;
   const motion = leaving === "crumple" ? "crumple-away" : leaving === "fold" ? "fold-away" : returning ? "uncrumple" : fresh ? "drop-in" : "";
 
   if (editing) {
@@ -386,7 +386,7 @@ export function ThoughtBubble({
             key={i}
             aria-hidden="true"
             style={{ ...heftStyle, transform: `translate(${(i + 1) * 5}px, ${-(i + 1) * 5}px) rotate(${-(i + 1) * 1.5}deg)`, opacity: 0.18 - i * 0.07 }}
-            className="hand pointer-events-none absolute inset-0 px-6 py-5 font-note text-[19px] leading-snug whitespace-pre-wrap sm:text-[20px]"
+            className="hand pointer-events-none absolute inset-0 px-2 py-1.5 font-note text-[19px] leading-snug whitespace-pre-wrap sm:text-[20px]"
           >
             {text}
           </span>
@@ -419,7 +419,7 @@ export function ThoughtBubble({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`paper-note relative flex flex-col items-start gap-1.5 text-left ${image ? `px-3 pt-3 pb-2.5 ${stream ? "" : "w-[300px]"}` : "px-6 py-5"} transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${pencil ? "is-pencil" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
+        className={`paper-note relative flex flex-col items-start gap-1.5 text-left ${image ? `px-3 pt-3 pb-2.5 ${stream ? "" : "w-[300px]"}` : pencil && !stream ? "px-2 py-1.5" : "px-6 py-5"} transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${pencil ? "is-pencil" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
       >
         {image && (
           <>
@@ -535,3 +535,11 @@ export function ThoughtBubble({
 
 const weekdayShort = (date: string) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(`${date}T12:00:00Z`).getUTCDay()];
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
+
+/** Pencil written lightly to hard: a passing thought, an ordinary one, one that keeps coming back, one that matters. */
+const PENCIL_WEIGHT: CSSProperties[] = [
+  { fontSize: "0.95em", fontWeight: 400 },
+  { fontSize: "1.2em", fontWeight: 500 },
+  { fontSize: "1.45em", fontWeight: 600, color: "color-mix(in srgb, var(--graphite) 40%, var(--ink))" },
+  { fontSize: "1.8em", fontWeight: 700, color: "var(--ink)", textShadow: "0 0 0.8px var(--ink)" },
+];
