@@ -16,6 +16,11 @@ import {
   StackError,
   threadOf,
   thoughtLabel,
+  guessLinks,
+  keywords,
+  pencilFade,
+  themeOf,
+  tomorrowIds,
   thisWeekend,
   visiblePaper,
   whenLabel,
@@ -453,5 +458,55 @@ describe("pictures", () => {
   it("carry over with their picture", () => {
     const p = paper([t("a", "", "open", null, { image: "data:image/webp;base64,AA" })]);
     expect(rollover(p, () => "n1").thoughts[0].image).toBe("data:image/webp;base64,AA");
+  });
+});
+
+describe("pencil thinks, pen commits", () => {
+  const pencil = (id: string, text: string, more: Partial<Thought> = {}) => t(id, text, "open", null, { kind: "pencil", ...more });
+  const base = paper([pencil("a", "Sravanthi mam tasks"), pencil("b", "Ravi anna about payroll"), pencil("c", "tanuj issue"), pencil("d", "data migration")]);
+
+  it("inks a thought into tomorrow where it's dropped; the rest move down, no limit", () => {
+    let p = applyStackOp(base, { kind: "shape", id: "a", at: 1 });
+    p = applyStackOp(p, { kind: "shape", id: "b", at: 2 });
+    p = applyStackOp(p, { kind: "shape", id: "c", at: 3 });
+    p = applyStackOp(p, { kind: "shape", id: "d", at: 3 });
+    expect(tomorrowIds(p)).toEqual(["a", "b", "d", "c"]);
+    expect(p.thoughts.filter((x) => x.kind === "pen").map((x) => x.id).sort()).toEqual(["a", "b", "c", "d"]);
+    p = applyStackOp(p, { kind: "shape", id: "b", at: null });
+    expect(tomorrowIds(p)).toEqual(["a", "d", "c"]);
+  });
+
+  it("wakes up numbered, in ink, in that order", () => {
+    let p = applyStackOp(base, { kind: "shape", id: "c", at: 1 });
+    p = applyStackOp(p, { kind: "shape", id: "a", at: 2 });
+    let n = 0;
+    const next = rollover(p, () => `n${++n}`).thoughts;
+    const byText = (s: string) => next.find((x) => x.text === s)!;
+    expect([byText("tanuj issue").rank, byText("Sravanthi mam tasks").rank, byText("data migration").rank]).toEqual([1, 2, null]);
+    expect(byText("tanuj issue").kind).toBe("pen");
+    expect(byText("data migration").kind).toBe("pencil");
+  });
+
+  it("fades pencil a little each night, never ink", () => {
+    const old = pencil("a", "x", { carriedFrom: "2026-10-14" });
+    expect(pencilFade(pencil("a", "x"), "2026-10-17")).toBe(1);
+    expect(pencilFade(old, "2026-10-17")).toBeCloseTo(0.64);
+    expect(pencilFade({ ...old, carriedFrom: "2026-09-01" }, "2026-10-17")).toBe(0.4);
+    expect(pencilFade({ ...old, kind: "pen" }, "2026-10-17")).toBe(1);
+  });
+
+  it("guesses related thoughts by a shared telling word, skipping joined and waved-off pairs", () => {
+    const p = paper([pencil("a", "world map of places"), pencil("b", "india map"), pencil("c", "travel planning using the maps"), pencil("d", "radiation")]);
+    expect(keywords("travel planning using the maps")).toEqual(new Set(["travel", "planning", "map"]));
+    const g = guessLinks(p);
+    expect(g.map((x) => [x.from, x.to].sort().join())).toEqual(["a,b", "a,c", "b,c"]);
+    const linked = applyStackOp(p, { kind: "link", id: "l1", from: "a", to: "b" });
+    expect(guessLinks(linked, new Set(["a|c"])).map((x) => [x.from, x.to].sort().join())).toEqual(["b,c"]);
+  });
+
+  it("notices a word that keeps coming up (four or more)", () => {
+    const p = paper(["india map", "world map", "map of trips", "maps for travel", "radiation"].map((text, i) => pencil(`t${i}`, text)));
+    expect(themeOf(p)).toEqual({ word: "map", ids: ["t0", "t1", "t2", "t3"] });
+    expect(themeOf(paper([pencil("a", "india map")]))).toBeNull();
   });
 });

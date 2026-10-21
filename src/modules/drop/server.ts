@@ -1,9 +1,9 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { users } from "@/db/schema";
 import { uid } from "@/lib/mutations";
-import { todayIn } from "@/lib/time";
+import { addDays, todayIn } from "@/lib/time";
 import {
   applyStackOp,
   CRUMPLE_KEEP_DAYS,
@@ -274,7 +274,49 @@ async function saveChanges(paperId: string, userId: string, before: DropPaper, a
 }
 
 export async function getToday(userId: string): Promise<DropPaper> {
-  return contentsOf(await ensureTodayPaper(userId));
+  const paper = await contentsOf(await ensureTodayPaper(userId));
+  return withEchoes(userId, paper);
+}
+
+/** How far back a thought written again still counts as "again". */
+const ECHO_DAYS = 30;
+const sameWords = (text: string) => text.trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * Marks thoughts whose words were written afresh (not carried over) on earlier
+ * days this month, with those days, so a thought you keep writing presses
+ * through the paper, darker each time.
+ */
+async function withEchoes(userId: string, paper: DropPaper): Promise<DropPaper> {
+  const texts = new Set(paper.thoughts.filter((t) => t.text).map((t) => sameWords(t.text)));
+  if (!texts.size) return paper;
+  const rows = await db
+    .select({ text: dropThoughts.text, date: dropPapers.date })
+    .from(dropThoughts)
+    .innerJoin(dropPapers, eq(dropPapers.id, dropThoughts.paperId))
+    .where(
+      and(
+        eq(dropThoughts.userId, userId),
+        isNull(dropThoughts.carriedFrom),
+        lt(dropPapers.date, paper.date),
+        gte(dropPapers.date, addDays(paper.date, -ECHO_DAYS)),
+        inArray(sql`lower(regexp_replace(trim(${dropThoughts.text}), '\\s+', ' ', 'g'))`, [...texts]),
+      ),
+    );
+  if (!rows.length) return paper;
+  const days = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const k = sameWords(r.text);
+    days.set(k, (days.get(k) ?? new Set()).add(r.date));
+  }
+  return {
+    ...paper,
+    thoughts: paper.thoughts.map((t) => {
+      const seen = days.get(sameWords(t.text));
+      // Only the copy written today (or carried from the first time) presses through.
+      return seen ? { ...t, echoes: [...seen].filter((d) => d !== t.carriedFrom).sort() } : t;
+    }),
+  };
 }
 
 /** Groups, regroups, renames, folds, inks or throws away on today's paper. Throws StackError when it doesn't fit. */

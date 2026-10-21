@@ -39,6 +39,8 @@ type Props = {
   onRank?: (rank: number | null) => void;
   /** A pasted or dropped picture: the note becomes a taped photo, the text its caption. */
   image?: string | null;
+  /** Earlier days these words were written afresh: it presses through, darker each time, with ghost copies behind. */
+  echoes?: string[];
   /** "Connect to…": the L key. */
   onConnect?: () => void;
   /** Joined to others by lines: shows the whole thread (the T key, or the thread button). */
@@ -149,6 +151,7 @@ export function ThoughtBubble({
   rank,
   onRank,
   image,
+  echoes,
   onConnect,
   onThread,
   onStackWith,
@@ -270,6 +273,7 @@ export function ThoughtBubble({
     ...(target ? { outline: "2px solid color-mix(in srgb, var(--red-text) 55%, transparent)", outlineOffset: 3 } : {}),
   };
   const shapeStyle = stream ? { ...settled, transform: `translateX(${dx}px)` } : settled;
+  const pressed = Math.min(3, echoes?.length ?? 0);
   const motion = leaving === "crumple" ? "crumple-away" : leaving === "fold" ? "fold-away" : returning ? "uncrumple" : fresh ? "drop-in" : "";
 
   if (editing) {
@@ -354,6 +358,16 @@ export function ThoughtBubble({
 
   return (
     <div className={`group relative ${stream ? "w-full" : "max-w-[300px]"} ${motion}`}>
+      {/* Written again and again: earlier copies show through underneath, like pressing hard on a pad. */}
+      {!stream &&
+        Array.from({ length: Math.min(2, pressed) }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            style={{ ...look, transform: `translate(${(i + 1) * 8}px, ${-(i + 1) * 8}px) rotate(${-(i + 1) * 1.5}deg)`, opacity: 0.24 - i * 0.1 }}
+            className="pointer-events-none absolute inset-0"
+          />
+        ))}
       {!readOnly && stream && dx !== 0 && (
         <span aria-hidden="true" className={`absolute inset-y-0 flex items-center font-hand text-xl text-red-text ${dx > 0 ? "left-0 pl-3" : "right-0 pr-3"}`}>
           {dx > 0 ? (done ? "unstrike" : "strike") : "crumple"}
@@ -404,7 +418,7 @@ export function ThoughtBubble({
         {text ? (
           <span
             style={fresh ? ({ "--write": writeOn(text) } as CSSProperties) : undefined}
-            className={`hand font-note leading-snug break-words whitespace-pre-wrap ${image ? "px-1 text-[19px]" : "text-[19px] sm:text-[20px]"} ${fresh ? "write-on" : ""}`}
+            className={`hand font-note leading-snug break-words whitespace-pre-wrap ${image ? "px-1 text-[19px]" : "text-[19px] sm:text-[20px]"} ${pressed ? "font-bold text-ink" : ""} ${fresh ? "write-on" : ""}`}
           >
             <span className="pen-strike">
               <HandText text={text} seed={seed} />
@@ -412,6 +426,11 @@ export function ThoughtBubble({
           </span>
         ) : (
           image && !readOnly && <span className="px-1 font-note text-[18px] text-mute">add a caption…</span>
+        )}
+        {pressed > 0 && echoes && (
+          <span className="text-[11px] font-medium text-mute">
+            {[...echoes.slice(-3).map((d) => weekdayShort(d)), "today"].join(" · ")} · {ordinal(echoes.length + 1)} time
+          </span>
         )}
         {(stream && meta) || when ? (
           <span className="flex flex-wrap items-center gap-1.5">
@@ -494,3 +513,6 @@ export function ThoughtBubble({
     </div>
   );
 }
+
+const weekdayShort = (date: string) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(`${date}T12:00:00Z`).getUTCDay()];
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;

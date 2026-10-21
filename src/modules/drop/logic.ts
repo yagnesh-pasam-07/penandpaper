@@ -31,6 +31,8 @@ export type Thought = {
   nextRank: number | null;
   /** A pasted or dropped picture (a small data URL), taped on like a photo; the text is its caption. */
   image?: string | null;
+  /** Earlier days the same words were written afresh (not carried): it presses through, darker each time. */
+  echoes?: string[];
 };
 
 /** An ink line from one thought or stack to another, maybe with a few words on it. */
@@ -260,7 +262,9 @@ export type StackOp =
   | { kind: "link"; id: string; from: string; to: string }
   | { kind: "unlink"; id: string }
   /** Words on a line, or an arrow or plain line. */
-  | { kind: "linkStyle"; id: string; label?: string | null; arrow?: boolean };
+  | { kind: "linkStyle"; id: string; label?: string | null; arrow?: boolean }
+  /** Shaping tonight: ink it into tomorrow's order at this place (the rest move down), or take it out (null). */
+  | { kind: "shape"; id: string; at: number | null };
 
 export class StackError extends Error {}
 
@@ -371,6 +375,22 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
       stacks = stacks.map((s) => ({ ...s, nextRank: pick(s.id) }));
       break;
     }
+    case "shape": {
+      const isThought = thoughts.some((t) => t.id === op.id && !t.stackId);
+      if (!isThought && !stacks.some((s) => s.id === op.id)) throw new StackError("Only a loose thought or a stack can go into tomorrow.");
+      const order = tomorrowIds({ thoughts, stacks }).filter((id) => id !== op.id);
+      if (op.at !== null) {
+        if (order.length >= MAX_RANK) throw new StackError(`That's ${MAX_RANK} for tomorrow already.`);
+        order.splice(Math.max(0, Math.min(op.at - 1, order.length)), 0, op.id);
+        // Going into tomorrow traces it in ink (every thought in a stack).
+        const inks = (t: Thought) => t.id === op.id || (!isThought && t.stackId === op.id);
+        thoughts = thoughts.map((t) => (inks(t) && t.kind === "pencil" ? { ...t, kind: "pen" } : t));
+      }
+      const pick = (id: string) => (order.includes(id) ? order.indexOf(id) + 1 : null);
+      thoughts = thoughts.map((t) => ({ ...t, nextRank: t.stackId ? null : pick(t.id) }));
+      stacks = stacks.map((s) => ({ ...s, nextRank: pick(s.id) }));
+      break;
+    }
     case "link": {
       const exists = (id: string) => thoughts.some((t) => t.id === id) || stacks.some((s) => s.id === id);
       if (!exists(op.from) || !exists(op.to)) throw new StackError("That isn't on today's paper.");
@@ -450,6 +470,82 @@ function withRanks(paper: { thoughts: Thought[]; stacks: Stack[] }, order: strin
 function renumberList(thoughts: Thought[], stacks: Stack[]): { thoughts: Thought[]; stacks: Stack[] } {
   const live = { thoughts: thoughts.map((t) => (t.stackId ? { ...t, rank: null } : t)), stacks };
   return withRanks(live, rankedIds(live));
+}
+
+/* ---------- Pencil thinks, pen commits ---------- */
+
+/** What's going into tomorrow, in order (loose thoughts and stacks with a next number). */
+export function tomorrowIds(paper: Pick<DropPaper, "thoughts" | "stacks">): string[] {
+  const all = [
+    ...paper.thoughts.filter((t) => t.nextRank !== null && !t.stackId).map((t) => ({ id: t.id, n: t.nextRank! })),
+    ...paper.stacks.filter((s) => s.nextRank !== null).map((s) => ({ id: s.id, n: s.nextRank! })),
+  ];
+  return all.sort((a, b) => a.n - b.n).map((x) => x.id);
+}
+
+/** Whole days between two YYYY-MM-DD dates. */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+/** How strongly a pencil thought still shows: it fades a little each night it isn't inked (never below 0.4). Ink never fades. */
+export function pencilFade(t: Pick<Thought, "kind" | "status" | "carriedFrom" | "createdAt">, date: string): number {
+  if (t.kind !== "pencil" || t.status !== "open") return 1;
+  const first = t.carriedFrom ?? t.createdAt.slice(0, 10);
+  return Math.max(0.4, 1 - 0.12 * Math.max(0, daysBetween(first, date)));
+}
+
+/** Words too common to say two thoughts are about the same thing. */
+const STOP = new Set(
+  "the and for with from that this into about your have will what when then them they their there here just make need more some call send done using near home time today tomorrow week".split(" "),
+);
+
+/** A thought's telling words: lower case, 3+ letters, a trailing plural s dropped. */
+export function keywords(text: string): Set<string> {
+  return new Set(
+    (text.toLowerCase().match(/[a-z][a-z']{2,}/g) ?? [])
+      .map((w) => w.replace(/'s$/, "").replace(/(?<!s)s$/, ""))
+      .filter((w) => w.length >= 3 && !STOP.has(w)),
+  );
+}
+
+export type Guess = { from: string; to: string; word: string };
+
+/**
+ * The paper's guesses at what belongs together: loose open thoughts sharing a
+ * telling word, not already joined and not waved off. A few at most, the
+ * closest matches first, so it never gets noisy.
+ */
+export function guessLinks(paper: DropPaper, dismissed: Set<string> = new Set(), max = 3): Guess[] {
+  const shown = visiblePaper(paper);
+  const loose = shown.thoughts.filter((t) => !t.stackId && t.status === "open" && t.text);
+  const joined = new Set((paper.links ?? []).flatMap((l) => [`${l.from}|${l.to}`, `${l.to}|${l.from}`]));
+  const words = new Map(loose.map((t) => [t.id, keywords(t.text)]));
+  const out: (Guess & { score: number })[] = [];
+  for (let i = 0; i < loose.length; i++) {
+    for (let j = i + 1; j < loose.length; j++) {
+      const a = loose[i];
+      const b = loose[j];
+      if (joined.has(`${a.id}|${b.id}`) || dismissed.has(guessKey(a.id, b.id))) continue;
+      const shared = [...words.get(a.id)!].filter((w) => words.get(b.id)!.has(w));
+      if (shared.length) out.push({ from: a.id, to: b.id, word: shared[0], score: shared.length });
+    }
+  }
+  return out.sort((x, y) => y.score - x.score).slice(0, max).map(({ from, to, word }) => ({ from, to, word }));
+}
+
+export const guessKey = (a: string, b: string) => [a, b].sort().join("|");
+
+export type Theme = { word: string; ids: string[] };
+
+/** A word that keeps coming up among today's loose open thoughts (4 or more): "Travel came up 5 times". */
+export function themeOf(paper: DropPaper, min = 4): Theme | null {
+  const shown = visiblePaper(paper);
+  const loose = shown.thoughts.filter((t) => !t.stackId && t.status === "open" && t.text);
+  const by = new Map<string, string[]>();
+  for (const t of loose) for (const w of keywords(t.text)) by.set(w, [...(by.get(w) ?? []), t.id]);
+  const best = [...by].sort((a, b) => b[1].length - a[1].length)[0];
+  return best && best[1].length >= min ? { word: best[0], ids: best[1] } : null;
 }
 
 /* ---------- Connections ---------- */
