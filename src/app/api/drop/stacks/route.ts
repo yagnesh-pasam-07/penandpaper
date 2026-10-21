@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_NEXT_RANK, MAX_RANK, MAX_STACK_NAME, StackError } from "@/modules/drop/logic";
+import { MAX_LINK_LABEL, MAX_NEXT_RANK, MAX_RANK, MAX_STACK_NAME, StackError } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
 import { changeStacks } from "@/modules/drop/server";
 
@@ -21,9 +21,12 @@ const op = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("rank"), id, rank: z.number().int().min(1).max(MAX_RANK).nullable() }),
   z.object({ kind: z.literal("order"), ids: z.array(id).max(MAX_RANK) }),
   z.object({ kind: z.literal("nextRank"), ids: z.array(id).max(MAX_NEXT_RANK) }),
+  z.object({ kind: z.literal("link"), id, from: id, to: id }),
+  z.object({ kind: z.literal("unlink"), id }),
+  z.object({ kind: z.literal("linkStyle"), id, label: z.string().max(MAX_LINK_LABEL * 2).nullable().optional(), arrow: z.boolean().optional() }),
 ]);
 
-/** One change to today's paper: stack, take out, unstack, rename, crumple, fold (schedule) or ink. */
+/** One change to today's paper: stack, take out, unstack, rename, crumple, fold (schedule), ink, number or connect. */
 export async function POST(request: Request) {
   const user = await requireUser();
   if (user instanceof Response) return user;

@@ -1,14 +1,27 @@
 import { z } from "zod";
-import { MAX_THOUGHT } from "@/modules/drop/logic";
+import { MAX_IMAGE, MAX_THOUGHT } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
 import { addThought } from "@/modules/drop/server";
 
-const body = z.object({
-  id: z.string().regex(/^[a-z0-9-]{6,40}$/),
-  text: z.string().trim().min(1).max(MAX_THOUGHT),
-  shape: z.number().int().min(0).max(5),
-  kind: z.enum(["pen", "pencil"]).default("pen"),
-});
+const body = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]{6,40}$/),
+    text: z.string().trim().max(MAX_THOUGHT),
+    shape: z.number().int().min(0).max(5),
+    kind: z.enum(["pen", "pencil"]).default("pen"),
+    /** A picture, already shrunk in the browser. */
+    image: z
+      .string()
+      .max(MAX_IMAGE)
+      .regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/)
+      .nullable()
+      .optional(),
+    /** Where it was pasted on the sheet. */
+    x: z.number().min(0).max(1).nullable().optional(),
+    y: z.number().min(-20000).max(20000).nullable().optional(),
+  })
+  // Words, a picture, or both.
+  .refine((b) => b.text.length > 0 || !!b.image);
 
 export async function POST(request: Request) {
   const user = await requireUser();

@@ -1,11 +1,11 @@
 import { addDays } from "@/lib/time";
-import { foldedItems, membersOf, rankedIds, stackLabel, visiblePaper, whenLabel, type DropPaper, type Thought } from "./logic";
+import { foldedItems, membersOf, rankedIds, stackLabel, thoughtLabel, visiblePaper, whenLabel, type DropPaper, type Thought } from "./logic";
 
 type Item = { text: string; done: boolean; quiet?: boolean } | { group: string };
 
 /** Open ones first: they're what tomorrow starts with. */
 const openFirst = (a: Thought, b: Thought) => (a.status === b.status ? 0 : a.status === "open" ? -1 : 1);
-const line = (t: Thought): Item => ({ text: t.text, done: t.status === "done" });
+const line = (t: Thought): Item => ({ text: thoughtLabel(t), done: t.status === "done" });
 
 /**
  * The 9 PM email's list: numbered thoughts first, in order, with their
@@ -19,7 +19,7 @@ export function digestItems(paper: DropPaper): Item[] {
   for (const id of numbered) {
     const t = shown.thoughts.find((x) => x.id === id);
     if (t) {
-      items.push({ text: `${t.rank}. ${t.text}`, done: t.status === "done" });
+      items.push({ text: `${t.rank}. ${thoughtLabel(t)}`, done: t.status === "done" });
       continue;
     }
     const s = shown.stacks.find((x) => x.id === id);
@@ -38,7 +38,7 @@ export function digestItems(paper: DropPaper): Item[] {
   items.push(...loose.map(line));
 
   const ideas = shown.thoughts.filter((t) => t.kind === "pencil" && !numbered.includes(t.id));
-  if (ideas.length) items.push({ group: "Ideas" }, ...ideas.map((t) => ({ text: t.text, done: false, quiet: true })));
+  if (ideas.length) items.push({ group: "Ideas" }, ...ideas.map((t) => ({ text: thoughtLabel(t), done: false, quiet: true })));
 
   const week = addDays(paper.date, 7);
   const soon = foldedItems(paper).filter((f) => f.on <= week);

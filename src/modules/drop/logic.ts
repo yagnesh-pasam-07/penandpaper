@@ -29,6 +29,18 @@ export type Thought = {
   rank: number | null;
   /** Picked for tomorrow's top 3 at Clear desk: arrives with this number. */
   nextRank: number | null;
+  /** A pasted or dropped picture (a small data URL), taped on like a photo; the text is its caption. */
+  image?: string | null;
+};
+
+/** An ink line from one thought or stack to another, maybe with a few words on it. */
+export type Link = {
+  id: string;
+  from: string;
+  to: string;
+  label: string | null;
+  /** An arrowhead at the `to` end; otherwise a plain line. */
+  arrow: boolean;
 };
 
 /** Thoughts piled together like sticky notes. Lives on one paper; its thoughts point at it. */
@@ -51,6 +63,8 @@ export type DropPaper = {
   date: string;
   thoughts: Thought[];
   stacks: Stack[];
+  /** Lines joining thoughts and stacks. */
+  links?: Link[];
   /** When the desk was cleared that day (the evening ritual), if it was. */
   clearedAt?: string | null;
 };
@@ -60,10 +74,13 @@ export const DROP_TIMEZONE = "Asia/Kolkata";
 
 export const MAX_THOUGHT = 1000;
 export const MAX_STACK_NAME = 60;
+export const MAX_LINK_LABEL = 40;
+/** A picture's data URL, after it's been shrunk in the browser. */
+export const MAX_IMAGE = 1_500_000;
 /** Crumpled thoughts are kept this long (for undo and mistakes), then removed for good. */
 export const CRUMPLE_KEEP_DAYS = 7;
-/** Numbering is for a few: past six it stops being an order. */
-export const MAX_RANK = 6;
+/** Numbering has no real limit; this only keeps the numbers sane. */
+export const MAX_RANK = 99;
 /** Clear desk's "tomorrow's top 3". */
 export const MAX_NEXT_RANK = 3;
 
@@ -100,7 +117,7 @@ export function foldedItems(paper: DropPaper): FoldedItem[] {
     out.push({ id: s.id, kind: "stack", label: stackLabel(s, n), count: n, on: s.scheduledFor! });
   }
   for (const t of paper.thoughts) {
-    if (isFolded(t, paper.date) && !(t.stackId && hiddenStacks.has(t.stackId))) out.push({ id: t.id, kind: "thought", label: t.text, count: 1, on: t.scheduledFor! });
+    if (isFolded(t, paper.date) && !(t.stackId && hiddenStacks.has(t.stackId))) out.push({ id: t.id, kind: "thought", label: thoughtLabel(t), count: 1, on: t.scheduledFor! });
   }
   return out.sort((a, b) => a.on.localeCompare(b.on));
 }
@@ -127,6 +144,8 @@ export type Rollover = {
   /** Copies for the new paper: open thoughts and the stacks they're in. */
   thoughts: Thought[];
   stacks: Stack[];
+  /** Lines whose two ends both came along (pointing at the copies). */
+  links: Link[];
   /**
    * Folded ones travel to the new paper as they are (same ids), so today
    * always knows what's folded. They remember the day they first left
@@ -159,8 +178,11 @@ export function rollover(previous: DropPaper, newId: () => string): Rollover {
     // Numbers belong to a paper: only tomorrow's picks arrive numbered.
     stacks.push({ ...s, id, scheduledFor: null, carriedFrom: s.carriedFrom ?? day, rank: s.nextRank, nextRank: null });
   }
+  const thoughtIds = new Map<string, string>();
   const thoughts = carryable.map((t): Thought => {
-    const carried = { ...t, id: newId(), doneAt: null, scheduledFor: null, carriedFrom: t.carriedFrom ?? day, rank: t.stackId ? null : t.nextRank, nextRank: null };
+    const id = newId();
+    thoughtIds.set(t.id, id);
+    const carried = { ...t, id, doneAt: null, scheduledFor: null, carriedFrom: t.carriedFrom ?? day, rank: t.stackId ? null : t.nextRank, nextRank: null };
     if (!t.stackId) return carried;
     const stackId = copied.get(t.stackId);
     if (stackId) return { ...carried, stackId };
@@ -173,7 +195,15 @@ export function rollover(previous: DropPaper, newId: () => string): Rollover {
     if (!isFolded(t, day) || inFoldedStack(t)) continue;
     move.thoughts.push({ id: t.id, stackId: t.stackId ? (copied.get(t.stackId) ?? null) : null, carriedFrom: t.carriedFrom ?? day });
   }
-  return { ...renumberList(thoughts, stacks), move };
+  // Folded ones keep their ids, so a line to one still finds it.
+  const kept = new Set([...move.stacks, ...move.thoughts.map((m) => m.id)]);
+  const end = (id: string) => thoughtIds.get(id) ?? copied.get(id) ?? (kept.has(id) ? id : undefined);
+  const links = (previous.links ?? []).flatMap((l) => {
+    const from = end(l.from);
+    const to = end(l.to);
+    return from && to ? [{ ...l, id: newId(), from, to }] : [];
+  });
+  return { ...renumberList(thoughts, stacks), links, move };
 }
 
 export { linkify, type TextPart } from "@/lib/linkify";
@@ -225,7 +255,12 @@ export type StackOp =
   /** Number these, in this order; everything else loses its number. */
   | { kind: "order"; ids: string[] }
   /** Tomorrow's top 3, in order (from Clear desk). */
-  | { kind: "nextRank"; ids: string[] };
+  | { kind: "nextRank"; ids: string[] }
+  /** Join two thoughts or stacks with an ink line. */
+  | { kind: "link"; id: string; from: string; to: string }
+  | { kind: "unlink"; id: string }
+  /** Words on a line, or an arrow or plain line. */
+  | { kind: "linkStyle"; id: string; label?: string | null; arrow?: boolean };
 
 export class StackError extends Error {}
 
@@ -237,6 +272,7 @@ export class StackError extends Error {}
 export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toISOString()): DropPaper {
   let thoughts = paper.thoughts;
   let stacks = paper.stacks;
+  let links = paper.links ?? [];
   const thought = (id: string) => {
     const t = thoughts.find((x) => x.id === id);
     if (!t) throw new StackError("That thought isn't on today's paper.");
@@ -316,7 +352,7 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
       const order = rankedIds({ thoughts, stacks });
       const at = order.indexOf(op.id);
       if (!thoughts.some((t) => t.id === op.id && !t.stackId) && !stacks.some((s) => s.id === op.id)) throw new StackError("Only a loose thought or a stack can be numbered.");
-      if (at === -1 && op.rank !== null && order.length >= MAX_RANK) throw new StackError(`Keep it to your top ${MAX_RANK}.`);
+      if (at === -1 && op.rank !== null && order.length >= MAX_RANK) throw new StackError(`That's ${MAX_RANK} numbered already.`);
       if (at !== -1) order.splice(at, 1);
       if (op.rank !== null) order.splice(Math.max(0, Math.min(op.rank - 1, order.length)), 0, op.id);
       ({ thoughts, stacks } = withRanks({ thoughts, stacks }, order));
@@ -324,7 +360,7 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
     }
     case "order": {
       const ids = [...new Set(op.ids)].filter((id) => thoughts.some((t) => t.id === id && !t.stackId) || stacks.some((s) => s.id === id));
-      if (ids.length > MAX_RANK) throw new StackError(`Keep it to your top ${MAX_RANK}.`);
+      if (ids.length > MAX_RANK) throw new StackError(`That's more than ${MAX_RANK}.`);
       ({ thoughts, stacks } = withRanks({ thoughts, stacks }, ids));
       break;
     }
@@ -333,6 +369,26 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
       const pick = (id: string) => (ids.includes(id) ? ids.indexOf(id) + 1 : null);
       thoughts = thoughts.map((t) => ({ ...t, nextRank: pick(t.id) }));
       stacks = stacks.map((s) => ({ ...s, nextRank: pick(s.id) }));
+      break;
+    }
+    case "link": {
+      const exists = (id: string) => thoughts.some((t) => t.id === id) || stacks.some((s) => s.id === id);
+      if (!exists(op.from) || !exists(op.to)) throw new StackError("That isn't on today's paper.");
+      if (op.from === op.to) throw new StackError("A thought can't connect to itself.");
+      if (links.some((l) => l.id === op.id)) throw new StackError("That id is taken.");
+      // One line between two notes is enough.
+      if (links.some((l) => (l.from === op.from && l.to === op.to) || (l.from === op.to && l.to === op.from))) break;
+      links = [...links, { id: op.id, from: op.from, to: op.to, label: null, arrow: true }];
+      break;
+    }
+    case "unlink": {
+      links = links.filter((l) => l.id !== op.id);
+      break;
+    }
+    case "linkStyle": {
+      if (!links.some((l) => l.id === op.id)) throw new StackError("That line isn't on today's paper.");
+      const label = op.label === undefined ? undefined : op.label?.trim().slice(0, MAX_LINK_LABEL) || null;
+      links = links.map((l) => (l.id === op.id ? { ...l, ...(label !== undefined ? { label } : {}), ...(op.arrow !== undefined ? { arrow: op.arrow } : {}) } : l));
       break;
     }
   }
@@ -348,7 +404,7 @@ export function applyStackOp(paper: DropPaper, op: StackOp, now = new Date().toI
     thoughts = thoughts.map((t) => (t.id === op.id ? { ...t, rank: null } : t));
     stacks = stacks.map((s) => (s.id === op.id ? { ...s, rank: null } : s));
   }
-  return settleStacks({ ...paper, thoughts, stacks });
+  return settleStacks({ ...paper, thoughts, stacks, links });
 }
 
 /**
@@ -365,7 +421,10 @@ export function settleStacks(paper: DropPaper): DropPaper {
     }
     return false;
   });
-  return { ...paper, ...renumberList(thoughts, stacks) };
+  // A line goes with either of its ends.
+  const ends = new Set([...thoughts.map((t) => t.id), ...stacks.map((s) => s.id)]);
+  const links = (paper.links ?? []).filter((l) => ends.has(l.from) && ends.has(l.to));
+  return { ...paper, ...renumberList(thoughts, stacks), links };
 }
 
 /* ---------- Numbering ---------- */
@@ -393,6 +452,44 @@ function renumberList(thoughts: Thought[], stacks: Stack[]): { thoughts: Thought
   return withRanks(live, rankedIds(live));
 }
 
+/* ---------- Connections ---------- */
+
+/** What's drawn on the sheet for a thought: itself, or the stack it's in. */
+export function sheetIdOf(paper: Pick<DropPaper, "thoughts">, id: string): string {
+  return paper.thoughts.find((t) => t.id === id)?.stackId ?? id;
+}
+
+/**
+ * Everything joined to `start` by lines, as a tree from it (depth first):
+ * each with how deep it sits. Ids are sheet ids (a thought in a stack counts as its stack).
+ */
+export function threadOf(paper: DropPaper, start: string): { id: string; depth: number }[] {
+  const next = new Map<string, Set<string>>();
+  for (const l of paper.links ?? []) {
+    const a = sheetIdOf(paper, l.from);
+    const b = sheetIdOf(paper, l.to);
+    if (a === b) continue;
+    next.set(a, (next.get(a) ?? new Set()).add(b));
+    next.set(b, (next.get(b) ?? new Set()).add(a));
+  }
+  const root = sheetIdOf(paper, start);
+  if (!next.has(root)) return [];
+  const out: { id: string; depth: number }[] = [];
+  const seen = new Set<string>();
+  const walk = (id: string, depth: number) => {
+    seen.add(id);
+    out.push({ id, depth });
+    for (const n of next.get(id) ?? []) if (!seen.has(n)) walk(n, depth + 1);
+  };
+  walk(root, 0);
+  return out;
+}
+
+/** What a thought reads as in lists: its words, or "Image" for a picture with no caption. */
+export function thoughtLabel(t: Pick<Thought, "text" | "image">): string {
+  return t.text || (t.image ? "Image" : "");
+}
+
 /** In number mode, a tap: the next number if it has none, otherwise its number comes off. */
 export function tapRank(paper: DropPaper, id: string): StackOp {
   const order = rankedIds(paper);
@@ -407,7 +504,7 @@ export function nextUp(paper: DropPaper): NextUp | null {
   for (const id of rankedIds(shown)) {
     const t = shown.thoughts.find((x) => x.id === id);
     if (t) {
-      if (t.status === "open") return { id, rank: t.rank!, label: t.text };
+      if (t.status === "open") return { id, rank: t.rank!, label: thoughtLabel(t) };
       continue;
     }
     const s = shown.stacks.find((x) => x.id === id);
@@ -428,10 +525,10 @@ export function deskCards(paper: DropPaper): DeskCard[] {
   const cards: DeskCard[] = [];
   for (const s of shown.stacks) {
     const open = membersOf(shown, s.id).filter((t) => t.status === "open" && t.kind === "pen");
-    if (open.length) cards.push({ kind: "stack", id: s.id, label: stackLabel(s, open.length), open: open.map((t) => ({ id: t.id, text: t.text })) });
+    if (open.length) cards.push({ kind: "stack", id: s.id, label: stackLabel(s, open.length), open: open.map((t) => ({ id: t.id, text: thoughtLabel(t) })) });
   }
   for (const t of shown.thoughts) {
-    if (!t.stackId && t.status === "open" && t.kind === "pen") cards.push({ kind: "thought", id: t.id, text: t.text });
+    if (!t.stackId && t.status === "open" && t.kind === "pen") cards.push({ kind: "thought", id: t.id, text: thoughtLabel(t) });
   }
   return cards;
 }

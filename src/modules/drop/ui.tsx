@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { bubbleStyle } from "@/components/canvas/bubble";
 import { Fly } from "@/components/canvas/fly";
-import { FreeCanvas, type Placement } from "@/components/canvas/free-canvas";
+import { FreeCanvas, type CanvasLink, type Placement } from "@/components/canvas/free-canvas";
 import { PaperSurface } from "@/components/canvas/paper-surface";
 import { StackCard, StackRow } from "@/components/canvas/stack-card";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
@@ -21,9 +21,13 @@ import {
   MAX_RANK,
   membersOf,
   nextUp,
+  rankedIds,
   settleStacks,
+  sheetIdOf,
   tapRank,
   stackLabel,
+  thoughtLabel,
+  threadOf,
   thisWeekend,
   visiblePaper,
   whenLabel,
@@ -33,6 +37,7 @@ import {
   type StackOp,
   type Thought,
 } from "./logic";
+import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { importTryPaper } from "./try-import";
 import { PenButton, Writer } from "./writer";
 
@@ -63,6 +68,18 @@ function sheetItems(paper: DropPaper): SheetItem[] {
 
 /** Still wants attention: an open thought (ideas always are), or a stack with one. */
 const isOpenItem = (it: SheetItem) => (it.kind === "thought" ? it.thought.status === "open" : it.members.some((m) => m.status === "open"));
+
+/** The paper's lines as the sheet draws them: a thought in a stack is reached through its stack. */
+function sheetLinks(paper: DropPaper, shown: Set<string>): CanvasLink[] {
+  return (paper.links ?? []).flatMap((l) => {
+    const from = sheetIdOf(paper, l.from);
+    const to = sheetIdOf(paper, l.to);
+    return from !== to && shown.has(from) && shown.has(to) ? [{ ...l, from, to }] : [];
+  });
+}
+
+/** What an item on the sheet reads as in a list. */
+const itemLabel = (it: SheetItem) => (it.kind === "thought" ? thoughtLabel(it.thought) : stackLabel(it.stack, it.members.length));
 
 const DRAFT_KEY = "pp-drop-draft";
 
@@ -95,6 +112,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   const [writing, setWriting] = useState(initial.thoughts.length === 0);
   const [draft, setDraft] = useState(readDraft);
   const [kind, setKind] = useState<Kind>("pencil");
+  // A picture pasted into the writer, dropped with the next thought.
+  const [draftImage, setDraftImage] = useState<Picture | null>(null);
   useEffect(() => {
     try {
       if (draft) localStorage.setItem(DRAFT_KEY, draft);
@@ -122,6 +141,14 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   const [numbering, setNumbering] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const [hint, setHint] = useState(stackHint);
+  // Connections: the line picked (its toolbar shows), the thread in focus, and "Connect to…" (the L key).
+  const [selectedLink, setSelectedLink] = useState<string | null>(null);
+  const [thread, setThread] = useState<string | null>(null);
+  const [linking, setLinking] = useState<string | null>(null);
+  // Image files dragged over the page: "let go to pin it".
+  const [filesOver, setFilesOver] = useState(false);
+  // Where the pointer is on the sheet, so a paste lands there.
+  const spot = useRef<{ x: number; y: number } | null>(null);
   const pending = useRef(0);
   // Saves go out one at a time, in order: drops land in the order typed, and
   // an edit never overtakes the drop it edits.
@@ -199,10 +226,12 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
       if (el?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
       if (e.key === "Escape") {
         setNumbering(false);
+        setThread(null);
+        setSelectedLink(null);
         return;
       }
-      // A selected thought keeps its own keys (S stack, W when, Delete crumple, 0–6 number).
-      if (el?.closest("[data-keys]") && (["s", "w", "delete", "backspace"].includes(e.key.toLowerCase()) || /^[0-6]$/.test(e.key))) return;
+      // A selected thought keeps its own keys (S stack, W when, L connect, T thread, Delete crumple, 0–9 number).
+      if (el?.closest("[data-keys]") && (["s", "w", "l", "t", "delete", "backspace"].includes(e.key.toLowerCase()) || /^[0-9]$/.test(e.key))) return;
       if ((e.key === "N" && e.shiftKey) || /^[1-9]$/.test(e.key)) {
         // Shift+N, or any number key: number mode.
         e.preventDefault();
@@ -256,7 +285,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
     }, ms);
   };
 
-  const drop = (value: string, from: { x: number; y: number }) => {
+  /** Puts a new thought on the paper and saves it; a picture and a spot are optional. */
+  const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number } }) => {
     const thought: Thought = {
       id: uid(),
       text: value,
@@ -266,26 +296,115 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
       createdAt: new Date().toISOString(),
       doneAt: null,
       carriedFrom: null,
-      x: null,
-      y: null,
+      x: extra.x ?? null,
+      y: extra.y ?? null,
       stackId: null,
       stackOrder: 0,
       scheduledFor: null,
       rank: null,
       nextRank: null,
+      image: extra.image ?? null,
     };
     update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setFresh((f) => new Set(f).add(thought.id));
-    setFlights((m) => new Map(m).set(thought.id, from));
-    setDraft("");
+    if (extra.from) setFlights((m) => new Map(m).set(thought.id, extra.from!));
     void save(
-      () => call("/api/drop/thoughts", { method: "POST", body: JSON.stringify({ id: thought.id, text: thought.text, shape: thought.shape, kind: thought.kind }) }),
+      () =>
+        call("/api/drop/thoughts", {
+          method: "POST",
+          body: JSON.stringify({ id: thought.id, text: thought.text, shape: thought.shape, kind: thought.kind, image: thought.image, x: thought.x, y: thought.y }),
+        }),
       () => {
         update((p) => ({ ...p, thoughts: p.thoughts.filter((t) => t.id !== thought.id) }));
-        setDraft((current) => current || value);
+        if (extra.from) setDraft((current) => current || value);
       },
     );
+    return thought.id;
   };
+
+  const drop = (value: string, from: { x: number; y: number }) => {
+    add(value, { image: draftImage?.url, from });
+    setDraft("");
+    setDraftImage(null);
+  };
+
+  /**
+   * Pictures pasted or dropped onto the page (not into the writer): each lands
+   * as a taped photo where the pointer is (a little apart when there are
+   * several), with a moment to take it back.
+   */
+  const pin = async (files: File[]) => {
+    const at = spot.current;
+    const ids: string[] = [];
+    for (const [i, file] of files.entries()) {
+      try {
+        const pic = await shrinkImage(file);
+        ids.push(add("", { image: pic.url, x: at ? Math.min(0.95, at.x + i * 0.03) : null, y: at ? at.y + i * 30 : null }));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    }
+    if (!ids.length) return;
+    setToast({
+      text: `${ids.length === 1 ? "Picture" : `${ids.length} pictures`} pinned · click to caption`,
+      undo: () => {
+        update((p) => settleStacks({ ...p, thoughts: p.thoughts.filter((t) => !ids.includes(t.id)) }));
+        ids.forEach((id) => void save(() => call(`/api/drop/thoughts/${id}`, { method: "DELETE" })));
+        setToast(null);
+      },
+    });
+  };
+  const pinRef = useRef(pin);
+  useEffect(() => {
+    pinRef.current = pin;
+  });
+
+  // ⌘V a screenshot anywhere (the writer takes its own pastes), or drop image files on the page.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (el?.closest("input, textarea, [contenteditable='true']")) return;
+      const files = imageFiles(e.clipboardData);
+      if (!files.length) return;
+      e.preventDefault();
+      void pinRef.current(files);
+    };
+    let depth = 0;
+    const onEnter = (e: DragEvent) => {
+      if (!draggingFiles(e.dataTransfer)) return;
+      depth += 1;
+      setFilesOver(true);
+    };
+    const onOver = (e: DragEvent) => {
+      if (draggingFiles(e.dataTransfer)) e.preventDefault();
+    };
+    const onLeave = (e: DragEvent) => {
+      if (!draggingFiles(e.dataTransfer)) return;
+      depth = Math.max(0, depth - 1);
+      if (!depth) setFilesOver(false);
+    };
+    const onDropFiles = (e: DragEvent) => {
+      if (!draggingFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      depth = 0;
+      setFilesOver(false);
+      const files = imageFiles(e.dataTransfer);
+      if (files.length) void pinRef.current(files);
+      else setError("Only pictures can go on the paper: PNG, JPG, GIF or WebP.");
+    };
+    window.addEventListener("paste", onPaste);
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDropFiles);
+    return () => {
+      window.removeEventListener("paste", onPaste);
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDropFiles);
+    };
+  }, []);
 
   const patch = (id: string, change: Partial<Pick<Thought, "text" | "status">>) => {
     const before = live.current.thoughts.find((t) => t.id === id);
@@ -462,6 +581,14 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   /** In number mode: the next number, or off if it has one. */
   const tapNumber = (id: string) => stackOp(tapRank(live.current, id));
 
+  /** Joins two things on the sheet with an ink line. */
+  const connect = (from: string, to: string) => {
+    const id = uid();
+    stackOp({ kind: "link", id, from, to });
+    setSelectedLink(id);
+  };
+  const linkedIds = new Set((paper.links ?? []).flatMap((l) => [sheetIdOf(paper, l.from), sheetIdOf(paper, l.to)]));
+
   /** In number mode a tap numbers the thought instead of editing, striking or opening it. */
   const tapToNumber = (id: string, node: ReactNode) =>
     numbering ? (
@@ -498,6 +625,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
     onStackWith: () => setPicking(t.id),
     onWhen: () => setWhenFor(t.id),
     onInk: () => ink(t.id, t.kind === "pencil" ? "pen" : "pencil"),
+    onConnect: () => setLinking(t.id),
+    onThread: linkedIds.has(sheetIdOf(paper, t.id)) ? () => setThread(sheetIdOf(paper, t.id)) : undefined,
   });
 
   const whenOf = (x: { scheduledFor: string | null }) => (x.scheduledFor ? whenLabel(x.scheduledFor, paper.date) : undefined);
@@ -510,6 +639,11 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   const folded = foldedItems(paper);
   const byId = new Map(paper.thoughts.map((t) => [t.id, t]));
   const looseOpen = onSheet.filter((it) => it.kind === "thought").length;
+  const lines = sheetLinks(paper, new Set(onSheet.map((it) => it.id)));
+  const threadList = thread ? threadOf(paper, thread).filter((x) => onSheet.some((it) => it.id === x.id)) : [];
+  const inThread = new Set(threadList.map((x) => x.id));
+  const dim = threadList.length ? new Set(onSheet.map((it) => it.id).filter((id) => !inThread.has(id))) : null;
+  const itemById = new Map(onSheet.map((it) => [it.id, it]));
   const showHint = hint && paper.stacks.length === 0 && looseOpen >= 3;
   // Clear desk shows in the evening (or once the paper fills up); Shift+C always works.
   const evening = mounted && new Date().getHours() >= 18;
@@ -528,6 +662,7 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   const bubble = (t: Thought, extra: { stream?: boolean; movable?: boolean; target?: boolean } = {}) => (
     <ThoughtBubble
       {...bubbleProps(t, tz, fresh.has(t.id))}
+      image={t.image}
       when={whenOf(t)}
       leaving={leaving.get(t.id) ?? null}
       returning={returning.has(t.id)}
@@ -630,7 +765,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                 ),
               )}
             </PaperSurface>
-            <div className={`${COLUMN} relative max-sm:hidden`}>
+            <div className={`${COLUMN} flex items-start gap-5 max-sm:hidden`}>
+            <div className="relative min-w-0 flex-1">
               <span className="absolute top-2 right-2 z-10 flex items-center gap-1">
                 <button
                   type="button"
@@ -652,6 +788,24 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                 items={onSheet}
                 onArrange={onArrange}
                 raised={openStack}
+                links={lines}
+                onLink={numbering ? undefined : connect}
+                selectedLink={selectedLink}
+                onSelectLink={setSelectedLink}
+                renderLinkTools={(l) => (
+                  <LinkTools
+                    key={l.id}
+                    link={l}
+                    onStyle={(change) => stackOp({ kind: "linkStyle", id: l.id, ...change })}
+                    onRemove={() => {
+                      setSelectedLink(null);
+                      stackOp({ kind: "unlink", id: l.id });
+                    }}
+                    onClose={() => setSelectedLink(null)}
+                  />
+                )}
+                dim={dim}
+                spotRef={spot}
                 canDropOn={(dragged) => byId.has(dragged)}
                 onDropOn={stackOnto}
                 onDetach={(id, at, pins) => {
@@ -679,7 +833,7 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                       count={it.members.length}
                       done={it.members.filter((m) => m.status === "done").length}
                       top={topCard(it.members)}
-                      peek={it.members.map((m) => m.text)}
+                      peek={it.members.map(thoughtLabel)}
                       carried={it.stack.carriedFrom ? weekday(it.stack.carriedFrom).slice(0, 3) : undefined}
                       when={whenOf(it.stack)}
                       open={openStack === it.id}
@@ -693,7 +847,7 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                       {it.members.map((t) => (
                         <StackRow
                           key={t.id}
-                          text={t.text}
+                          text={thoughtLabel(t)}
                           done={t.status === "done"}
                           pencil={t.kind === "pencil"}
                           meta={meta(t, tz)}
@@ -708,6 +862,37 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                   )
                 }
               />
+              {threadList.length > 1 && (
+                <ThreadPanel
+                  items={threadList.map((x) => ({ ...x, label: itemById.get(x.id) ? itemLabel(itemById.get(x.id)!) : "" }))}
+                  onGo={focusItem}
+                  onClose={() => setThread(null)}
+                  onStack={() => {
+                    // Everything loose in the thread piles onto its first one.
+                    const [root, ...rest] = threadList.map((x) => itemById.get(x.id)!).filter(Boolean);
+                    const into = root.kind === "stack" ? root.id : uid();
+                    let target = root.id;
+                    for (const it of rest) {
+                      if (it.kind !== "thought") continue;
+                      stackOp({ kind: "stack", thought: it.id, onto: target, newStackId: into });
+                      target = into;
+                    }
+                    setThread(null);
+                  }}
+                  onUnlink={() => {
+                    for (const l of lines) if (inThread.has(l.from) && inThread.has(l.to)) stackOp({ kind: "unlink", id: l.id });
+                    setThread(null);
+                  }}
+                />
+              )}
+            </div>
+            {numbering && (
+              <OrderPanel
+                items={onSheet.filter(isOpenItem)}
+                onOrder={(ids) => stackOp({ kind: "order", ids })}
+                onAdd={(id) => stackOp({ kind: "rank", id, rank: rankedIds(live.current).length + 1 })}
+              />
+            )}
             </div>
           </>
         )}
@@ -757,7 +942,29 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
       </main>
 
       <PenButton ref={penButton} hidden={writing} onOpen={() => setWriting(true)} />
-      {writing && mounted && <Writer draft={draft} onDraft={setDraft} kind={kind} onKind={setKind} onDrop={drop} onClose={closeWriter} />}
+      {writing && mounted && (
+        <Writer draft={draft} onDraft={setDraft} kind={kind} onKind={setKind} image={draftImage} onImage={setDraftImage} onDrop={drop} onClose={closeWriter} />
+      )}
+
+      {filesOver && (
+        <div aria-hidden="true" className="pointer-events-none fixed inset-3 z-[55] flex flex-col items-center justify-center gap-2 rounded-[18px] border-[2.5px] border-dashed border-red-text bg-red-soft/55">
+          <span className="font-hand text-[34px] font-bold text-red-text">Let go to pin it on today&apos;s paper</span>
+          <span className="text-[13px] text-mute">PNG, JPG, GIF or WebP · up to 10 MB · several at once is fine</span>
+        </div>
+      )}
+
+      {linking && (
+        <LinkPicker
+          paper={paper}
+          from={linking}
+          onClose={() => setLinking(null)}
+          onPick={(to) => {
+            const from = linking;
+            setLinking(null);
+            connect(from, to);
+          }}
+        />
+      )}
 
       {ordering && (
         <HelpOrder
@@ -833,6 +1040,7 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
 function bubbleProps(t: Thought, tz: string, fresh: boolean) {
   return {
     text: t.text,
+    image: t.image,
     done: t.status === "done",
     kind: t.kind,
     shape: t.shape,
@@ -846,7 +1054,7 @@ function bubbleProps(t: Thought, tz: string, fresh: boolean) {
 
 function topCard(members: Thought[]) {
   const t = members[0];
-  return { text: t?.text ?? "", shape: t?.shape ?? 0, seed: t?.createdAt, done: t?.status === "done" };
+  return { text: t ? thoughtLabel(t) : "", shape: t?.shape ?? 0, seed: t?.createdAt, done: t?.status === "done" };
 }
 
 /** A tiny looping picture of one note sliding onto another (still, with reduced motion). */
@@ -1016,6 +1224,265 @@ function StreamStack({
   );
 }
 
+/** By a picked line: arrow or plain line, a few words on it, or remove it. */
+function LinkTools({
+  link,
+  onStyle,
+  onRemove,
+  onClose,
+}: {
+  link: CanvasLink;
+  onStyle: (change: { label?: string | null; arrow?: boolean }) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const [labelling, setLabelling] = useState(false);
+  const [draft, setDraft] = useState(link.label ?? "");
+  const chip = "flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium hover:bg-soft";
+  return (
+    <div
+      role="toolbar"
+      aria-label="Connection"
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
+      className="flex items-center gap-0.5 rounded-xl border border-line bg-sheet p-1 shadow-[0_12px_30px_-18px_var(--shadow)]"
+    >
+      {labelling ? (
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onStyle({ label: draft.trim() || null });
+            setLabelling(false);
+          }}
+        >
+          <input
+            autoFocus
+            value={draft}
+            maxLength={40}
+            aria-label="Words on this line"
+            placeholder="for the trip"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), setLabelling(false))}
+            className="h-8 w-40 rounded-lg border border-line bg-bg px-2 font-hand text-[18px] outline-none"
+          />
+          <button type="submit" className={`${chip} bg-ink text-bg hover:bg-ink`}>
+            Save
+          </button>
+        </form>
+      ) : (
+        <>
+          <button type="button" aria-pressed={link.arrow} onClick={() => onStyle({ arrow: true })} className={`${chip} ${link.arrow ? "bg-soft" : ""}`}>
+            → Arrow
+          </button>
+          <button type="button" aria-pressed={!link.arrow} onClick={() => onStyle({ arrow: false })} className={`${chip} ${link.arrow ? "" : "bg-soft"}`}>
+            — Line
+          </button>
+          <button type="button" onClick={() => setLabelling(true)} className={chip}>
+            Aa Label
+          </button>
+          <span aria-hidden="true" className="mx-0.5 h-[18px] w-px bg-line" />
+          <button type="button" onClick={onRemove} className={`${chip} text-red-text hover:bg-red-soft`}>
+            Remove
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** One thread in focus: its notes as a little tree; stack them all, or undo the lines. */
+function ThreadPanel({
+  items,
+  onGo,
+  onClose,
+  onStack,
+  onUnlink,
+}: {
+  items: { id: string; depth: number; label: string }[];
+  onGo: (id: string) => void;
+  onClose: () => void;
+  onStack: () => void;
+  onUnlink: () => void;
+}) {
+  return (
+    <aside
+      aria-label="Thread"
+      className="absolute top-12 right-3 z-30 w-[260px] rounded-2xl border border-line bg-sheet p-3.5 shadow-[0_18px_40px_-24px_var(--shadow)]"
+    >
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-semibold">Thread · {items.length} thoughts</span>
+        <button type="button" onClick={onClose} className="rounded-md px-1.5 text-[12px] text-mute hover:bg-soft hover:text-ink">
+          Esc
+        </button>
+      </div>
+      <ul className="mt-1.5 flex max-h-72 flex-col overflow-y-auto">
+        {items.map((it) => (
+          <li key={it.id}>
+            <button
+              type="button"
+              onClick={() => onGo(it.id)}
+              style={{ paddingLeft: 6 + Math.min(it.depth, 4) * 18 }}
+              className="flex w-full items-center gap-1.5 rounded-lg py-1.5 pr-1.5 text-left font-note text-[19px] hover:bg-soft"
+            >
+              {it.depth > 0 && <span className="text-mute">↳</span>}
+              <span className="min-w-0 flex-1 truncate">{it.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2.5 flex gap-2">
+        <button type="button" onClick={onStack} className="h-9 rounded-lg border border-line px-3 text-[13px] font-medium hover:bg-soft">
+          Stack these
+        </button>
+        <button type="button" onClick={onUnlink} className="h-9 rounded-lg border border-line px-3 text-[13px] font-medium hover:bg-soft">
+          Unlink
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/**
+ * Number mode's Order list: the numbered ones, first to last; drag a row (or
+ * Alt+↑/↓ on it) to move it. Below, the ones without a number: tap to add one at the end.
+ */
+function OrderPanel({ items, onOrder, onAdd }: { items: SheetItem[]; onOrder: (ids: string[]) => void; onAdd: (id: string) => void }) {
+  const rankOf = (it: SheetItem) => (it.kind === "thought" ? it.thought.rank : it.stack.rank);
+  const numbered = items.filter((it) => rankOf(it) !== null).sort((a, b) => rankOf(a)! - rankOf(b)!);
+  const rest = items.filter((it) => rankOf(it) === null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+  const list = useRef<HTMLOListElement>(null);
+  const move = (id: string, to: number) => {
+    const ids = numbered.map((it) => it.id).filter((x) => x !== id);
+    ids.splice(Math.max(0, Math.min(to, ids.length)), 0, id);
+    onOrder(ids);
+  };
+  return (
+    <aside aria-label="Order" className="sticky top-4 w-[300px] shrink-0 rounded-[18px] border border-line bg-sheet px-3 py-3.5">
+      <div className="flex items-baseline justify-between px-2 pb-1.5">
+        <span className="text-sm font-semibold">Order</span>
+        <span className="text-[12px] text-mute">{numbered.length > 1 ? "drag to reorder" : "tap notes to number them"}</span>
+      </div>
+      <ol ref={list} className="flex flex-col">
+        {numbered.map((it, i) => (
+          <li
+            key={it.id}
+            draggable
+            onDragStart={(e) => {
+              setDragging(it.id);
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", it.id);
+            }}
+            onDragOver={(e) => {
+              if (!dragging) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              setOver(e.clientY < r.top + r.height / 2 ? i : i + 1);
+            }}
+            onDrop={(e) => {
+              if (!dragging) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const from = numbered.findIndex((x) => x.id === dragging);
+              const to = over ?? i;
+              move(dragging, to > from ? to - 1 : to);
+              setDragging(null);
+              setOver(null);
+            }}
+            onDragEnd={() => {
+              setDragging(null);
+              setOver(null);
+            }}
+            className={`relative ${dragging === it.id ? "opacity-40" : ""}`}
+          >
+            {over === i && dragging && <span aria-hidden="true" className="absolute inset-x-2 -top-px h-0.5 rounded bg-red-text" />}
+            {over === i + 1 && i === numbered.length - 1 && dragging && <span aria-hidden="true" className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-red-text" />}
+            <button
+              type="button"
+              aria-label={`${i + 1}: ${itemLabel(it)}. Alt and arrow keys to move.`}
+              onKeyDown={(e) => {
+                if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+                e.preventDefault();
+                const to = i + (e.key === "ArrowUp" ? -1 : 1);
+                if (to < 0 || to >= numbered.length) return;
+                move(it.id, to);
+                requestAnimationFrame(() => list.current?.querySelectorAll<HTMLButtonElement>("button")[to]?.focus());
+              }}
+              className="flex h-10 w-full cursor-grab items-center gap-2.5 rounded-[10px] px-2 text-left font-note text-[19px] hover:bg-soft active:cursor-grabbing"
+            >
+              <b className="w-6 text-right font-hand font-bold text-red-text">{i + 1}</b>
+              <span className="min-w-0 flex-1 truncate">{itemLabel(it)}</span>
+              <span aria-hidden="true" className="text-[14px] tracking-[-2px] text-mute">
+                ⋮⋮
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      {rest.length > 0 && (
+        <div className="mx-2 mt-2 border-t border-dashed border-line pt-2.5">
+          <span className="text-[12px] text-mute">Not numbered · {rest.length} · tap one to add it at the end</span>
+          <div className="mt-1 flex flex-col">
+            {rest.map((it) => (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => onAdd(it.id)}
+                className="flex h-9 items-center gap-2.5 rounded-[10px] px-2 text-left font-note text-[17px] text-mute hover:bg-soft hover:text-ink"
+              >
+                <span className="w-6 text-right font-sans text-[13px]">+</span>
+                <span className="min-w-0 flex-1 truncate">{itemLabel(it)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+/** "Connect to…" (L on a selected note): the others on the sheet, joined to it by an ink line. */
+function LinkPicker({ paper, from, onPick, onClose }: { paper: DropPaper; from: string; onPick: (to: string) => void; onClose: () => void }) {
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    list.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, []);
+  const me = paper.thoughts.find((t) => t.id === from);
+  const self = sheetIdOf(paper, from);
+  const options = sheetItems(paper).filter((it) => it.id !== self && isOpenItem(it));
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Connect to…"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onKeyDown={dialogKeys(onClose)}
+      className="scrim-bg fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+    >
+      <div className="flex max-h-[70dvh] w-full flex-col gap-3 rounded-t-[22px] border border-line bg-sheet p-4 shadow-[0_30px_60px_-30px_var(--shadow)] sm:max-w-sm sm:rounded-[22px]">
+        <div className="flex items-baseline justify-between gap-3 px-1">
+          <span className="font-hand text-[26px] leading-none font-bold">Connect to…</span>
+          <span className="truncate text-[13px] text-mute">{me ? thoughtLabel(me) : ""}</span>
+        </div>
+        <div ref={list} className="flex flex-col gap-1 overflow-y-auto">
+          {options.length === 0 && <span className="px-3 py-2.5 text-sm text-mute">Nothing else on the sheet to connect to yet.</span>}
+          {options.map((it) => (
+            <button key={it.id} type="button" onClick={() => onPick(it.id)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-soft focus-visible:bg-soft">
+              <span className="min-w-0 flex-1 truncate font-note text-[16px]">{itemLabel(it)}</span>
+              {it.kind === "stack" && <span className="text-[12px] text-mute">{it.members.length} thoughts</span>}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={onClose} className="h-10 rounded-xl text-sm font-medium text-mute hover:bg-soft">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Keeps arrow keys moving between a dialog's buttons; Esc closes. */
 function dialogKeys(onClose: () => void) {
   return (e: ReactKeyboardEvent<HTMLElement>) => {
@@ -1064,6 +1531,9 @@ function StackPicker({
   const options = sheetItems(paper)
     .filter((it) => it.id !== me.id && it.id !== me.stackId && isOpenItem(it))
     .sort((a, b) => distance(a) - distance(b));
+  // Any place in the order, or last: the ones from that place down shift by one.
+  const numbered = rankedIds(paper).length;
+  const last = me.rank ? numbered : numbered + 1;
 
   return (
     <div
@@ -1077,13 +1547,13 @@ function StackPicker({
       <div className="flex max-h-[70dvh] w-full flex-col gap-3 rounded-t-[22px] border border-line bg-sheet p-4 shadow-[0_30px_60px_-30px_var(--shadow)] sm:max-w-sm sm:rounded-[22px]">
         <div className="flex items-baseline justify-between gap-3 px-1">
           <span className="font-hand text-[26px] leading-none font-bold">Stack with…</span>
-          <span className="truncate text-[13px] text-mute">{me.text}</span>
+          <span className="truncate text-[13px] text-mute">{thoughtLabel(me)}</span>
         </div>
         {onRank && !me.stackId && (
           <div className="flex flex-col gap-1.5 px-1">
             <span className="text-[13px] font-medium text-mute">Set number</span>
             <div className="flex flex-wrap gap-1.5">
-              {Array.from({ length: MAX_RANK }, (_, i) => i + 1).map((n) => (
+              {Array.from({ length: Math.min(last, MAX_RANK) }, (_, i) => i + 1).map((n) => (
                 <button
                   key={n}
                   type="button"
@@ -1091,7 +1561,7 @@ function StackPicker({
                   aria-pressed={me.rank === n}
                   className={`flex size-11 items-center justify-center rounded-full border font-hand text-[20px] font-bold ${me.rank === n ? "border-red-text bg-red-soft text-red-text" : "border-line hover:bg-soft"}`}
                 >
-                  {n}
+                  {n === last && last > 1 && !me.rank ? <span className="font-sans text-[11px] font-medium">Last·{n}</span> : n}
                 </button>
               ))}
               {me.rank && (
@@ -1100,6 +1570,9 @@ function StackPicker({
                 </button>
               )}
             </div>
+            {numbered > 0 && (
+              <span className="text-[12px] leading-snug text-mute">Pick a place: the one there and everything after it move down by one. Or type a number on a selected note.</span>
+            )}
             <span className="pt-1 text-[13px] font-medium text-mute">Stack with…</span>
           </div>
         )}
@@ -1112,7 +1585,7 @@ function StackPicker({
           {options.length === 0 && !me.stackId && <span className="px-3 py-2.5 text-sm text-mute">Nothing else on the sheet to stack with yet.</span>}
           {options.map((it) => (
             <button key={it.id} type="button" onClick={() => onPick(it.id)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-soft focus-visible:bg-soft">
-              <span className="min-w-0 flex-1 truncate font-note text-[16px]">{it.kind === "thought" ? it.thought.text : stackLabel(it.stack, it.members.length)}</span>
+              <span className="min-w-0 flex-1 truncate font-note text-[16px]">{itemLabel(it)}</span>
               {it.kind === "stack" && <span className="text-[12px] text-mute">{it.members.length} thoughts</span>}
             </button>
           ))}
@@ -1126,16 +1599,16 @@ function StackPicker({
 }
 
 /**
- * "Help me order": pick up to six, then answer "Which first?" for a few pairs
- * (a binary insertion, so six take at most ten questions). The result becomes
- * the numbers 1…n.
+ * "Help me order": pick the ones that matter, then answer "Which first?" for a
+ * few pairs (a binary insertion, so six take at most ten questions). The
+ * result becomes the numbers 1…n.
  */
 function HelpOrder({ items, onApply, onClose }: { items: SheetItem[]; onApply: (ids: string[]) => void; onClose: () => void }) {
-  const [picked, setPicked] = useState<string[]>(() => items.filter((it) => (it.kind === "thought" ? it.thought.rank : it.stack.rank) !== null).map((it) => it.id).slice(0, MAX_RANK));
+  const [picked, setPicked] = useState<string[]>(() => items.filter((it) => (it.kind === "thought" ? it.thought.rank : it.stack.rank) !== null).map((it) => it.id));
   const [sort, setSort] = useState<{ sorted: string[]; rest: string[]; lo: number; hi: number } | null>(null);
   const label = (id: string) => {
     const it = items.find((x) => x.id === id);
-    return !it ? "" : it.kind === "thought" ? it.thought.text : stackLabel(it.stack, it.members.length);
+    return it ? itemLabel(it) : "";
   };
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < MAX_RANK ? [...p, id] : p));
 
@@ -1169,9 +1642,7 @@ function HelpOrder({ items, onApply, onClose }: { items: SheetItem[]; onApply: (
           <>
             <div className="flex items-baseline justify-between gap-3 px-1">
               <span className="font-hand text-[26px] leading-none font-bold">Which ones matter today?</span>
-              <span className="text-[13px] text-mute">
-                {picked.length} of {MAX_RANK}
-              </span>
+              <span className="text-[13px] text-mute">{picked.length} picked</span>
             </div>
             <div className="flex flex-col gap-1 overflow-y-auto">
               {items.map((it) => (
@@ -1370,6 +1841,7 @@ export function HistoryPaper({ me, paper }: { me: Me; paper: DropPaper }) {
           label={`Paper for ${longDate(paper.date)}`}
           className={`${COLUMN} max-sm:hidden`}
           items={items}
+          links={sheetLinks(paper, new Set(items.map((it) => it.id)))}
           raised={openStack}
           render={(it) =>
             it.kind === "thought" ? (
@@ -1380,13 +1852,13 @@ export function HistoryPaper({ me, paper }: { me: Me; paper: DropPaper }) {
                 count={it.members.length}
                 done={it.members.filter((m) => m.status === "done").length}
                 top={topCard(it.members)}
-                peek={it.members.map((m) => m.text)}
+                peek={it.members.map(thoughtLabel)}
                 rank={it.stack.rank}
                 open={openStack === it.id}
                 onToggleOpen={() => toggle(it.id)}
               >
                 {it.members.map((t) => (
-                  <StackRow key={t.id} text={t.text} done={t.status === "done"} pencil={t.kind === "pencil"} meta={meta(t, tz)} readOnly />
+                  <StackRow key={t.id} text={thoughtLabel(t)} done={t.status === "done"} pencil={t.kind === "pencil"} meta={meta(t, tz)} readOnly />
                 ))}
               </StackCard>
             )
