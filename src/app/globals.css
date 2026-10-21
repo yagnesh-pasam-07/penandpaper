@@ -277,3 +277,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .demo-slide, .ink-in .paper-note, .stamp-in, .highlight, .drift { animation: none; }
 }
+
+/* A strip of masking tape holding a pasted picture on the paper. */
+.tape {
+  background: color-mix(in srgb, var(--t1, #fff1bf) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
+}

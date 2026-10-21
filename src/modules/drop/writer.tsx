@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { PenIcon, PencilIcon } from "@/components/icons";
+import { imageFiles, shrinkImage, type Picture } from "./image";
 import { MAX_THOUGHT, type Kind } from "./logic";
 
 /** The floating pen at the bottom of the page: opens the writer. */
@@ -53,6 +54,8 @@ export function Writer({
   onDraft,
   kind,
   onKind,
+  image,
+  onImage,
   onDrop,
   onClose,
 }: {
@@ -60,6 +63,9 @@ export function Writer({
   onDraft: (text: string) => void;
   kind: Kind;
   onKind: (kind: Kind) => void;
+  /** A picture pasted in (or picked) for this thought. */
+  image: Picture | null;
+  onImage: (image: Picture | null) => void;
   /** The written text, and where on screen it was written (the note flies from there). */
   onDrop: (text: string, from: { x: number; y: number }) => void;
   onClose: () => void;
@@ -69,6 +75,21 @@ export function Writer({
   const card = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const inset = useKeyboardInset(true);
+  const picker = useRef<HTMLInputElement>(null);
+  const [problem, setProblem] = useState("");
+
+  /** Pastes or picks a picture onto this thought (the first, if there are several). */
+  const attach = async (files: File[]) => {
+    if (!files.length) return false;
+    try {
+      onImage(await shrinkImage(files[0]));
+      setProblem("");
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+    }
+    area.current?.focus();
+    return true;
+  };
 
   useEffect(() => {
     const el = area.current;
@@ -79,7 +100,7 @@ export function Writer({
 
   const send = () => {
     const value = draft.trim().slice(0, MAX_THOUGHT);
-    if (!value) return;
+    if (!value && !image) return;
     const r = area.current?.getBoundingClientRect();
     onDrop(value, r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 });
     area.current?.focus();
@@ -137,6 +158,14 @@ export function Writer({
             enterKeyHint="send"
             placeholder={pencil ? "Jot an idea…" : "What's on your mind?"}
             onChange={(e) => onDraft(e.target.value)}
+            onPaste={(e) => {
+              const files = imageFiles(e.clipboardData);
+              if (!files.length) return;
+              // A picture pasted while writing goes on this thought.
+              e.preventDefault();
+              e.stopPropagation();
+              void attach(files);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Tab" && !e.shiftKey) {
                 // Tab here switches the pen, it doesn't leave the box.
@@ -154,19 +183,71 @@ export function Writer({
             className={`ruled-line hand min-h-[72px] flex-1 resize-none bg-transparent font-note text-[22px] leading-[36px] caret-ink outline-none placeholder:font-sans placeholder:text-lg placeholder:text-mute focus-visible:outline-none ${pencil ? "font-light text-graphite" : "text-ink"}`}
           />
         </div>
+        {image && (
+          <div className="flex items-end gap-2.5 pl-12">
+            <span className="relative -rotate-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a data URL from a paste */}
+              <img src={image.url} alt="Picture for this thought" className="h-[92px] max-w-[160px] rounded-lg bg-soft object-cover shadow-[inset_0_0_0_1px_var(--line)]" />
+              <button
+                type="button"
+                onClick={() => {
+                  onImage(null);
+                  area.current?.focus();
+                }}
+                aria-label="Remove picture"
+                className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-ink text-[13px] leading-none text-bg"
+              >
+                ×
+              </button>
+            </span>
+            <span className="text-[12px] text-mute">
+              picture · {image.w}×{image.h}
+            </span>
+          </div>
+        )}
+        {problem && (
+          <p role="alert" className="pl-12 text-[13px] text-red-text">
+            {problem}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-3 pl-12 text-[13px] text-mute">
-          <span className="max-sm:hidden">Enter to drop · Tab {pencil ? "pen" : "pencil"} · Esc to close</span>
+          <span className="max-sm:hidden">{image ? "Enter drops it with the picture" : "Enter to drop · ⌘V a picture"} · Tab {pencil ? "pen" : "pencil"} · Esc to close</span>
           <span className="sm:hidden">Enter to drop</span>
           <span className="flex items-center gap-1">
+            <input
+              ref={picker}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(e) => {
+                void attach([...(e.target.files ?? [])]);
+                e.target.value = "";
+              }}
+            />
+            <button type="button" onClick={() => picker.current?.click()} aria-label="Add a picture" title="Add a picture" className="flex size-9 items-center justify-center rounded-lg hover:bg-soft hover:text-ink">
+              <CameraIcon />
+            </button>
             <button type="button" onClick={onClose} className="h-9 rounded-lg px-3 font-medium hover:bg-soft hover:text-ink">
               Close
             </button>
-            <button type="button" onClick={send} disabled={!draft.trim()} className="h-9 rounded-lg bg-red px-3.5 font-semibold text-on-red disabled:opacity-40">
+            <button type="button" onClick={send} disabled={!draft.trim() && !image} className="h-9 rounded-lg bg-red px-3.5 font-semibold text-on-red disabled:opacity-40">
               Drop
             </button>
           </span>
         </div>
       </div>
     </div>
+  );
+}
+
+/** A small camera, for "add a picture". */
+function CameraIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8.5C4 7.7 4.7 7 5.5 7h2.2l1.4-2h5.8l1.4 2h2.2c.8 0 1.5.7 1.5 1.5v9c0 .8-.7 1.5-1.5 1.5h-13C4.7 19 4 18.3 4 17.5v-9z" />
+      <circle cx="12" cy="13" r="3.4" />
+    </svg>
   );
 }

@@ -1,4 +1,4 @@
-import { date, index, integer, pgTable, real, smallint, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, pgTable, real, smallint, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
 /** One paper per person per day (in DROP_TIMEZONE). */
@@ -93,6 +93,30 @@ export const dropThoughts = pgTable(
     rank: smallint("rank"),
     /** Picked for tomorrow's top 3: arrives numbered. */
     nextRank: smallint("next_rank"),
+    /** A pasted or dropped picture, as a small data URL; `text` is then its caption (may be empty). */
+    image: text("image"),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
+);
+
+/** Ink lines joining two thoughts or stacks on one paper. */
+export const dropLinks = pgTable(
+  "drop_links",
+  {
+    /** Made in the browser, like a thought's. */
+    id: text("id").primaryKey(),
+    paperId: uuid("paper_id")
+      .notNull()
+      .references(() => dropPapers.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** A thought's or a stack's id. */
+    fromId: text("from_id").notNull(),
+    toId: text("to_id").notNull(),
+    label: text("label"),
+    arrow: boolean("arrow").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (t) => [index("drop_links_paper_idx").on(t.paperId)],
 );

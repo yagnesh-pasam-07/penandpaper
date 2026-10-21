@@ -35,8 +35,14 @@ type Props = {
   returning?: boolean;
   /** Its place in today's order, if numbered: a red circled number at the corner. */
   rank?: number | null;
-  /** Keys 1–6 on a selected thought set its number (0 clears). */
+  /** Keys 1–9 on a selected thought set its number (0 clears). */
   onRank?: (rank: number | null) => void;
+  /** A pasted or dropped picture: the note becomes a taped photo, the text its caption. */
+  image?: string | null;
+  /** "Connect to…": the L key. */
+  onConnect?: () => void;
+  /** Joined to others by lines: shows the whole thread (the T key, or the thread button). */
+  onThread?: () => void;
   /** "Stack with…": the S key when it's selected, or a long press on a phone. */
   onStackWith?: () => void;
   /** "When": the W key or the calendar button. */
@@ -142,6 +148,9 @@ export function ThoughtBubble({
   returning,
   rank,
   onRank,
+  image,
+  onConnect,
+  onThread,
   onStackWith,
   onWhen,
   onInk,
@@ -152,6 +161,7 @@ export function ThoughtBubble({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [dx, setDx] = useState(0);
+  const [zoom, setZoom] = useState(false);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipe = useRef<{ x: number; y: number; swiped: boolean } | null>(null);
   const press = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -248,7 +258,11 @@ export function ThoughtBubble({
     setDx(0);
   };
 
-  const look = bubbleStyle(shape, false, seed, pencil ? "pencil" : "pen");
+  const drawn = bubbleStyle(shape, false, seed, pencil ? "pencil" : "pen");
+  // A picture is taped on like a photo: white, square-ish corners.
+  const look: CSSProperties = image
+    ? { ...drawn, background: "var(--sheet)", borderRadius: 6, boxShadow: "0 1px 0 var(--line), 0 16px 30px -20px var(--shadow), inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent)" }
+    : drawn;
   // Done stops shouting: the tint goes neutral, the outline stays.
   const settled: CSSProperties = {
     ...look,
@@ -325,8 +339,18 @@ export function ThoughtBubble({
     );
   }
 
-  const label = `${rank ? `Number ${rank}: ` : ""}${pencil ? "Idea: " : ""}${text}${done ? ", done" : ""}${when ? `, ${when}` : ""}`;
-  const keys = [onEdit && "Enter to edit", onRank && "1 to 6 to number", onStackWith && "S to stack", onWhen && "W for when", onDelete && "Delete to crumple"].filter(Boolean).join(", ");
+  const label = `${rank ? `Number ${rank}: ` : ""}${image ? "Picture: " : pencil ? "Idea: " : ""}${text}${done ? ", done" : ""}${when ? `, ${when}` : ""}`;
+  const keys = [
+    onEdit && "Enter to edit",
+    onRank && "1 to 9 to number",
+    onStackWith && "S to stack",
+    onWhen && "W for when",
+    onConnect && "L to connect",
+    onThread && "T for its thread",
+    onDelete && "Delete to crumple",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className={`group relative ${stream ? "w-full" : "max-w-[300px]"} ${motion}`}>
@@ -346,8 +370,10 @@ export function ThoughtBubble({
         onKeyDown={(e) => {
           if (readOnly || e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
           const k = e.key.toLowerCase();
-          const digit = /^[0-6]$/.test(k) && onRank ? () => onRank(k === "0" ? null : Number(k)) : undefined;
-          const act = digit ?? (k === "enter" ? startEdit : k === "s" ? onStackWith : k === "w" ? onWhen : k === "delete" || k === "backspace" ? onDelete : undefined);
+          const digit = /^[0-9]$/.test(k) && onRank ? () => onRank(k === "0" ? null : Number(k)) : undefined;
+          const act =
+            digit ??
+            (k === "enter" ? startEdit : k === "s" ? onStackWith : k === "w" ? onWhen : k === "l" ? onConnect : k === "t" ? onThread : k === "delete" || k === "backspace" ? onDelete : undefined);
           if (!act) return;
           e.preventDefault();
           act();
@@ -356,16 +382,37 @@ export function ThoughtBubble({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`paper-note relative flex flex-col items-start gap-1.5 px-6 py-5 text-left transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${pencil ? "is-pencil" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
+        className={`paper-note relative flex flex-col items-start gap-1.5 text-left ${image ? `px-3 pt-3 pb-2.5 ${stream ? "" : "w-[300px]"}` : "px-6 py-5"} transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${pencil ? "is-pencil" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
       >
-        <span
-          style={fresh ? ({ "--write": writeOn(text) } as CSSProperties) : undefined}
-          className={`hand font-note text-[19px] leading-snug break-words whitespace-pre-wrap sm:text-[20px] ${fresh ? "write-on" : ""}`}
-        >
-          <span className="pen-strike">
-            <HandText text={text} seed={seed} />
+        {image && (
+          <>
+            <span aria-hidden="true" className="tape pointer-events-none absolute -top-3 left-1/2 h-6 w-20 -translate-x-1/2 -rotate-3" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- a data URL from a paste; nothing for next/image to optimise */}
+            <img
+              src={image}
+              alt={text ? `Picture: ${text}` : "Pasted picture"}
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom(true);
+              }}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className={`max-h-[240px] w-full cursor-zoom-in rounded-[3px] bg-soft object-contain shadow-[inset_0_0_0_1px_var(--line)] ${done ? "opacity-60 grayscale" : ""}`}
+            />
+          </>
+        )}
+        {text ? (
+          <span
+            style={fresh ? ({ "--write": writeOn(text) } as CSSProperties) : undefined}
+            className={`hand font-note leading-snug break-words whitespace-pre-wrap ${image ? "px-1 text-[19px]" : "text-[19px] sm:text-[20px]"} ${fresh ? "write-on" : ""}`}
+          >
+            <span className="pen-strike">
+              <HandText text={text} seed={seed} />
+            </span>
           </span>
-        </span>
+        ) : (
+          image && !readOnly && <span className="px-1 font-note text-[18px] text-mute">add a caption…</span>
+        )}
         {(stream && meta) || when ? (
           <span className="flex flex-wrap items-center gap-1.5">
             {when && (
@@ -409,6 +456,11 @@ export function ThoughtBubble({
               {pencil ? <PenIcon size={15} /> : <PencilIcon size={14} />}
             </button>
           )}
+          {onThread && (
+            <button type="button" onClick={onThread} aria-label={`Show the thread of "${text}"`} title="Its thread (T)" className={`${toolButton} text-[13px] text-mute`}>
+              ⤳
+            </button>
+          )}
           {onWhen && (
             <button type="button" onClick={onWhen} aria-label={`When is "${text}" for?`} title="When (W)" className={`${toolButton} text-mute`}>
               <WhenIcon size={13} />
@@ -421,6 +473,23 @@ export function ThoughtBubble({
             <CloseIcon size={11} />
           </button>
         </span>
+      )}
+      {zoom && image && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={text || "Picture"}
+          onClick={() => setZoom(false)}
+          onKeyDown={(e) => e.key === "Escape" && setZoom(false)}
+          className="scrim-bg fixed inset-0 z-[60] flex cursor-zoom-out flex-col items-center justify-center gap-3 p-6"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
+          <img src={image} alt={text || "Pasted picture"} className="max-h-[85dvh] max-w-full rounded-md bg-sheet shadow-[0_30px_60px_-30px_var(--shadow)]" />
+          {text && <span className="font-note text-[22px] text-ink">{text}</span>}
+          <button type="button" autoFocus onClick={() => setZoom(false)} className="h-10 rounded-xl bg-sheet px-4 text-sm font-medium">
+            Close
+          </button>
+        </div>
       )}
     </div>
   );

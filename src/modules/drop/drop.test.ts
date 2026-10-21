@@ -14,6 +14,8 @@ import {
   rollover,
   tapRank,
   StackError,
+  threadOf,
+  thoughtLabel,
   thisWeekend,
   visiblePaper,
   whenLabel,
@@ -298,10 +300,13 @@ describe("number it", () => {
     ]);
   });
 
-  it("keeps it to six", () => {
-    let p = base;
-    for (const id of ["a", "b", "c", "d", "e", "f"]) p = tap(p, id);
-    expect(() => tap(p, "g")).toThrow("Keep it to your top 6.");
+  it("has no six limit: a seventh gets 7, and giving a new one 2 shifts the rest down", () => {
+    let p = paper(["a", "b", "c", "d", "e", "f", "g", "h"].map((id) => t(id, `thought ${id}`, "open")));
+    for (const id of ["a", "b", "c", "d", "e", "f", "g"]) p = tap(p, id);
+    expect(ranks(p).at(-1)).toEqual(["g", 7]);
+    p = applyStackOp(p, { kind: "rank", id: "h", rank: 2 });
+    expect(ranks(p).map(([id]) => id)).toEqual(["a", "h", "b", "c", "d", "e", "f", "g"]);
+    expect(ranks(p).map(([, n]) => n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it("closes up when a numbered thought is crumpled, folded or stacked; a new stack takes the target's number", () => {
@@ -388,5 +393,65 @@ describe("linkify", () => {
   });
   it("never makes a javascript: link", () => {
     expect(linkify("javascript:alert(1)").every((p) => p.kind === "text")).toBe(true);
+  });
+});
+
+describe("connections", () => {
+  const base = paper([t("a", "world map", "open"), t("b", "india map", "open"), t("c", "kerala trip", "open"), t("d", "radiation", "open")]);
+
+  it("joins two notes once, labels and restyles the line, and removes it", () => {
+    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
+    p = applyStackOp(p, { kind: "link", id: "l2", from: "b", to: "a" });
+    expect(p.links).toEqual([{ id: "l1", from: "a", to: "b", label: null, arrow: true }]);
+    p = applyStackOp(p, { kind: "linkStyle", id: "l1", label: "  for the trip  ", arrow: false });
+    expect(p.links?.[0]).toMatchObject({ label: "for the trip", arrow: false });
+    p = applyStackOp(p, { kind: "unlink", id: "l1" });
+    expect(p.links).toEqual([]);
+  });
+
+  it("won't join a note to itself or to something not on the paper", () => {
+    expect(() => applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "a" })).toThrow(StackError);
+    expect(() => applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "zz" })).toThrow(StackError);
+  });
+
+  it("drops a line when one of its ends is crumpled", () => {
+    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
+    p = applyStackOp(applyStackOp(p, { kind: "stack", thought: "c", onto: "b", newStackId: "s1" }), { kind: "crumple", stack: "s1" });
+    expect(p.links).toEqual([]);
+  });
+
+  it("follows a whole thread, through a stack", () => {
+    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
+    p = applyStackOp(p, { kind: "link", id: "l2", from: "b", to: "c" });
+    expect(threadOf(p, "c")).toEqual([
+      { id: "c", depth: 0 },
+      { id: "b", depth: 1 },
+      { id: "a", depth: 2 },
+    ]);
+    expect(threadOf(p, "d")).toEqual([]);
+    p = applyStackOp(p, { kind: "stack", thought: "d", onto: "a", newStackId: "s1" });
+    expect(threadOf(p, "b").map((x) => x.id)).toEqual(["b", "s1", "c"]);
+  });
+
+  it("carries lines whose two ends both carry over", () => {
+    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
+    p = applyStackOp(p, { kind: "link", id: "l2", from: "b", to: "c" });
+    p = { ...p, thoughts: p.thoughts.map((x) => (x.id === "c" ? { ...x, status: "done" as const } : x)) };
+    let n = 0;
+    const next = rollover(p, () => `n${++n}`);
+    const idOf = (text: string) => next.thoughts.find((x) => x.text === text)!.id;
+    expect(next.links).toHaveLength(1);
+    expect(next.links[0]).toMatchObject({ from: idOf("world map"), to: idOf("india map") });
+  });
+});
+
+describe("pictures", () => {
+  it("read as their caption, or as Image without one", () => {
+    expect(thoughtLabel({ text: "leave page bug", image: "data:image/webp;base64,AA" })).toBe("leave page bug");
+    expect(thoughtLabel({ text: "", image: "data:image/webp;base64,AA" })).toBe("Image");
+  });
+  it("carry over with their picture", () => {
+    const p = paper([t("a", "", "open", null, { image: "data:image/webp;base64,AA" })]);
+    expect(rollover(p, () => "n1").thoughts[0].image).toBe("data:image/webp;base64,AA");
   });
 });
