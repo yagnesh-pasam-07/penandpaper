@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
 import { bubbleStyle } from "@/components/canvas/bubble";
 import { Fly } from "@/components/canvas/fly";
 import { FreeCanvas, type CanvasLink, type Placement } from "@/components/canvas/free-canvas";
 import { PaperSurface } from "@/components/canvas/paper-surface";
 import { StackCard, StackRow } from "@/components/canvas/stack-card";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
-import { CloseIcon, PencilIcon } from "@/components/icons";
+import { CloseIcon } from "@/components/icons";
 import { RankMark } from "@/components/canvas/rank-mark";
 import { uid } from "@/lib/mutations";
 import { addDays, longDate, shortDate, weekday } from "@/lib/time";
@@ -180,8 +180,11 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   // Shaping tonight: pencil thoughts inked into tomorrow's order. "Later" holds the ask off till tomorrow.
   const [shaping, setShaping] = useState(false);
   const [traced, setTraced] = useState<Set<string>>(new Set());
-  const [askLater, setAskLater] = useState(() => readLocal(`pp-shape-later-${initial.date}`) === "1");
   const strip = useRef<HTMLElement>(null);
+  // While a note is dragged over the strip: where it would land.
+  const [landing, setLanding] = useState<number | null>(null);
+  // The evening ask is showing: plain S starts shaping.
+  const asking = useRef(false);
   // The paper's guesses you've waved off, and whether this week's note was already seen.
   const [waved, setWaved] = useState<Set<string>>(() => new Set((readLocal(GUESS_KEY) ?? "").split(",").filter(Boolean)));
   const [themeSeen, setThemeSeen] = useState(() => readLocal("pp-drop-theme-week") === weekOf(initial.date));
@@ -273,8 +276,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
         // Shift+N, or any number key: number mode.
         e.preventDefault();
         setNumbering((on) => (/^[1-9]$/.test(e.key) ? true : !on));
-      } else if (e.key === "S" && e.shiftKey) {
-        // Shift+S: shape today (ink what goes into tomorrow).
+      } else if ((e.key === "S" && e.shiftKey) || (e.key === "s" && asking.current)) {
+        // Shift+S (or S while the evening ask shows): shape today, ink what goes into tomorrow.
         e.preventDefault();
         setNumbering(false);
         setShaping((on) => !on);
@@ -630,17 +633,25 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   };
   const tomorrow = tomorrowIds(paper);
 
-  /** A note dragged off the sheet onto the Tomorrow strip: it goes in where it was let go. */
-  const dropOnStrip = (id: string, at: { x: number; y: number }) => {
+  /** The place (1-based) a note held over the Tomorrow strip would take, or null when it isn't over it. */
+  const stripPlace = (id: string, at: { x: number; y: number }): number | null => {
     const r = strip.current?.getBoundingClientRect();
-    if (!shaping || !r || at.x < r.left || at.x > r.right || at.y < r.top - 24 || at.y > r.bottom + 24) return false;
+    if (!shaping || !r || at.x < r.left || at.x > r.right || at.y < r.top - 24 || at.y > r.bottom + 24) return null;
     const rows = [...(strip.current?.querySelectorAll<HTMLElement>("[data-row]") ?? [])].filter((el) => el.dataset.row !== id);
-    // Rows read left to right, top to bottom: it goes before the first one it was let go ahead of.
+    // Rows read left to right, top to bottom: it goes before the first one it's held ahead of.
     const before = rows.findIndex((el) => {
       const b = el.getBoundingClientRect();
       return at.y < b.top || (at.y <= b.bottom && at.x < b.left + b.width / 2);
     });
-    shapeAt(id, (before === -1 ? rows.length : before) + 1);
+    return (before === -1 ? rows.length : before) + 1;
+  };
+
+  /** A note dragged off the sheet onto the Tomorrow strip: it goes in where it was let go. */
+  const dropOnStrip = (id: string, at: { x: number; y: number }) => {
+    const place = stripPlace(id, at);
+    setLanding(null);
+    if (place === null) return false;
+    shapeAt(id, place);
     return true;
   };
 
@@ -735,7 +746,11 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
   const allById = new Map(items.map((it) => [it.id, it]));
   const tomorrowItems = tomorrow.map((id) => allById.get(id)).filter((x): x is SheetItem => !!x);
   const pencilOpen = visiblePaper(paper).thoughts.filter((t) => t.kind === "pencil" && t.status === "open").length;
-  const showAsk = mounted && !shaping && !askLater && tomorrow.length === 0 && pencilOpen > 0 && new Date().getHours() >= 21;
+  const late = mounted && new Date().getHours() >= 21;
+  const showAsk = late && !shaping && tomorrow.length === 0 && pencilOpen > 0;
+  useEffect(() => {
+    asking.current = showAsk;
+  }, [showAsk]);
   // Morning: what was inked last night is today's list, in ink, beside a fresh sheet.
   const inkList = numbering || shaping ? [] : items.filter((it) => (it.kind === "thought" ? it.thought.rank : it.stack.rank) !== null && !leaving.has(it.id));
   const inList = new Set(inkList.map((it) => it.id));
@@ -748,6 +763,10 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
           .map((g): CanvasLink => ({ id: `guess-${guessKey(g.from, g.to)}`, from: g.from, to: g.to, label: null, arrow: false, guess: true }));
   const theme = mounted && !themeSeen && !numbering && !shaping ? themeOf(paper) : null;
   const canvasDim = shaping ? new Set(tomorrow) : dim;
+  // A pencil thought's weight: written again, and joined to others, make it matter more.
+  const joins = new Map<string, number>();
+  for (const l of paper.links ?? []) for (const end of [l.from, l.to]) joins.set(end, (joins.get(end) ?? 0) + 1);
+  const weightOf = (t: Thought) => Math.min(3, Math.min(2, t.echoes?.length ?? 0) + Math.min(2, joins.get(t.id) ?? 0));
   const showHint = hint && paper.stacks.length === 0 && looseOpen >= 3;
   // Clear desk shows in the evening (or once the paper fills up); Shift+C always works.
   const evening = mounted && new Date().getHours() >= 18;
@@ -767,6 +786,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
     <ThoughtBubble
       {...bubbleProps(t, tz, fresh.has(t.id))}
       image={t.image}
+      echoes={t.echoes}
+      weight={weightOf(t)}
       when={whenOf(t)}
       leaving={leaving.get(t.id) ?? null}
       returning={returning.has(t.id)}
@@ -792,6 +813,11 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                   ? ` · ${open} open${ideas ? ` · ${ideas} in pencil` : ""}${done ? ` · ${done} done` : ""}`
                   : ""}
             </span>
+            {showAsk && (
+              <button type="button" onClick={() => setShaping(true)} className="shrink-0 rounded-lg px-2 py-1 text-[13px] text-mute hover:bg-soft hover:text-ink">
+                {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · shape today? <kbd className="rounded border border-line px-1 font-sans text-[11px] font-semibold text-ink">S</kbd>
+              </button>
+            )}
 
           </>
         }
@@ -810,46 +836,6 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
             </span>
             <button type="button" onClick={dismissHint} aria-label="Dismiss the tip" className="flex size-9 items-center justify-center rounded-full text-mute hover:bg-soft hover:text-ink">
               <CloseIcon size={11} />
-            </button>
-          </div>
-        )}
-
-        {showAsk && (
-          <div role="status" className={`${COLUMN} flex flex-wrap items-center gap-x-3.5 gap-y-2 rounded-2xl border border-line bg-sheet py-3 pr-3 pl-4 shadow-[0_14px_34px_-26px_var(--shadow)]`}>
-            <span className="text-red-text">
-              <PencilIcon size={24} />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="font-hand text-[26px] leading-tight font-bold">Time to shape today</span>
-              <span className="text-sm text-mute">
-                {pencilOpen} {pencilOpen === 1 ? "thought" : "thoughts"} in pencil. Pick the few that deserve ink for tomorrow.
-              </span>
-            </span>
-            <span className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAskLater(true);
-                  writeLocal(`pp-shape-later-${paper.date}`, "1");
-                }}
-                className="h-9 rounded-[10px] border border-line px-3.5 text-sm font-medium hover:bg-soft"
-              >
-                Later
-              </button>
-              <button type="button" onClick={() => setShaping(true)} className="h-9 rounded-[10px] bg-ink px-4 text-sm font-semibold text-bg">
-                Shape now <kbd className="ml-1 font-sans text-[12px] opacity-70 max-sm:hidden">⇧S</kbd>
-              </button>
-            </span>
-          </div>
-        )}
-
-        {shaping && (
-          <div role="status" className={`${COLUMN} flex items-center gap-3 rounded-xl bg-red-soft py-1.5 pr-2 pl-4 text-sm`}>
-            <b>Shaping</b>
-            <span className="min-w-0 flex-1 truncate text-mute max-sm:hidden">drag into Tomorrow · drop between two to put it there · tap to add at the end · Esc to stop</span>
-            <span className="min-w-0 flex-1 truncate text-mute sm:hidden">swipe right to ink it</span>
-            <button type="button" onClick={doneShaping} className="h-8 rounded-lg bg-ink px-3.5 text-[13px] font-semibold text-bg">
-              Done
             </button>
           </div>
         )}
@@ -978,6 +964,7 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                 raised={openStack}
                 links={[...lines, ...guesses]}
                 onDropOutside={dropOnStrip}
+                onDragOutside={(id, at) => setLanding(at ? stripPlace(id, at) : null)}
                 renderGuessTools={(l) => (
                   <span className="flex h-7 items-center gap-1 rounded-full border border-line bg-sheet pr-1 pl-2.5 text-[12px] font-medium shadow-[0_8px_18px_-14px_var(--shadow)]">
                     connect?
@@ -1129,6 +1116,8 @@ export function DropCanvas({ initial, me, stackHint = false }: { initial: DropPa
                 shaping={shaping}
                 day={weekday(addDays(paper.date, 1))}
                 traced={traced}
+                landing={landing}
+                onDone={doneShaping}
                 onMove={(id, at) => shapeAt(id, at)}
                 onRemove={(id) => shapeAt(id, null)}
               />
@@ -1523,9 +1512,9 @@ function InkList({ items, onStrike, onGo }: { items: SheetItem[]; onStrike: (t: 
 
 /**
  * Tomorrow, while shaping: drag a note from the sheet in and it's traced in
- * ink; where it's let go is its number, and the rest move down. Rows drag to
- * reorder (or Alt+↑/↓); × takes one back out (it stays inked). After shaping
- * it reads "Thursday, in ink".
+ * ink; where it's let go is its number (a red line shows where, "becomes ③"),
+ * and the rest move down. Rows drag to reorder (or Alt+↑/↓); × takes one back
+ * out (it stays inked). After shaping it reads "Thursday, in ink".
  */
 function TomorrowStrip({
   stripRef,
@@ -1533,6 +1522,8 @@ function TomorrowStrip({
   shaping,
   day,
   traced,
+  landing,
+  onDone,
   onMove,
   onRemove,
 }: {
@@ -1541,82 +1532,96 @@ function TomorrowStrip({
   shaping: boolean;
   day: string;
   traced: Set<string>;
+  /** Where a note held over the strip would land (1-based), while dragging. */
+  landing: number | null;
+  onDone: () => void;
   onMove: (id: string, at: number) => void;
   onRemove: (id: string) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const list = useRef<HTMLOListElement>(null);
+  const marker = (n: number) => (
+    <li aria-hidden="true" className="relative col-span-full h-1 rounded-sm bg-red-text">
+      <span className="absolute -top-3.5 left-0 bg-soft px-2 font-hand text-[20px] leading-none font-bold text-red-text">becomes {n}</span>
+    </li>
+  );
   return (
     <section
       ref={stripRef}
       aria-label="Tomorrow"
-      className={`rounded-[20px] px-[18px] pt-4 pb-[18px] ${items.length || !shaping ? "bg-soft shadow-[inset_0_0_0_1px_var(--line)]" : "border-2 border-dashed border-ink/25"}`}
+      className={`rounded-[20px] px-[18px] pt-4 pb-[18px] ${items.length || !shaping ? "bg-soft shadow-[inset_0_0_0_1px_var(--line)]" : "border-2 border-dashed border-ink/25"} ${landing !== null ? "shadow-[inset_0_0_0_2px_var(--red-text)]" : ""}`}
     >
-      <div className="flex items-baseline gap-2.5">
+      <div className="flex items-center gap-2.5">
         <h2 className="font-hand text-[28px] leading-none font-bold">{shaping ? "Tomorrow" : `${day}, in ink`}</h2>
-        <span className="text-[12px] text-mute">
-          {items.length === 0
-            ? "drag thoughts here, in the order you'll do them · they get traced in ink"
-            : shaping
-              ? `${items.length} in ink`
-              : "arrives numbered on tomorrow's paper · drag to reorder"}
-        </span>
+        {shaping && items.length === 0 && <span className="text-[12px] text-mute">drag thoughts here</span>}
+        {shaping && (
+          <button type="button" onClick={onDone} title="Esc" className="ml-auto h-8 rounded-lg bg-ink px-3.5 text-[13px] font-semibold text-bg">
+            Done
+          </button>
+        )}
       </div>
       {items.length === 0 ? (
-        <div className="mt-3 flex gap-3" aria-hidden="true">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <span key={n} style={{ opacity: n > 3 ? 1.6 - n * 0.25 : 1 }} className="flex size-8 items-center justify-center rounded-full border-[1.5px] border-dashed border-graphite/50 font-hand text-[19px] text-graphite">
-              {n}
-            </span>
-          ))}
-        </div>
+        <ol className="mt-3 flex gap-3">
+          {landing !== null ? (
+            marker(1)
+          ) : (
+            [1, 2, 3].map((n) => (
+              <li key={n} aria-hidden="true" className="flex size-8 items-center justify-center rounded-full border-[1.5px] border-dashed border-graphite/50 font-hand text-[19px] text-graphite">
+                {n}
+              </li>
+            ))
+          )}
+        </ol>
       ) : (
         <ol ref={list} className={`mt-3 grid gap-x-4 gap-y-2.5 ${shaping ? "sm:grid-cols-2" : "max-w-[470px]"}`}>
           {items.map((it, i) => (
-            <li
-              key={it.id}
-              data-row={it.id}
-              draggable
-              onDragStart={(e) => {
-                setDragging(it.id);
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", it.id);
-              }}
-              onDragOver={(e) => dragging && e.preventDefault()}
-              onDrop={(e) => {
-                if (!dragging) return;
-                e.preventDefault();
-                if (dragging !== it.id) onMove(dragging, i + 1);
-                setDragging(null);
-              }}
-              onDragEnd={() => setDragging(null)}
-              className={`group relative ${dragging === it.id ? "opacity-40" : ""}`}
-            >
-              <button
-                type="button"
-                aria-label={`${i + 1}: ${itemLabel(it)}. Alt and arrow keys to move.`}
-                onKeyDown={(e) => {
-                  if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
-                  e.preventDefault();
-                  const to = i + (e.key === "ArrowUp" ? -1 : 1);
-                  if (to < 0 || to >= items.length) return;
-                  onMove(it.id, to + 1);
-                  requestAnimationFrame(() => list.current?.querySelectorAll<HTMLButtonElement>("li > button")[to]?.focus());
+            <Fragment key={it.id}>
+              {landing === i + 1 && marker(i + 1)}
+              <li
+                data-row={it.id}
+                draggable
+                onDragStart={(e) => {
+                  setDragging(it.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", it.id);
                 }}
-                className="block w-full cursor-grab active:cursor-grabbing"
+                onDragOver={(e) => dragging && e.preventDefault()}
+                onDrop={(e) => {
+                  if (!dragging) return;
+                  e.preventDefault();
+                  if (dragging !== it.id) onMove(dragging, i + 1);
+                  setDragging(null);
+                }}
+                onDragEnd={() => setDragging(null)}
+                className={`group relative ${dragging === it.id ? "opacity-40" : ""}`}
               >
-                <InkRow n={i + 1} label={itemLabel(it)} done={!isOpenItem(it)} traced={traced.has(it.id)} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onRemove(it.id)}
-                aria-label={`Take "${itemLabel(it)}" out of tomorrow`}
-                className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-mute opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-soft hover:text-ink"
-              >
-                <CloseIcon size={10} />
-              </button>
-            </li>
+                <button
+                  type="button"
+                  aria-label={`${i + 1}: ${itemLabel(it)}. Alt and arrow keys to move.`}
+                  onKeyDown={(e) => {
+                    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+                    e.preventDefault();
+                    const to = i + (e.key === "ArrowUp" ? -1 : 1);
+                    if (to < 0 || to >= items.length) return;
+                    onMove(it.id, to + 1);
+                    requestAnimationFrame(() => list.current?.querySelectorAll<HTMLButtonElement>("li > button")[to]?.focus());
+                  }}
+                  className="block w-full cursor-grab active:cursor-grabbing"
+                >
+                  <InkRow n={i + 1} label={itemLabel(it)} done={!isOpenItem(it)} traced={traced.has(it.id)} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemove(it.id)}
+                  aria-label={`Take "${itemLabel(it)}" out of tomorrow`}
+                  className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-mute opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-soft hover:text-ink"
+                >
+                  <CloseIcon size={10} />
+                </button>
+              </li>
+            </Fragment>
           ))}
+          {landing === items.length + 1 && marker(items.length + 1)}
         </ol>
       )}
     </section>

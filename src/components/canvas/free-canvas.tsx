@@ -61,6 +61,7 @@ export function FreeCanvas<T extends Item>({
   renderLinkTools,
   renderGuessTools,
   onDropOutside,
+  onDragOutside,
   dim,
   spotRef,
   className = "",
@@ -97,6 +98,8 @@ export function FreeCanvas<T extends Item>({
   renderGuessTools?: (link: CanvasLink) => ReactNode;
   /** A bubble let go outside the sheet (onto a strip beside it, say): where the pointer was. Return true if it was taken. */
   onDropOutside?: (id: string, at: { x: number; y: number }) => boolean;
+  /** While a bubble is dragged: where the pointer is once it's off the sheet (null while over it, or when the drag ends). */
+  onDragOutside?: (id: string, at: { x: number; y: number } | null) => void;
   /** Faded back (one thread in focus): these items and the lines touching them. */
   dim?: Set<string> | null;
   /** Kept up to date with where the pointer is on the sheet, in saved spots (for a paste or a dropped file). */
@@ -174,9 +177,9 @@ export function FreeCanvas<T extends Item>({
   const height = Math.max(minHeight, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
-  const latest = useRef({ boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink, onDropOutside });
+  const latest = useRef({ boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink, onDropOutside, onDragOutside });
   useLayoutEffect(() => {
-    latest.current = { boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink, onDropOutside };
+    latest.current = { boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink, onDropOutside, onDragOutside };
   });
 
   // Saved spots are relative to the arranged group, not the screen.
@@ -261,6 +264,10 @@ export function FreeCanvas<T extends Item>({
       const target = moving && rect ? hit(d.id, { x: ev.clientX - rect.left, y: ev.clientY - rect.top }) : null;
       d = { ...d, dx, dy, moving, target };
       if (d.moving) ev.preventDefault();
+      if (moving && rect && !d.sub) {
+        const off = ev.clientY > rect.bottom || ev.clientY < rect.top || ev.clientX < rect.left || ev.clientX > rect.right;
+        latest.current.onDragOutside?.(d.id, off ? { x: ev.clientX, y: ev.clientY } : null);
+      }
       setDrag(d);
     };
     const stop = (ev: PointerEvent) => {
@@ -268,7 +275,8 @@ export function FreeCanvas<T extends Item>({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
       window.removeEventListener("pointercancel", stop);
-      const { width: w, onArrange: arrange, onDropOn: dropOn, onDetach: detach, onDropOutside: outside } = latest.current;
+      const { width: w, onArrange: arrange, onDropOn: dropOn, onDetach: detach, onDropOutside: outside, onDragOutside: overOutside } = latest.current;
+      overOutside?.(d.id, null);
       const rect = sheet.current?.getBoundingClientRect();
       const off = !!rect && (ev.clientY > rect.bottom || ev.clientY < rect.top || ev.clientX < rect.left || ev.clientX > rect.right);
       if (ev.type === "pointerup" && d.moving && w > 0) {
