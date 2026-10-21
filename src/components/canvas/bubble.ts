@@ -39,20 +39,25 @@ export function handRadius(seed: string): string {
 }
 
 /**
- * A note's look. Pen notes carry their tint; pencil ideas are plain paper
- * with a soft graphite smudge round the edge. Both get the paper's grain and
- * a faint lit top edge, like a real sheet.
+ * A note's look. Pen notes are cut paper: a tint, a hand-drawn edge, the
+ * paper's grain and a faint lit top edge. Pencil ideas have no box at all:
+ * just handwriting on the sheet, since only what's committed becomes a card.
  */
 export function bubbleStyle(shape: number, lifted = false, seed = String(shape), kind: "pen" | "pencil" = "pen"): CSSProperties {
   const s = BUBBLE_SHAPES[Math.abs(shape) % BUBBLE_SHAPES.length];
-  const pencil = kind === "pencil";
-  const edge = pencil
-    ? "inset 0 0 0 1px color-mix(in srgb, var(--graphite) 28%, transparent), 0 0 6px color-mix(in srgb, var(--graphite) 14%, transparent)"
-    : // A faint ink edge, like the outline of a sketched note (lighter than the fill in the dark theme).
-      "inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent), inset 0 1px 0 color-mix(in srgb, white 35%, transparent)";
+  if (kind === "pencil") {
+    return {
+      borderRadius: handRadius(seed),
+      backgroundColor: "transparent",
+      boxShadow: lifted ? "0 24px 40px -18px var(--shadow)" : "none",
+      transform: lifted ? "rotate(-7deg)" : `rotate(${s.rotate * 0.6}deg)`,
+    };
+  }
+  // A faint ink edge, like the outline of a sketched note (lighter than the fill in the dark theme).
+  const edge = "inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent), inset 0 1px 0 color-mix(in srgb, white 35%, transparent)";
   return {
     borderRadius: handRadius(seed),
-    backgroundColor: pencil ? "var(--sheet)" : s.tint,
+    backgroundColor: s.tint,
     backgroundImage: "var(--grain)",
     boxShadow: `${edge}${lifted ? ", 0 24px 40px -18px var(--shadow)" : ", 0 1px 2px -1px var(--shadow)"}`,
     transform: lifted ? "rotate(-7deg)" : `rotate(${s.rotate}deg)`,

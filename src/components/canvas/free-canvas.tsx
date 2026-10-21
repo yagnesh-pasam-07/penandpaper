@@ -6,7 +6,7 @@ import { layout, snap, type Box, type Point, type Size } from "./arrange";
 type Item = { id: string; x: number | null; y: number | null };
 export type Placement = { id: string; x: number; y: number };
 /** An ink line between two items on the sheet (by their ids here). */
-export type CanvasLink = { id: string; from: string; to: string; label: string | null; arrow: boolean };
+export type CanvasLink = { id: string; from: string; to: string; label: string | null; arrow: boolean; /** The paper's guess: a dotted pencil line until it's inked. */ guess?: boolean };
 
 /** What an item needs to know while it renders. */
 export type CanvasCtx = {
@@ -59,6 +59,9 @@ export function FreeCanvas<T extends Item>({
   selectedLink = null,
   onSelectLink,
   renderLinkTools,
+  renderGuessTools,
+  onDropOutside,
+  onDragOutside,
   dim,
   spotRef,
   className = "",
@@ -91,6 +94,12 @@ export function FreeCanvas<T extends Item>({
   onSelectLink?: (id: string | null) => void;
   /** What shows by the selected line (its toolbar). */
   renderLinkTools?: (link: CanvasLink) => ReactNode;
+  /** What shows halfway along a guessed (dotted) line: "connect? ✓ ✕". */
+  renderGuessTools?: (link: CanvasLink) => ReactNode;
+  /** A bubble let go outside the sheet (onto a strip beside it, say): where the pointer was. Return true if it was taken. */
+  onDropOutside?: (id: string, at: { x: number; y: number }) => boolean;
+  /** While a bubble is dragged: where the pointer is once it's off the sheet (null while over it, or when the drag ends). */
+  onDragOutside?: (id: string, at: { x: number; y: number } | null) => void;
   /** Faded back (one thread in focus): these items and the lines touching them. */
   dim?: Set<string> | null;
   /** Kept up to date with where the pointer is on the sheet, in saved spots (for a paste or a dropped file). */
@@ -168,9 +177,9 @@ export function FreeCanvas<T extends Item>({
   const height = Math.max(minHeight, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
-  const latest = useRef({ boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink });
+  const latest = useRef({ boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink, onDropOutside, onDragOutside });
   useLayoutEffect(() => {
-    latest.current = { boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink };
+    latest.current = { boxes, base, items, width, lift, onArrange, canDropOn, onDropOn, onDetach, onLink, onDropOutside, onDragOutside };
   });
 
   // Saved spots are relative to the arranged group, not the screen.
@@ -255,6 +264,10 @@ export function FreeCanvas<T extends Item>({
       const target = moving && rect ? hit(d.id, { x: ev.clientX - rect.left, y: ev.clientY - rect.top }) : null;
       d = { ...d, dx, dy, moving, target };
       if (d.moving) ev.preventDefault();
+      if (moving && rect && !d.sub) {
+        const off = ev.clientY > rect.bottom || ev.clientY < rect.top || ev.clientX < rect.left || ev.clientX > rect.right;
+        latest.current.onDragOutside?.(d.id, off ? { x: ev.clientX, y: ev.clientY } : null);
+      }
       setDrag(d);
     };
     const stop = (ev: PointerEvent) => {
@@ -262,11 +275,16 @@ export function FreeCanvas<T extends Item>({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
       window.removeEventListener("pointercancel", stop);
-      const { width: w, onArrange: arrange, onDropOn: dropOn, onDetach: detach } = latest.current;
+      const { width: w, onArrange: arrange, onDropOn: dropOn, onDetach: detach, onDropOutside: outside, onDragOutside: overOutside } = latest.current;
+      overOutside?.(d.id, null);
+      const rect = sheet.current?.getBoundingClientRect();
+      const off = !!rect && (ev.clientY > rect.bottom || ev.clientY < rect.top || ev.clientX < rect.left || ev.clientX > rect.right);
       if (ev.type === "pointerup" && d.moving && w > 0) {
         justDragged.current = true;
         setTimeout(() => (justDragged.current = false), 0);
-        if (d.target) dropOn?.(d.id, d.target);
+        if (off && !d.sub && outside?.(d.id, { x: ev.clientX, y: ev.clientY })) {
+          // Taken by whatever it was dropped on; it stays where it was on the sheet.
+        } else if (d.target) dropOn?.(d.id, d.target);
         else if (d.sub) detach?.(d.id, saved(landing(d)), pins(d.id));
         else arrange?.([{ id: d.id, ...saved(landing(d)) }, ...pins(d.id)]);
       }
@@ -353,7 +371,8 @@ export function FreeCanvas<T extends Item>({
             }}
             className={`group/item absolute top-0 left-0 w-max max-w-[320px] ${faded ? "opacity-30" : ""} ${onArrange ? "touch-none" : ""} ${
               dragging
-                ? "z-30 cursor-grabbing opacity-90 drop-shadow-[0_18px_22px_var(--shadow)]"
+                ? // Lifted off the sheet: a pencil thought rides on a scrap of white paper.
+                  "z-30 cursor-grabbing opacity-95 drop-shadow-[0_18px_22px_var(--shadow)] [&_.is-pencil]:rounded-md! [&_.is-pencil]:bg-sheet!"
                 : `${raised === it.id ? "z-20" : "z-0"} transition-transform duration-200 ease-out motion-reduce:transition-none`
             }`}
           >
@@ -379,6 +398,21 @@ export function FreeCanvas<T extends Item>({
           </div>
         );
       })}
+      {renderGuessTools &&
+        width > 0 &&
+        links
+          .filter((l) => l.guess)
+          .map((l) => {
+            const a = boxes.get(l.from);
+            const b = boxes.get(l.to);
+            if (!a || !b || dim?.has(l.from) || dim?.has(l.to)) return null;
+            const mid = curve(a, b, l.id).mid;
+            return (
+              <div key={l.id} className="absolute z-30 -translate-1/2" style={{ left: mid.x, top: mid.y }}>
+                {renderGuessTools(l)}
+              </div>
+            );
+          })}
       {selectedLink && renderLinkTools && width > 0 && (() => {
         const l = links.find((x) => x.id === selectedLink);
         const a = l && boxes.get(l.from);
@@ -482,6 +516,9 @@ function InkLines({
         const b = boxes.get(l.to);
         if (!a || !b) return null;
         const { d, mid } = curve(a, b, l.id);
+        if (l.guess) {
+          return <path key={l.id} d={d} fill="none" stroke="var(--graphite, var(--mute))" strokeWidth="1.6" strokeDasharray="2 7" strokeLinecap="round" opacity={dim ? 0.25 : 0.9} />;
+        }
         const on = selected === l.id;
         const faded = dim && (dim.has(l.from) || dim.has(l.to));
         return (

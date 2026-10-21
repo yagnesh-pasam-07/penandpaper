@@ -23,6 +23,7 @@ const op = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("nextRank"), ids: z.array(id).max(MAX_NEXT_RANK) }),
   z.object({ kind: z.literal("link"), id, from: id, to: id }),
   z.object({ kind: z.literal("unlink"), id }),
+  z.object({ kind: z.literal("shape"), id, at: z.number().int().min(1).max(MAX_RANK).nullable() }),
   z.object({ kind: z.literal("linkStyle"), id, label: z.string().max(MAX_LINK_LABEL * 2).nullable().optional(), arrow: z.boolean().optional() }),
 ]);
 

@@ -283,3 +283,19 @@ body {
   background: color-mix(in srgb, var(--t1, #fff1bf) 80%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
 }
+
+/* Inked into tomorrow: the words are traced over in pen, left to right. */
+@keyframes trace {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+.trace {
+  background: linear-gradient(90deg, var(--ink) 50%, var(--graphite) 50%) 100% 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: trace 700ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trace { animation: none; background: none; color: inherit; }
+}

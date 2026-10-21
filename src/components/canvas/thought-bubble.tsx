@@ -39,6 +39,13 @@ type Props = {
   onRank?: (rank: number | null) => void;
   /** A pasted or dropped picture: the note becomes a taped photo, the text its caption. */
   image?: string | null;
+  /** Earlier days these words were written afresh: earlier copies show through underneath, like pressing hard on a pad. */
+  echoes?: string[];
+  /**
+   * How much a pencil thought matters: 0 barely (small, light), 1 an ordinary
+   * thought, 2 and 3 written again or joined to others (bigger, pressed harder, darker).
+   */
+  weight?: number;
   /** "Connect to…": the L key. */
   onConnect?: () => void;
   /** Joined to others by lines: shows the whole thread (the T key, or the thread button). */
@@ -149,6 +156,8 @@ export function ThoughtBubble({
   rank,
   onRank,
   image,
+  echoes,
+  weight = 1,
   onConnect,
   onThread,
   onStackWith,
@@ -270,6 +279,9 @@ export function ThoughtBubble({
     ...(target ? { outline: "2px solid color-mix(in srgb, var(--red-text) 55%, transparent)", outlineOffset: 3 } : {}),
   };
   const shapeStyle = stream ? { ...settled, transform: `translateX(${dx}px)` } : settled;
+  const pressed = Math.min(2, echoes?.length ?? 0);
+  // Pencil with no box: its value shows in the hand itself (size, pressure, darkness).
+  const heftStyle: CSSProperties | undefined = pencil && !image ? PENCIL_WEIGHT[Math.max(0, Math.min(3, Math.round(weight)))] : undefined;
   const motion = leaving === "crumple" ? "crumple-away" : leaving === "fold" ? "fold-away" : returning ? "uncrumple" : fresh ? "drop-in" : "";
 
   if (editing) {
@@ -354,6 +366,31 @@ export function ThoughtBubble({
 
   return (
     <div className={`group relative ${stream ? "w-full" : "max-w-[300px]"} ${motion}`}>
+      {/* Written again and again: earlier copies show through underneath, like pressing hard on a pad. */}
+      {!stream &&
+        !pencil &&
+        Array.from({ length: pressed }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            style={{ ...look, transform: `translate(${(i + 1) * 8}px, ${-(i + 1) * 8}px) rotate(${-(i + 1) * 1.5}deg)`, opacity: 0.24 - i * 0.1 }}
+            className="pointer-events-none absolute inset-0"
+          />
+        ))}
+      {/* Pencil has no box to echo: the earlier writing shows through as faint handwriting instead. */}
+      {!stream &&
+        pencil &&
+        !image &&
+        Array.from({ length: pressed }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            style={{ ...heftStyle, transform: `translate(${(i + 1) * 5}px, ${-(i + 1) * 5}px) rotate(${-(i + 1) * 1.5}deg)`, opacity: 0.18 - i * 0.07 }}
+            className="hand pointer-events-none absolute inset-0 px-2 py-1.5 font-note text-[19px] leading-snug whitespace-pre-wrap sm:text-[20px]"
+          >
+            {text}
+          </span>
+        ))}
       {!readOnly && stream && dx !== 0 && (
         <span aria-hidden="true" className={`absolute inset-y-0 flex items-center font-hand text-xl text-red-text ${dx > 0 ? "left-0 pl-3" : "right-0 pr-3"}`}>
           {dx > 0 ? (done ? "unstrike" : "strike") : "crumple"}
@@ -382,7 +419,7 @@ export function ThoughtBubble({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`paper-note relative flex flex-col items-start gap-1.5 text-left ${image ? `px-3 pt-3 pb-2.5 ${stream ? "" : "w-[300px]"}` : "px-6 py-5"} transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${pencil ? "is-pencil" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
+        className={`paper-note relative flex flex-col items-start gap-1.5 text-left ${image ? `px-3 pt-3 pb-2.5 ${stream ? "" : "w-[300px]"}` : pencil && !stream ? "px-2 py-1.5" : "px-6 py-5"} transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${pencil ? "is-pencil" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
       >
         {image && (
           <>
@@ -406,7 +443,7 @@ export function ThoughtBubble({
             style={fresh ? ({ "--write": writeOn(text) } as CSSProperties) : undefined}
             className={`hand font-note leading-snug break-words whitespace-pre-wrap ${image ? "px-1 text-[19px]" : "text-[19px] sm:text-[20px]"} ${fresh ? "write-on" : ""}`}
           >
-            <span className="pen-strike">
+            <span className="pen-strike" style={heftStyle}>
               <HandText text={text} seed={seed} />
             </span>
           </span>
@@ -435,6 +472,7 @@ export function ThoughtBubble({
         <span className="pointer-events-none absolute top-full left-1/2 mt-1.5 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap text-mute opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
           {meta}
           {carried && !pencil ? ` · from ${carried}` : ""}
+          {echoes?.length ? ` · ${ordinal(echoes.length + 1)} time (${[...echoes.slice(-3).map(weekdayShort), "today"].join(", ")})` : ""}
         </span>
       )}
       {!readOnly && (
@@ -494,3 +532,14 @@ export function ThoughtBubble({
     </div>
   );
 }
+
+const weekdayShort = (date: string) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(`${date}T12:00:00Z`).getUTCDay()];
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
+
+/** Pencil written lightly to hard: a passing thought, an ordinary one, one that keeps coming back, one that matters. */
+const PENCIL_WEIGHT: CSSProperties[] = [
+  { fontSize: "0.95em", fontWeight: 400 },
+  { fontSize: "1.2em", fontWeight: 500 },
+  { fontSize: "1.45em", fontWeight: 600, color: "color-mix(in srgb, var(--graphite) 40%, var(--ink))" },
+  { fontSize: "1.8em", fontWeight: 700, color: "var(--ink)", textShadow: "0 0 0.8px var(--ink)" },
+];
