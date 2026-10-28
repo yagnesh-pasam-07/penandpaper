@@ -46,7 +46,7 @@ const CRUMPLE_MS = 450;
 type Toast = { text: string; undo?: () => void; action?: { label: string; run: () => void } };
 type Leaving = Map<string, "crumple">;
 
-export function DropCanvas({ initial, papers, me, focus = null }: { initial: DropPaper; papers: PaperMeta[]; me: Me; focus?: string | null }) {
+export function DropCanvas({ initial, papers, me, focus = null, write = false }: { initial: DropPaper; papers: PaperMeta[]; me: Me; focus?: string | null; write?: boolean }) {
   const router = useRouter();
   // One paper per mount (the page keys this by paper), so its id is fixed.
   const paperId = initial.id;
@@ -58,7 +58,7 @@ export function DropCanvas({ initial, papers, me, focus = null }: { initial: Dro
     setPaper(live.current);
   }, []);
   // The writer: open, and what's half-written in it (kept on close, and across reloads on this device).
-  const [writing, setWriting] = useState(initial.thoughts.length === 0);
+  const [writing, setWriting] = useState(initial.thoughts.length === 0 || write);
   const [draft, setDraft] = useState(() => readDraft(draftKey(paperId)));
   // A picture pasted into the writer, dropped with the next thought.
   const [draftImage, setDraftImage] = useState<Picture | null>(null);

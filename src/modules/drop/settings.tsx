@@ -76,6 +76,15 @@ export function SettingsView({ me, appearance }: { me: Me; appearance: { canvas:
             </div>
           </div>
         </section>
+
+        <section aria-labelledby="capture" className="flex flex-col gap-2">
+          <h2 id="capture" className="font-hand text-[30px] leading-none font-bold">
+            Capture from your phone
+          </h2>
+          <p className="max-w-[60ch] text-[15px] text-mute">
+            Add Pen &amp; Paper to your home screen, then use Share on a link, text or picture in any app and choose Pen &amp; Paper: it lands on your latest paper. Android (Chrome) has Share and a &ldquo;New thought&rdquo; shortcut; on iPhone, Add to Home Screen opens the app, and you can start typing as soon as it opens.
+          </p>
+        </section>
       </main>
     </div>
   );

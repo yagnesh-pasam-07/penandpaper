@@ -38,6 +38,16 @@ Two modules share one app, one sign-in and one database. The public homepage (`/
 
 Shared canvas pieces (bubble looks, the dotted sheet, the interactive thought bubble) live in `src/components/canvas` so the team module can use them too.
 
+## Capture from anywhere
+
+Pen & Paper installs as an app, and other apps can share to it.
+
+- **Install**: the manifest (`src/app/manifest.ts`) makes it installable. Chrome and Edge offer **Install app** in the account menu; on Android use Chrome's menu → Install app; on iPhone and iPad use Share → Add to Home Screen. It has no service worker: current Chrome doesn't need one to install, and nothing here should be cached offline (every page is signed-in and live).
+- **Share to Pen & Paper** (`/share`): from any app's Share sheet, a link, some words or a picture lands as a note on the paper you touched last, then opens it with the note highlighted. A title, text and link become one note (a link already in the text isn't repeated). Pictures must be PNG, JPG, GIF or WebP and about 1 MB (the same limit as pasting); a bigger one is skipped with a notice, since the browser's share can't shrink it first. Sharing the same thing twice within five minutes makes one note.
+- **Quick drop**: the home-screen shortcut **New thought** (long-press the icon on Android) opens `/drop?write=1`, the writer on your latest paper. **Library** opens `/drop/library`.
+- **Safe by design**: a share saves straight away only when it comes from the browser or OS itself, or from this site (`Sec-Fetch-Site: none` or `same-origin`). Anything else, or a browser that doesn't say, gets an "Add to …? [Add] [Cancel]" screen first, so another website can't add notes to your paper by linking to `/share`. Signed out, it goes to log in and comes back to the same share (a picture can't make that trip; the words do).
+- **Limits**: Android Chrome supports both install and Share to. **iPhone Safari supports Add to Home Screen but not Share Target**, so on iOS open the home-screen app and start typing (the shortcuts below are an Android and desktop feature too). Desktop Chrome can install it and share to it too.
+
 ## Run it locally
 
 ```bash

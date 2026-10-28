@@ -7,6 +7,7 @@ import { BackIcon, MoonIcon, PenIcon, SunIcon } from "./icons";
 import type { Tint } from "@/lib/types";
 import { btn } from "./btn";
 import { applyAppearance, saveAppearance } from "@/lib/appearance";
+import { promptInstall, useCanInstall } from "@/lib/install";
 
 /* ---------- Buttons ---------- */
 
@@ -89,6 +90,7 @@ export function Avatar({
 /** The signed-in person's avatar; opens a small menu with their email and Sign out. */
 export function AccountMenu({ name, email, tint, onSignOut }: { name: string; email: string; tint?: Tint; onSignOut: () => void }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const canInstall = useCanInstall();
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (ref.current?.open && !ref.current.contains(e.target as Node)) ref.current.open = false;
@@ -115,6 +117,11 @@ export function AccountMenu({ name, email, tint, onSignOut }: { name: string; em
         <Link href="/settings" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
           Settings
         </Link>
+        {canInstall && (
+          <button type="button" onClick={() => void promptInstall()} className="rounded-xl px-3 py-2.5 text-left text-sm hover:bg-soft">
+            Install app
+          </button>
+        )}
         <button type="button" onClick={onSignOut} className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-text hover:bg-red-soft">
           Sign out
         </button>

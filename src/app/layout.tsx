@@ -41,6 +41,8 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Pen & Paper",
   description: "Drop every thought onto paper.",
+  // iPhone and iPad: "Add to Home Screen" opens it like an app.
+  appleWebApp: { capable: true, title: "Pen & Paper", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -56,6 +58,9 @@ export const viewport: Viewport = {
 // system, which follows the OS) and the saved canvas. Keys match src/lib/canvases.ts.
 const themeScript = `(function(){try{var d=document.documentElement,m=localStorage.getItem("pp-theme"),c=localStorage.getItem("pp-canvas");if(m!=="light"&&m!=="dark")m="system";var t=m==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.setAttribute("data-theme",t);d.setAttribute("data-theme-mode",m);d.setAttribute("data-canvas",c==="ruled"||c==="grid"?c:"dotted")}catch(e){}})()`;
 
+// Holds Chrome's install offer until the account menu asks for it (keys match src/lib/install.ts).
+const installScript = `window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__ppInstall=e;window.dispatchEvent(new Event("pp-install"))})`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -68,6 +73,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: installScript }} />
       </head>
       {/* Browser extensions often add attributes to <body>; don't treat that as a hydration error. */}
       <body className="min-h-full bg-bg text-ink" suppressHydrationWarning>

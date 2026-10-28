@@ -5,18 +5,19 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { AppearanceSync } from "@/components/appearance";
 import { getAppearance, getPaper, listPapers } from "@/modules/drop/server";
+import { ShareNotice } from "@/modules/drop/share-notice";
 import { DropCanvas } from "@/modules/drop/ui";
 import { currentUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "Pen & Paper" };
 
-async function Paper({ params, searchParams }: { params: Promise<{ paperId: string }>; searchParams: Promise<{ note?: string | string[] }> }) {
+async function Paper({ params, searchParams }: { params: Promise<{ paperId: string }>; searchParams: Promise<{ note?: string | string[]; write?: string | string[]; skipped?: string | string[] }> }) {
   // Needs the live request (session cookie); never part of a prerender.
   await connection();
   const { paperId } = await params;
-  const { note } = await searchParams;
+  const { note, write, skipped } = await searchParams;
   const user = await currentUser();
-  if (!user) redirect(`/login?next=/drop/${paperId}`);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/drop/${paperId}${write === "1" ? "?write=1" : ""}`)}`);
   if (!z.uuid().safeParse(paperId).success) notFound();
   const [paper, papers, appearance] = await Promise.all([getPaper(user.id, paperId), listPapers(user.id), getAppearance(user.id)]);
   if (!paper) notFound();
@@ -25,7 +26,8 @@ async function Paper({ params, searchParams }: { params: Promise<{ paperId: stri
   return (
     <>
       <AppearanceSync canvas={appearance.canvas} theme={appearance.theme} />
-      <DropCanvas key={paper.id} initial={paper} papers={listed} me={{ name: user.name, email: user.email }} focus={typeof note === "string" ? note : null} />
+      {skipped === "image" && <ShareNotice>That picture was too big to add from a share. Drop it on the paper and it will shrink first.</ShareNotice>}
+      <DropCanvas key={paper.id} initial={paper} papers={listed} me={{ name: user.name, email: user.email }} focus={typeof note === "string" ? note : null} write={write === "1"} />
     </>
   );
 }

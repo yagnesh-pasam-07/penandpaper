@@ -206,6 +206,25 @@ export async function addThought(
   return toThought(again);
 }
 
+/**
+ * Puts a captured thought (a share from another app) on the paper touched last,
+ * loose in the flow. The same id sent twice returns the note already there.
+ */
+export async function captureThought(userId: string, input: { id: string; text: string; image?: string | null }): Promise<{ paperId: string; paperName: string | null; thought: Thought }> {
+  const paperId = await latestPaperId(userId);
+  const shape = [...input.id].reduce((n, c) => n + c.charCodeAt(0), 0) % 6;
+  const thought = await addThought(userId, paperId, { id: input.id, text: input.text, shape, image: input.image ?? null });
+  const paper = await ownedPaper(userId, paperId);
+  return { paperId, paperName: paper?.name ?? null, thought };
+}
+
+/** The paper a capture would land on, for asking before it does. */
+export async function captureTarget(userId: string): Promise<{ paperId: string; paperName: string | null }> {
+  const paperId = await latestPaperId(userId);
+  const paper = await ownedPaper(userId, paperId);
+  return { paperId, paperName: paper?.name ?? null };
+}
+
 /** Edits or strikes a thought on this paper. Returns null if it isn't there. */
 export async function updateThought(userId: string, paperId: string, id: string, patch: { text?: string; status?: "open" | "done" }): Promise<Thought | null> {
   const [row] = await db
