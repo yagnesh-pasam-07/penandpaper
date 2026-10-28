@@ -98,9 +98,14 @@ export function canInject(url) {
   return true;
 }
 
-/** "overlay" (the box on the page) or "window" (the small separate window). */
-export function chooseSurface({ mode, url }) {
-  return mode === "window" || !canInject(url) ? "window" : "overlay";
+/**
+ * "overlay" (the box on the page) or "window" (the small separate window).
+ * When the shortcut is pressed while another app is in front (a Global
+ * shortcut), the page isn't on screen, so the box has to be a window, which
+ * the browser brings to the front.
+ */
+export function chooseSurface({ mode, url, chromeFocused = true }) {
+  return mode === "window" || !canInject(url) || !chromeFocused ? "window" : "overlay";
 }
 
 /** What happened to a save, as the box should say it. `status` 0 means the request never got an answer. */

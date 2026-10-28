@@ -5,7 +5,7 @@ import { buildCaptureUrl, buildShareUrl, DEFAULT_SERVER, pickShare } from "./sha
 // The small separate window: the fallback for pages that can't hold the box,
 // the right-click items, and anyone who picked "a separate window" in Options.
 const WINDOW = { type: "popup", width: 420, height: 340, focused: true };
-const QUICK_WINDOW = { type: "popup", width: 420, height: 180, focused: true };
+const QUICK_WINDOW = { type: "popup", width: 520, height: 300, focused: true };
 
 const MENU = [
   { id: "page", title: "Save page to Pen & Paper", contexts: ["page"] },
@@ -211,7 +211,9 @@ chrome.commands.onCommand.addListener(async (command) => {
   void flush();
   const tab = await activeTab();
   const { mode } = await settings();
-  if (tab?.id && chooseSurface({ mode, url: tab.url }) === "overlay") {
+  // Pressed from another app (a Global shortcut): the page isn't in front, so use the window.
+  const chromeFocused = await chrome.windows.getLastFocused().then((w) => w.focused, () => true);
+  if (tab?.id && chooseSurface({ mode, url: tab.url, chromeFocused }) === "overlay") {
     try {
       await onPage(tab, () => window.__ppQuick.toggle());
       return;

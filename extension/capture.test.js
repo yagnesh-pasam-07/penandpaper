@@ -68,6 +68,8 @@ describe("canInject and chooseSurface", () => {
     expect(chooseSurface({ mode: undefined, url: "https://example.com" })).toBe("overlay");
     expect(chooseSurface({ mode: "window", url: "https://example.com" })).toBe("window");
     expect(chooseSurface({ mode: "overlay", url: "chrome://newtab/" })).toBe("window");
+    expect(chooseSurface({ mode: "overlay", url: "https://example.com", chromeFocused: false })).toBe("window");
+    expect(chooseSurface({ mode: "overlay", url: "https://example.com", chromeFocused: true })).toBe("overlay");
   });
 });
 
