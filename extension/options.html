@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pen &amp; Paper options</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #faf8f3; --sheet: #fff; --ink: #1d1c1a; --mute: #6d6a63; --line: #e6e1d7; --red: #c0392b; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #151412; --sheet: #1e1d1a; --ink: #ece9e2; --mute: #a29e94; --line: #34312c; --red: #e07a6b; } }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+    main { max-width: 520px; margin: 48px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 18px; }
+    h1 { font-size: 22px; margin: 0; }
+    fieldset { border: 1px solid var(--line); border-radius: 14px; background: var(--sheet); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    legend { padding: 0 6px; color: var(--mute); font-size: 13px; }
+    label { display: flex; align-items: center; gap: 10px; }
+    input[type="text"] { flex: 1; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+    button { align-self: flex-start; font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 10px; border: 0; background: var(--red); color: #fff; cursor: pointer; }
+    #status { min-height: 1.4em; color: var(--mute); }
+    #status.error { color: var(--red); }
+    :focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Pen &amp; Paper</h1>
+  <form id="form">
+    <fieldset>
+      <legend>Where to save</legend>
+      <label><input type="radio" name="where" value="production"> Pen &amp; Paper (penandpaper-app.vercel.app)</label>
+      <label><input type="radio" name="where" value="local"> This computer, for development (http://localhost:3000)</label>
+      <label><input type="radio" name="where" value="custom"> Another address <input type="text" id="custom" placeholder="https://…" autocomplete="off" spellcheck="false"></label>
+    </fieldset>
+    <button type="submit">Save</button>
+    <p id="status" role="status"></p>
+  </form>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

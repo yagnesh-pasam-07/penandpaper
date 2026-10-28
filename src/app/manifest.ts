@@ -25,6 +25,7 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: "New thought", short_name: "Write", description: "Open the writer on your latest paper", url: "/drop?write=1", icons: [{ src: "/pwa/icon/192", sizes: "192x192", type: "image/png" }] },
+      { name: "Quick thought", short_name: "Quick", description: "Type one thought and save it", url: "/capture", icons: [{ src: "/pwa/icon/192", sizes: "192x192", type: "image/png" }] },
       { name: "Library", description: "All your papers", url: "/drop/library", icons: [{ src: "/pwa/icon/192", sizes: "192x192", type: "image/png" }] },
     ],
     // Multipart so a picture can come along with the words.

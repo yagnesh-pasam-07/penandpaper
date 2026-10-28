@@ -43,13 +43,40 @@ export function buildShareText(fields: ShareFields): string {
   return lines.join("\n").slice(0, MAX_THOUGHT).trim();
 }
 
+/** A thought typed into the quick box: tidied and cut to the length of a thought, or null when it is empty. */
+export function captureText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.replace(/\r\n?/g, "\n").trim().slice(0, MAX_THOUGHT).trim();
+  return text || null;
+}
+
+/**
+ * Whether a request to save a quick thought came from this site's own page.
+ * A page on another site can't send `Sec-Fetch-Site: same-origin`; when a
+ * browser sends no such header at all, the `Origin` must be this site's.
+ */
+export function isSameSite(headers: { get(name: string): string | null }, origin: string): boolean {
+  const site = headers.get("sec-fetch-site");
+  if (site) return site === "same-origin";
+  return headers.get("origin") === origin;
+}
+
+/** Where a share came from, besides a phone's share sheet: the browser extension says `from=ext`. */
+export type ShareSource = "ext";
+
+/** The source a share names, or null: only the exact word the extension sends counts. */
+export function shareSource(value: string | null | undefined): ShareSource | null {
+  return value === "ext" ? "ext" : null;
+}
+
 /** The search string a share was sent with, so a sign-in can come back to the same share. */
-export function shareQuery(fields: ShareFields): string {
+export function shareQuery(fields: ShareFields, from: ShareSource | null = null): string {
   const q = new URLSearchParams();
   for (const key of ["title", "text", "url"] as const) {
     const v = clean(fields[key]);
     if (v) q.set(key, v);
   }
+  if (from) q.set("from", from);
   return q.toString();
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAX_THOUGHT } from "./logic";
-import { buildShareText, cleanUrl, pictureDataUrl, shareId, shareQuery } from "./share";
+import { buildShareText, captureText, cleanUrl, isSameSite, pictureDataUrl, shareId, shareQuery, shareSource } from "./share";
 
 describe("cleanUrl", () => {
   it("keeps http and https addresses exactly as sent", () => {
@@ -50,6 +50,41 @@ describe("shareQuery", () => {
   it("keeps only the filled fields, so a sign-in can come back to the same share", () => {
     expect(shareQuery({ title: "T", text: "", url: "https://example.com" })).toBe("title=T&url=https%3A%2F%2Fexample.com");
     expect(shareQuery({})).toBe("");
+  });
+});
+
+describe("captureText", () => {
+  it("tidies a typed thought and cuts it to the length of a thought", () => {
+    expect(captureText("  hello\r\nworld  ")).toBe("hello\nworld");
+    expect(captureText("x".repeat(5000))?.length).toBe(MAX_THOUGHT);
+  });
+  it("is nothing for empty or non-text input", () => {
+    for (const v of ["", "   \n ", null, undefined, 3, {}]) expect(captureText(v)).toBeNull();
+  });
+});
+
+describe("isSameSite", () => {
+  const origin = "https://penandpaper-app.vercel.app";
+  const headers = (h: Record<string, string>) => ({ get: (k: string) => h[k.toLowerCase()] ?? null });
+  it("accepts only a same-origin request when the browser says where it came from", () => {
+    expect(isSameSite(headers({ "sec-fetch-site": "same-origin" }), origin)).toBe(true);
+    for (const site of ["cross-site", "same-site", "none"]) expect(isSameSite(headers({ "sec-fetch-site": site, origin }), origin)).toBe(false);
+  });
+  it("without that header, the Origin must be this site's", () => {
+    expect(isSameSite(headers({ origin }), origin)).toBe(true);
+    expect(isSameSite(headers({ origin: "https://evil.example" }), origin)).toBe(false);
+    expect(isSameSite(headers({}), origin)).toBe(false);
+  });
+});
+
+describe("shareSource", () => {
+  it("only the browser extension's exact word counts", () => {
+    expect(shareSource("ext")).toBe("ext");
+    for (const v of ["EXT", "ext ", "extension", "", null, undefined, "<script>"]) expect(shareSource(v)).toBeNull();
+  });
+  it("is kept through a sign-in so the share finishes in the extension's window", () => {
+    expect(shareQuery({ text: "hi" }, "ext")).toBe("text=hi&from=ext");
+    expect(shareQuery({ text: "hi" })).toBe("text=hi");
   });
 });
 

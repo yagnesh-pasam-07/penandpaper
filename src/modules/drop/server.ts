@@ -218,6 +218,12 @@ export async function captureThought(userId: string, input: { id: string; text: 
   return { paperId, paperName: paper?.name ?? null, thought };
 }
 
+/** Whether this paper is theirs, and its name, for telling them where a capture went. */
+export async function paperTitle(userId: string, paperId: string): Promise<{ name: string | null } | null> {
+  const paper = await ownedPaper(userId, paperId);
+  return paper ? { name: paper.name } : null;
+}
+
 /** The paper a capture would land on, for asking before it does. */
 export async function captureTarget(userId: string): Promise<{ paperId: string; paperName: string | null }> {
   const paperId = await latestPaperId(userId);

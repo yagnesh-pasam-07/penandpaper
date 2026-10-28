@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { MAX_IMAGE } from "@/modules/drop/logic";
-import { buildShareText, pictureDataUrl, shareId, shareQuery, SHARE_IMAGE_TYPES, type ShareFields } from "@/modules/drop/share";
+import { buildShareText, pictureDataUrl, shareId, shareQuery, shareSource, SHARE_IMAGE_TYPES, type ShareFields, type ShareSource } from "@/modules/drop/share";
 import { captureTarget, captureThought } from "@/modules/drop/server";
 import { currentUser } from "@/server/session";
 
@@ -48,7 +48,13 @@ function read(source: URLSearchParams | FormData): ShareFields {
   return parsed.success ? parsed.data : {};
 }
 
-async function handle(request: Request, shared: ShareFields, file: File | null): Promise<Response> {
+/** Which app sent it: only the browser extension says so, by `from=ext`. */
+function readSource(source: URLSearchParams | FormData): ShareSource | null {
+  const v = source.get("from");
+  return shareSource(typeof v === "string" ? v : null);
+}
+
+async function handle(request: Request, shared: ShareFields, file: File | null, from: ShareSource | null): Promise<Response> {
   // A browser warming a link up must not add anything.
   if ((request.headers.get("sec-purpose") ?? "").includes("prefetch")) return new NextResponse(null, { status: 204 });
 
@@ -56,7 +62,7 @@ async function handle(request: Request, shared: ShareFields, file: File | null):
   const user = await currentUser();
   if (!user) {
     // Sign in, then come back to the same share (a picture can't make the trip; the words do).
-    const back = `/share?${shareQuery(shared)}`;
+    const back = `/share?${shareQuery(shared, from)}`;
     return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(back)}`, origin), 303);
   }
 
@@ -83,11 +89,13 @@ async function handle(request: Request, shared: ShareFields, file: File | null):
     const where = target.paperName?.trim() ? `“${esc(target.paperName.trim())}”` : "your latest paper";
     return html(
       `<h1>Add to ${where}?</h1><blockquote>${esc(text || "A picture")}</blockquote>${skippedImage || image ? "<p>Pictures can't be added from this screen. Share it again from the app, or drop it on the paper.</p>" : ""}
-<form method="post" action="/share" class="row"><input type="hidden" name="title" value="${esc(shared.title ?? "")}"><input type="hidden" name="text" value="${esc(shared.text ?? "")}"><input type="hidden" name="url" value="${esc(shared.url ?? "")}"><a class="b" href="/drop">Cancel</a><button class="p" type="submit"${text ? "" : " disabled"}>Add</button></form>`,
+<form method="post" action="/share" class="row"><input type="hidden" name="title" value="${esc(shared.title ?? "")}"><input type="hidden" name="text" value="${esc(shared.text ?? "")}"><input type="hidden" name="url" value="${esc(shared.url ?? "")}">${from ? `<input type="hidden" name="from" value="${from}">` : ""}<a class="b" href="/drop">Cancel</a><button class="p" type="submit"${text ? "" : " disabled"}>Add</button></form>`,
     );
   }
 
   const done = await captureThought(user.id, { id: shareId(user.id, text, image), text, image });
+  // From the browser extension's little window: say where it went, then let the window close.
+  if (from === "ext") return NextResponse.redirect(new URL(`/share/done?paper=${done.paperId}`, origin), 303);
   const to = new URL(`/drop/${done.paperId}`, origin);
   to.searchParams.set("note", done.thought.id);
   if (skippedImage) to.searchParams.set("skipped", "image");
@@ -95,12 +103,13 @@ async function handle(request: Request, shared: ShareFields, file: File | null):
 }
 
 export async function GET(request: Request) {
-  return handle(request, read(new URL(request.url).searchParams), null);
+  const params = new URL(request.url).searchParams;
+  return handle(request, read(params), null, readSource(params));
 }
 
 export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
   if (!form) return html(`<h1>That didn't come through</h1><p>Try sharing it again.</p><div class="row"><a class="b" href="/drop">Open my paper</a></div>`, 400);
   const picture = form.get("image");
-  return handle(request, read(form), picture instanceof File ? picture : null);
+  return handle(request, read(form), picture instanceof File ? picture : null, readSource(form));
 }
