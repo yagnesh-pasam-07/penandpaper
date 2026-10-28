@@ -4,10 +4,10 @@ import { noStore, requireUser } from "@/modules/drop/http";
 import { crumpleThought, updateThought } from "@/modules/drop/server";
 
 const patch = z
-  .object({ text: z.string().trim().min(1).max(MAX_THOUGHT).optional(), status: z.enum(["open", "done"]).optional() })
+  .object({ paperId: z.uuid(), text: z.string().trim().min(1).max(MAX_THOUGHT).optional(), status: z.enum(["open", "done"]).optional() })
   .refine((p) => p.text !== undefined || p.status !== undefined);
 
-const gone = () => Response.json({ error: "That thought isn't on today's paper." }, { status: 404 });
+const gone = () => Response.json({ error: "That thought isn't on this paper." }, { status: 404 });
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/thoughts/[id]">) {
   const user = await requireUser();
@@ -15,14 +15,17 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/thoug
   const parsed = patch.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Nothing to change." }, { status: 400 });
   const { id } = await ctx.params;
-  const thought = await updateThought(user.id, id, parsed.data);
+  const { paperId, ...change } = parsed.data;
+  const thought = await updateThought(user.id, paperId, id, change);
   return thought ? Response.json(thought, noStore) : gone();
 }
 
-/** Crumples it: hidden at once, swept up for good a week later. */
-export async function DELETE(_request: Request, ctx: RouteContext<"/api/drop/thoughts/[id]">) {
+/** Crumples it: hidden at once, swept up for good a week later. The paper goes in the query: `?paper=<id>`. */
+export async function DELETE(request: Request, ctx: RouteContext<"/api/drop/thoughts/[id]">) {
   const user = await requireUser();
   if (user instanceof Response) return user;
+  const paper = z.uuid().safeParse(new URL(request.url).searchParams.get("paper"));
+  if (!paper.success) return Response.json({ error: "Which paper?" }, { status: 400 });
   const { id } = await ctx.params;
-  return (await crumpleThought(user.id, id)) ? new Response(null, { status: 204 }) : gone();
+  return (await crumpleThought(user.id, paper.data, id)) ? new Response(null, { status: 204 }) : gone();
 }

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { HOME, isHome, MAX_ZOOM, MIN_ZOOM, parseView, wheelFactor, zoomAround, ZOOM_STEP, type View } from "@/components/canvas/view";
 
-const KEY = "pp-drop-view";
 /** Presses on these never start a pan: they have their own jobs. */
 const OWN = "button, a, input, textarea, select, summary, header, [data-note], [role='dialog'], [role='menu'], [data-no-pan]";
 
@@ -19,9 +18,9 @@ function localPoint(origin: HTMLElement | null, clientX: number, clientY: number
  * - Dragging empty canvas, or the middle mouse button anywhere, pans.
  * - The plain wheel keeps scrolling the page while the view is at home; once it is zoomed or panned it pans instead.
  * `page` carries the pattern variables; `origin` is the untransformed top-left of the sheet the notes sit on.
- * The view is remembered on this device.
+ * The view is remembered on this device, per paper (`storageKey`).
  */
-export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefObject<HTMLElement | null>) {
+export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefObject<HTMLElement | null>, storageKey: string) {
   const [view, setViewState] = useState<View>(HOME);
   const ref = useRef(view);
   const loaded = useRef(false);
@@ -34,17 +33,17 @@ export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefOb
   // Remembered per device; read after mount so the server and first render agree.
   useEffect(() => {
     try {
-      setView(parseView(localStorage.getItem(KEY)));
+      setView(parseView(localStorage.getItem(storageKey)));
     } catch {}
     loaded.current = true;
-  }, [setView]);
+  }, [setView, storageKey]);
   useEffect(() => {
     if (!loaded.current) return;
     try {
-      if (isHome(view)) localStorage.removeItem(KEY);
-      else localStorage.setItem(KEY, JSON.stringify(view));
+      if (isHome(view)) localStorage.removeItem(storageKey);
+      else localStorage.setItem(storageKey, JSON.stringify(view));
     } catch {}
-  }, [view]);
+  }, [view, storageKey]);
 
   // The pattern follows the notes: its tile scales with the zoom and starts where the sheet does, shifted by the pan.
   useLayoutEffect(() => {

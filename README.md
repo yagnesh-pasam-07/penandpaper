@@ -6,29 +6,31 @@ Two modules share one app, one sign-in and one database. The public homepage (`/
 
 | Module | What it does | Where |
 | --- | --- | --- |
-| **Drop** | A personal brain dump. Open the app, type, press Enter: the thought lands on today's paper. Unstruck thoughts roll over to tomorrow, and a 9 PM email lists the day. | `/drop`, code in `src/modules/drop` |
-| **Team** | A lead drops thoughts, estimates them, and drags them onto people. Each person gets their paper at 9:00 in their own time zone. | `/projects`, `/me`, code in `src/screens` |
+| **Drop** | A canvas of papers you make yourself. Open one, type, press Enter: the thought lands on it. Make as many papers as you like, find anything across all of them, and get an evening email of what you dropped. | `/drop`, code in `src/modules/drop` |
+| **Team** | Parked for now: its routes redirect to `/drop` and nothing links to it. A lead drops thoughts, estimates them, and drags them onto people. | code in `src/screens` |
 
 - [Product Requirements Document](docs/PRD.md) (team planner)
 
 ## Drop
 
-![Drop: today's paper with dropped, struck and carried thoughts](docs/images/drop-today.jpg)
+![Drop: a paper with dropped and struck thoughts](docs/images/drop-today.jpg)
 
-| On a phone: a vertical stream | Past papers | Ink (dark) |
-| --- | --- | --- |
-| ![Drop on a phone](docs/images/drop-phone.png) | ![Past papers](docs/images/drop-history.png) | ![Drop in the dark theme](docs/images/drop-today-dark.jpg) |
+| On a phone: a vertical stream | Ink (dark) |
+| --- | --- |
+| ![Drop on a phone](docs/images/drop-phone.png) | ![Drop in the dark theme](docs/images/drop-today-dark.jpg) |
 
-- **Canvas home**: `/drop` opens straight to today's paper. Press Space, start typing, or tap the floating **Write…** pen to open the writer (it opens by itself on an empty paper). Enter drops the thought and keeps the writer open for the next; Shift+Enter is a new line; Esc or a click outside closes it and keeps any unfinished text as a draft. Each note flies from the writer to its place on the sheet.
-- **Bubbles**: hand-cut notes, each with its own imperfect outline (seeded by when it was dropped, so it keeps its shape across days) and a faint ink edge, with the time it was dropped shown on hover and a small ↻ on carried ones. Click to edit; double-click (or swipe right on a phone) to strike out: one thin red pen line draws across the words, which stay readable, and a moment later the thought sinks into a **Done today** row of small chips (↺ brings one back); delete from the edit view or the hover buttons. Links are clickable, and show a preview under the note: a YouTube video its thumbnail, any other link its site and path.
-- **Daily paper**: each day (in `DROP_TIMEZONE`, default IST) is a fresh paper. Unstruck thoughts from the last paper roll over on the first open of the day, marked "from Sat".
-- **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails today's paper, open ones first and highlighted, done ones struck. No email if nothing was dropped that day.
-- **History**: `/drop/history` lists past papers; each opens read-only.
-- **Arrange**: new drops land in a row right under the input; arranged thoughts keep their shape below. Drag a thought anywhere on the sheet (it stays within the page column). It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
-- **Pencil or pen**: Tab in the writer switches. Pencil is an idea (graphite, untinted, never struck, carried quietly); pen is a task. Ink it / Pencil it from a note's toolbar. Counts read "5 open · 3 ideas · 2 done".
-- **Fold till later**: W (or the calendar button) on a thought: Today, Tomorrow, This weekend, or a date. It folds out of sight ("Folded till Sat · Undo") and appears on that day's paper marked with its day; "N folded for later" lists them. The 9 PM email lists the next 7 days under "Coming up".
+- **Canvas home**: `/drop` opens the paper you touched last (a first blank one if you have none), at `/drop/<paper>`. Press Space, start typing, or tap the floating **Write…** pen to open the writer (it opens by itself on an empty paper). Enter drops the thought and keeps the writer open for the next; Shift+Enter is a new line; Esc or a click outside closes it and keeps any unfinished text as a draft. Each note flies from the writer to its place on the sheet.
+- **Bubbles**: hand-cut notes, each with its own imperfect outline (seeded by when it was dropped, so it keeps its shape across days) and a faint ink edge, with the time it was dropped shown on hover. Click to edit; double-click (or swipe right on a phone) to strike out: one thin red pen line draws across the words, which stay readable, and the thought stays exactly where it is (strike it again to take the line off); delete from the edit view or the hover buttons. Links are clickable, and show a preview under the note: a YouTube video its thumbnail, any other link its site and path.
+- **Papers you make**: the **+** in the header makes a new blank paper (a name is optional; the date it was made shows by itself). Thoughts stay on the paper they were dropped on, and nothing is carried between papers. Papers are not tied to days: make several in one day, or leave one alone for weeks.
+- **Switcher**: the paper's name in the header opens a list of all your papers, newest first, with the date made and how many thoughts each holds. The same menu renames (or double-click the name), archives and deletes the open paper. On a phone it opens as a sheet from the bottom.
+- **Library**: `/drop/library` shows every paper as a small card (a miniature of its canvas, name, date made, thought count), newest first, with an **Archived** toggle. Every paper stays fully editable. Rename, archive (put away, hidden from the switcher) and delete live on each card.
+- **Delete**: a deleted paper disappears at once, with an Undo; the nightly cron removes it for good after 7 days, like crumpled thoughts.
+- **Search**: the magnifier in the header, or Ctrl/⌘ K, searches the words of every thought on every paper (any case, newest first, up to 50). A result opens its paper and the note pulses.
+- **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails what you dropped today ("Here's what you dropped today"), grouped by paper (its name, or the date it was made), struck ones with their line. "Open my paper" goes to the paper you wrote on last. No email if nothing was dropped that day.
+- **Arrange**: new drops land in a row right under the input; arranged thoughts keep their shape below. Drag a thought anywhere on the page. It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
+- **Pan and zoom**: Ctrl/⌘ + scroll (or a trackpad pinch) zooms around the pointer, 25–300%; drag empty canvas or use the middle mouse button to pan; the − / percent / + control at the bottom right resets the view. Each paper remembers its own view on this device. The pattern and the notes move together.
+- **Appearance**: `/settings` picks the canvas (Dotted, Grid or Ruled) and Light, Dark or System. It applies at once, is kept on the device, and is saved to your account.
 - **Crumple**: ✕, Delete, swipe left, or the editor all crumple (with a 6-second Undo). Crumpled thoughts are hidden everywhere and swept up for good after 7 days by the nightly cron.
-- **Clear desk** (`/drop/clear`, Shift+C, or the 9 PM email's button): each open task, one card at a time: Tomorrow (T), Keep as idea (K), Crumple (X), Done already (D), ← Back; swipes on a phone. Ends with a DESK CLEARED stamp, also shown on that day in History.
 - **Handwriting**: notes in Kalam (the most legible of Caveat, Kalam, Patrick Hand, Gochi Hand and Nanum Pen Script at 18–24px; Caveat stays for headings), with a tiny per-word wobble seeded per note, ink write-on when dropped, paper grain, and Telugu (Gurajada) / Hindi (Kalam) handwriting.
 - **Keyboard first**: Space, or simply typing, opens the writer from anywhere on the page (the first letter goes in); Enter drops; Esc closes.
 - **Phone**: the canvas becomes a vertical stream with the same input.
@@ -42,7 +44,7 @@ Shared canvas pieces (bubble looks, the dotted sheet, the interactive thought bu
 npm install
 cp .env.example .env.local      # then fill in DATABASE_URL, BETTER_AUTH_SECRET, …
 npm run db:migrate              # create tables on your database
-npm run seed -- you@example.com # optional: a week of Drop papers for that email
+npm run seed -- you@example.com # optional: a few Drop papers for that email
 npm run dev                     # http://localhost:3000
 ```
 
@@ -62,10 +64,10 @@ See `.env.example` for the full annotated list.
 | `DATABASE_URL_UNPOOLED` | for migrations | Neon direct connection string (`npm run db:migrate`). |
 | `BETTER_AUTH_SECRET` | yes | Signs session cookies. One per environment: `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | production | The site's address, e.g. `https://penandpaper-app.vercel.app`. |
-| `RESEND_API_KEY`, `EMAIL_FROM` | for email | Sign-in links, invites, the daily papers. `EMAIL_FROM`'s domain must be verified in Resend. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | for email | Sign-in links, invites, the evening email. `EMAIL_FROM`'s domain must be verified in Resend. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | optional | "Continue with Google". Redirect URI: `{BETTER_AUTH_URL}/api/auth/callback/google`. |
 | `CRON_SECRET` | production | Vercel Cron sends it to `/api/cron/drop-digest`. `openssl rand -hex 24`. |
-| `DROP_TIMEZONE` | optional | Drop's day boundaries (default `Asia/Kolkata`). The cron time in `vercel.json` is fixed to 9 PM IST; change both together. |
+| `DROP_TIMEZONE` | optional | The day the evening email covers, and how dates read (default `Asia/Kolkata`). The cron time in `vercel.json` is fixed to 9 PM IST; change both together. |
 | `SUPPORT_EMAIL` | optional | Contact address on `/privacy`. |
 
 ## Databases

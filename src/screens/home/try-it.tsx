@@ -6,27 +6,24 @@ import { FreeCanvas, type Placement } from "@/components/canvas/free-canvas";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { btn } from "@/components/ui";
 import { uid } from "@/lib/mutations";
-import { applyPaperOp, type DropPaper, type Thought } from "@/modules/drop/logic";
+import type { DropPaper, Thought } from "@/modules/drop/logic";
 import { readTryPaper, TRY_KEY } from "@/modules/drop/try-import";
 
 const noSubscribe = () => () => {};
 
-const thought = (text: string, i: number, kind: Thought["kind"] = "pen"): Thought => ({
+const thought = (text: string, i: number): Thought => ({
   id: `try-${i}-${text.length}`,
   text,
   status: "open",
-  kind,
   shape: i,
   createdAt: new Date(Date.UTC(2026, 9, 19, 8, i)).toISOString(),
   doneAt: null,
-  carriedFrom: null,
   x: null,
   y: null,
-  scheduledFor: null,
 });
 
 /** What a first visit starts with. */
-const EXAMPLES: Thought[] = [thought("idea: weekend photo walk", 2, "pencil"), thought("read the design doc", 1), thought("call amma", 0)];
+const EXAMPLES: Thought[] = [thought("weekend photo walk", 2), thought("read the design doc", 1), thought("call amma", 0)];
 
 /**
  * "Try it right here": a small real paper on the homepage. Visitors drop,
@@ -46,7 +43,7 @@ export function TryIt() {
 function TryPaper() {
   const [paper, setPaper] = useState<DropPaper>(() => {
     const saved = readTryPaper();
-    return { date: "try", thoughts: saved?.thoughts ?? EXAMPLES };
+    return { id: "try", name: null, createdAt: new Date(Date.UTC(2026, 9, 19, 8)).toISOString(), archivedAt: null, thoughts: saved?.thoughts ?? EXAMPLES };
   });
   const [text, setText] = useState("");
   const [fresh, setFresh] = useState<Set<string>>(new Set());
@@ -81,7 +78,7 @@ function TryPaper() {
     setText("");
   };
 
-  const toggle = (id: string) => change((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id && t.kind === "pen" ? { ...t, status: t.status === "done" ? "open" : "done" } : t)) }));
+  const toggle = (id: string) => change((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? { ...t, status: t.status === "done" ? "open" : "done" } : t)) }));
   const crumple = (id: string) => {
     setLeaving((s) => new Set(s).add(id));
     setTimeout(() => {
@@ -138,7 +135,6 @@ function TryPaper() {
             <ThoughtBubble
               text={it.t.text}
               done={it.t.status === "done"}
-              kind={it.t.kind}
               shape={it.t.shape}
               seed={it.t.createdAt}
               fresh={fresh.has(it.id)}
@@ -146,7 +142,6 @@ function TryPaper() {
               leaving={leaving.has(it.id) ? "crumple" : null}
               onEdit={(v) => change((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === it.id ? { ...t, text: v } : t)) }))}
               onToggle={() => toggle(it.id)}
-              onInk={() => change((p) => applyPaperOp(p, { kind: "ink", thought: it.id, to: it.t.kind === "pencil" ? "pen" : "pencil" }))}
               onDelete={() => crumple(it.id)}
             />
           )}

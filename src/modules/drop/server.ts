@@ -1,285 +1,281 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { users } from "@/db/schema";
-import { uid } from "@/lib/mutations";
-import { addDays, todayIn } from "@/lib/time";
 import {
-  applyPaperOp,
   CRUMPLE_KEEP_DAYS,
   DROP_TIMEZONE,
-  rollover,
+  SEARCH_LIMIT,
+  cleanName,
+  escapeLike,
+  groupDigest,
+  previewNotes,
+  type DigestGroup,
+  type DigestRow,
   type DropPaper,
-  type Kind,
-  type PaperOp,
+  type PaperCardData,
+  type PaperMeta,
+  type SearchHit,
   type Thought,
 } from "./logic";
 import { dropPapers, dropPrefs, dropThoughts } from "./schema";
 
 const db = httpDb;
 
-export function dropToday(): string {
-  return todayIn(process.env.DROP_TIMEZONE || DROP_TIMEZONE);
+/** The zone the evening email's day, and how dates read, follow. */
+export function dropZone(): string {
+  return process.env.DROP_TIMEZONE || DROP_TIMEZONE;
 }
 
 type ThoughtRow = typeof dropThoughts.$inferSelect;
+
+const iso = (d: Date | string) => new Date(d).toISOString();
 
 function toThought(r: ThoughtRow): Thought {
   return {
     id: r.id,
     text: r.text,
     status: r.status,
-    kind: r.kind,
     shape: r.shape,
-    createdAt: new Date(r.createdAt).toISOString(),
-    doneAt: r.doneAt ? new Date(r.doneAt).toISOString() : null,
-    carriedFrom: r.carriedFrom,
+    createdAt: iso(r.createdAt),
+    doneAt: r.doneAt ? iso(r.doneAt) : null,
     x: r.x,
     y: r.y,
-    scheduledFor: r.scheduledFor,
     image: r.image,
   };
 }
 
+/* ---------- Papers ---------- */
+
+const metaCols = {
+  id: dropPapers.id,
+  name: dropPapers.name,
+  createdAt: dropPapers.createdAt,
+  updatedAt: dropPapers.updatedAt,
+  archivedAt: dropPapers.archivedAt,
+};
+
+type MetaRow = { id: string; name: string | null; createdAt: Date; updatedAt: Date; archivedAt: Date | null };
+
+const toMeta = (r: MetaRow, count: number): PaperMeta => ({
+  id: r.id,
+  name: r.name,
+  createdAt: iso(r.createdAt),
+  updatedAt: iso(r.updatedAt),
+  archivedAt: r.archivedAt ? iso(r.archivedAt) : null,
+  count,
+});
+
+/** One of this person's papers (not deleted), or null. Archived ones are still theirs to open and edit. */
+async function ownedPaper(userId: string, paperId: string) {
+  const [row] = await db
+    .select(metaCols)
+    .from(dropPapers)
+    .where(and(eq(dropPapers.id, paperId), eq(dropPapers.userId, userId), isNull(dropPapers.deletedAt)));
+  return row ?? null;
+}
+
+/** Notes that something on the paper changed, so it is the one /drop opens next. */
+async function touch(paperId: string): Promise<void> {
+  await db.update(dropPapers).set({ updatedAt: sql`now()` }).where(eq(dropPapers.id, paperId));
+}
+
 /** A paper's thoughts, leaving out crumpled ones. */
-async function contentsOf(paper: { id: string; date: string; clearedAt?: string | null }): Promise<DropPaper> {
+async function contentsOf(paper: { id: string; name: string | null; createdAt: Date; archivedAt: Date | null }): Promise<DropPaper> {
   const rows = await db
     .select()
     .from(dropThoughts)
     .where(and(eq(dropThoughts.paperId, paper.id), isNull(dropThoughts.crumpledAt)))
     .orderBy(asc(dropThoughts.createdAt), asc(dropThoughts.id));
-  return { date: paper.date, thoughts: rows.map(toThought), clearedAt: paper.clearedAt ?? null };
+  return { id: paper.id, name: paper.name, createdAt: iso(paper.createdAt), archivedAt: paper.archivedAt ? iso(paper.archivedAt) : null, thoughts: rows.map(toThought) };
 }
 
-type PaperRef = { id: string; date: string; clearedAt: string | null };
+/** Opens a paper with its thoughts, if it is theirs. */
+export async function getPaper(userId: string, paperId: string): Promise<DropPaper | null> {
+  const paper = await ownedPaper(userId, paperId);
+  return paper ? contentsOf(paper) : null;
+}
 
-const paperCols = { id: dropPapers.id, date: dropPapers.date, clearedAt: dropPapers.clearedAt };
+/** A new blank paper; the name is optional. */
+export async function createPaper(userId: string, name?: string | null): Promise<PaperMeta> {
+  const [row] = await db.insert(dropPapers).values({ userId, name: cleanName(name) }).returning(metaCols);
+  return toMeta(row, 0);
+}
 
-/**
- * Today's paper, made on first open of the day. Making it also brings over the
- * last paper's open thoughts, and moves along whatever was
- * folded for later; if two requests race, only the one that made the paper
- * does that.
- */
-async function ensureTodayPaper(userId: string): Promise<PaperRef> {
-  const date = dropToday();
-  const [existing] = await db
-    .select(paperCols)
+/** The paper /drop opens: the one touched last, or a first blank one if there are none. */
+export async function latestPaperId(userId: string): Promise<string> {
+  const [row] = await db
+    .select({ id: dropPapers.id })
     .from(dropPapers)
-    .where(and(eq(dropPapers.userId, userId), eq(dropPapers.date, date)));
-  if (existing) return existing;
-
-  const [created] = await db.insert(dropPapers).values({ userId, date }).onConflictDoNothing().returning(paperCols);
-  if (!created) {
-    const [row] = await db
-      .select(paperCols)
-      .from(dropPapers)
-      .where(and(eq(dropPapers.userId, userId), eq(dropPapers.date, date)));
-    return row;
-  }
-
-  const [prev] = await db
-    .select(paperCols)
-    .from(dropPapers)
-    .where(and(eq(dropPapers.userId, userId), lt(dropPapers.date, date)))
-    .orderBy(desc(dropPapers.date))
+    .where(and(eq(dropPapers.userId, userId), isNull(dropPapers.archivedAt), isNull(dropPapers.deletedAt)))
+    .orderBy(desc(dropPapers.updatedAt), desc(dropPapers.createdAt))
     .limit(1);
-  if (prev) {
-    const carried = rollover(await contentsOf(prev), uid);
-    const queries = [];
-    if (carried.thoughts.length) queries.push(db.insert(dropThoughts).values(carried.thoughts.map((t) => thoughtRow(t, created.id, userId))));
-    for (const m of carried.move.thoughts) {
-      queries.push(db.update(dropThoughts).set({ paperId: created.id, carriedFrom: m.carriedFrom }).where(and(eq(dropThoughts.id, m.id), eq(dropThoughts.userId, userId))));
-    }
-    if (queries.length) await db.batch(queries as unknown as Parameters<typeof db.batch>[0]);
-  }
-  return created;
+  return row?.id ?? (await createPaper(userId)).id;
 }
 
-function thoughtRow(t: Thought, paperId: string, userId: string): typeof dropThoughts.$inferInsert {
-  return {
-    id: t.id,
-    paperId,
-    userId,
-    text: t.text,
-    status: t.status,
-    kind: t.kind,
-    shape: t.shape,
-    createdAt: t.createdAt,
-    carriedFrom: t.carriedFrom,
-    x: t.x,
-    y: t.y,
-    scheduledFor: t.scheduledFor,
-    image: t.image ?? null,
-  };
-}
-
-/**
- * Saves the difference between two versions of today's paper, in one batch:
- * moved, folded or inked thoughts, and what went away (crumpled, so it can be
- * swept up later).
- */
-async function saveChanges(paperId: string, before: DropPaper, after: DropPaper): Promise<void> {
-  const queries = [];
-  const kept = new Map(after.thoughts.map((t) => [t.id, t]));
-  for (const was of before.thoughts) {
-    const t = kept.get(was.id);
-    if (!t) continue;
-    const changed = t.x !== was.x || t.y !== was.y || t.scheduledFor !== was.scheduledFor || t.kind !== was.kind || t.status !== was.status;
-    if (changed) {
-      queries.push(
-        db
-          .update(dropThoughts)
-          .set({
-            x: t.x,
-            y: t.y,
-            scheduledFor: t.scheduledFor,
-            kind: t.kind,
-            status: t.status,
-            ...(t.status !== was.status ? { doneAt: t.status === "done" ? sql`now()` : null } : {}),
-          })
-          .where(and(eq(dropThoughts.id, t.id), eq(dropThoughts.paperId, paperId))),
-      );
-    }
-  }
-  const gone = before.thoughts.filter((t) => !kept.has(t.id)).map((t) => t.id);
-  if (gone.length) queries.push(db.update(dropThoughts).set({ crumpledAt: sql`now()` }).where(and(inArray(dropThoughts.id, gone), eq(dropThoughts.paperId, paperId))));
-  if (queries.length) await db.batch(queries as unknown as Parameters<typeof db.batch>[0]);
-}
-
-export async function getToday(userId: string): Promise<DropPaper> {
-  const paper = await contentsOf(await ensureTodayPaper(userId));
-  return withEchoes(userId, paper);
-}
-
-/** How far back a thought written again still counts as "again". */
-const ECHO_DAYS = 30;
-const sameWords = (text: string) => text.trim().toLowerCase().replace(/\s+/g, " ");
-
-/**
- * Marks thoughts whose words were written afresh (not carried over) on earlier
- * days this month, with those days, so a thought you keep writing presses
- * through the paper, darker each time.
- */
-async function withEchoes(userId: string, paper: DropPaper): Promise<DropPaper> {
-  const texts = new Set(paper.thoughts.filter((t) => t.text).map((t) => sameWords(t.text)));
-  if (!texts.size) return paper;
+/** Papers, newest first, with how many thoughts each holds; archived ones only when asked for. */
+export async function listPapers(userId: string, opts: { archived?: boolean } = {}): Promise<PaperMeta[]> {
   const rows = await db
-    .select({ text: dropThoughts.text, date: dropPapers.date })
+    .select({ ...metaCols, count: sql<number>`count(${dropThoughts.id})::int` })
+    .from(dropPapers)
+    .leftJoin(dropThoughts, and(eq(dropThoughts.paperId, dropPapers.id), isNull(dropThoughts.crumpledAt)))
+    .where(and(eq(dropPapers.userId, userId), isNull(dropPapers.deletedAt), opts.archived ? isNotNull(dropPapers.archivedAt) : isNull(dropPapers.archivedAt)))
+    .groupBy(dropPapers.id)
+    .orderBy(desc(dropPapers.createdAt))
+    .limit(200);
+  return rows.map((r) => toMeta(r, r.count));
+}
+
+/** The library: each paper with a small picture of its canvas. */
+export async function listPaperCards(userId: string, opts: { archived?: boolean } = {}): Promise<PaperCardData[]> {
+  const papers = await listPapers(userId, opts);
+  if (!papers.length) return [];
+  const rows = await db
+    .select({ id: dropThoughts.id, paperId: dropThoughts.paperId, text: dropThoughts.text, status: dropThoughts.status, x: dropThoughts.x, y: dropThoughts.y })
     .from(dropThoughts)
-    .innerJoin(dropPapers, eq(dropPapers.id, dropThoughts.paperId))
-    .where(
-      and(
-        eq(dropThoughts.userId, userId),
-        isNull(dropThoughts.carriedFrom),
-        lt(dropPapers.date, paper.date),
-        gte(dropPapers.date, addDays(paper.date, -ECHO_DAYS)),
-        inArray(sql`lower(regexp_replace(trim(${dropThoughts.text}), '\\s+', ' ', 'g'))`, [...texts]),
-      ),
-    );
-  if (!rows.length) return paper;
-  const days = new Map<string, Set<string>>();
-  for (const r of rows) {
-    const k = sameWords(r.text);
-    days.set(k, (days.get(k) ?? new Set()).add(r.date));
-  }
-  return {
-    ...paper,
-    thoughts: paper.thoughts.map((t) => {
-      const seen = days.get(sameWords(t.text));
-      // Only the copy written today (or carried from the first time) presses through.
-      return seen ? { ...t, echoes: [...seen].filter((d) => d !== t.carriedFrom).sort() } : t;
-    }),
-  };
+    .where(and(inArray(dropThoughts.paperId, papers.map((p) => p.id)), isNull(dropThoughts.crumpledAt)))
+    .orderBy(asc(dropThoughts.createdAt), asc(dropThoughts.id));
+  const byPaper = new Map<string, typeof rows>();
+  for (const r of rows) byPaper.set(r.paperId, [...(byPaper.get(r.paperId) ?? []), r]);
+  return papers.map((p) => ({ ...p, notes: previewNotes(byPaper.get(p.id) ?? []) }));
 }
 
-/** Folds or inks a thought on today's paper. Throws PaperError when it doesn't fit. */
-export async function changePaper(userId: string, op: PaperOp): Promise<DropPaper> {
-  const paper = await ensureTodayPaper(userId);
-  const before = await contentsOf(paper);
-  const after = applyPaperOp(before, op);
-  await saveChanges(paper.id, before, after);
-  return after;
+/** Renames a paper; a blank name clears it. False if it isn't theirs. */
+export async function renamePaper(userId: string, paperId: string, name: string | null): Promise<boolean> {
+  const rows = await db
+    .update(dropPapers)
+    .set({ name: cleanName(name), updatedAt: sql`now()` })
+    .where(and(eq(dropPapers.id, paperId), eq(dropPapers.userId, userId), isNull(dropPapers.deletedAt)))
+    .returning({ id: dropPapers.id });
+  return rows.length > 0;
 }
 
-export async function addThought(userId: string, input: { id: string; text: string; shape: number; kind: Kind; image?: string | null; x?: number | null; y?: number | null }): Promise<Thought> {
-  const paper = await ensureTodayPaper(userId);
+/** Puts a paper away (or brings it back). */
+export async function archivePaper(userId: string, paperId: string, archived: boolean): Promise<boolean> {
+  const rows = await db
+    .update(dropPapers)
+    .set({ archivedAt: archived ? sql`now()` : null })
+    .where(and(eq(dropPapers.id, paperId), eq(dropPapers.userId, userId), isNull(dropPapers.deletedAt)))
+    .returning({ id: dropPapers.id });
+  return rows.length > 0;
+}
+
+/** Deletes a paper: hidden at once, kept a week so it can be undone, then swept up. */
+export async function deletePaper(userId: string, paperId: string): Promise<boolean> {
+  const rows = await db
+    .update(dropPapers)
+    .set({ deletedAt: sql`now()` })
+    .where(and(eq(dropPapers.id, paperId), eq(dropPapers.userId, userId), isNull(dropPapers.deletedAt)))
+    .returning({ id: dropPapers.id });
+  return rows.length > 0;
+}
+
+/** Takes a deleted paper back (an undo). */
+export async function restorePaper(userId: string, paperId: string): Promise<boolean> {
+  const rows = await db
+    .update(dropPapers)
+    .set({ deletedAt: null, updatedAt: sql`now()` })
+    .where(and(eq(dropPapers.id, paperId), eq(dropPapers.userId, userId), isNotNull(dropPapers.deletedAt)))
+    .returning({ id: dropPapers.id });
+  return rows.length > 0;
+}
+
+/* ---------- Thoughts ---------- */
+
+/** Thrown when the paper isn't theirs (or is gone). */
+export class PaperNotFound extends Error {}
+
+export async function addThought(
+  userId: string,
+  paperId: string,
+  input: { id: string; text: string; shape: number; image?: string | null; x?: number | null; y?: number | null },
+): Promise<Thought> {
+  if (!(await ownedPaper(userId, paperId))) throw new PaperNotFound();
   const [row] = await db
     .insert(dropThoughts)
-    .values({ id: input.id, paperId: paper.id, userId, text: input.text, shape: input.shape, kind: input.kind, image: input.image ?? null, x: input.x ?? null, y: input.y ?? null })
+    .values({ id: input.id, paperId, userId, text: input.text, shape: input.shape, image: input.image ?? null, x: input.x ?? null, y: input.y ?? null })
     .onConflictDoNothing()
     .returning();
-  if (row) return toThought(row);
+  if (row) {
+    await touch(paperId);
+    return toThought(row);
+  }
   // Same id sent twice (a retry): return what's there, if it's theirs.
   const [again] = await db.select().from(dropThoughts).where(and(eq(dropThoughts.id, input.id), eq(dropThoughts.userId, userId)));
   if (!again) throw new Error("conflict");
   return toThought(again);
 }
 
-/** Only today's thoughts can change; past papers are read-only. Only pen can be struck. Returns null if not found. */
-export async function updateThought(userId: string, id: string, patch: { text?: string; status?: "open" | "done" }): Promise<Thought | null> {
-  const today = await ensureTodayPaper(userId);
+/** Edits or strikes a thought on this paper. Returns null if it isn't there. */
+export async function updateThought(userId: string, paperId: string, id: string, patch: { text?: string; status?: "open" | "done" }): Promise<Thought | null> {
   const [row] = await db
     .update(dropThoughts)
     .set({
       ...(patch.text !== undefined ? { text: patch.text } : {}),
       ...(patch.status ? { status: patch.status, doneAt: patch.status === "done" ? sql`now()` : null } : {}),
     })
-    .where(
-      and(
-        eq(dropThoughts.id, id),
-        eq(dropThoughts.userId, userId),
-        eq(dropThoughts.paperId, today.id),
-        isNull(dropThoughts.crumpledAt),
-        ...(patch.status === "done" ? [eq(dropThoughts.kind, "pen")] : []),
-      ),
-    )
+    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt)))
     .returning();
-  return row ? toThought(row) : null;
+  if (!row) return null;
+  await touch(paperId);
+  return toThought(row);
 }
 
-/** Crumples a thought on today's paper (kept a week, then swept up). */
-export async function crumpleThought(userId: string, id: string): Promise<boolean> {
-  const today = await ensureTodayPaper(userId);
+/** Crumples a thought on this paper (kept a week, then swept up). */
+export async function crumpleThought(userId: string, paperId: string, id: string): Promise<boolean> {
   const rows = await db
     .update(dropThoughts)
     .set({ crumpledAt: sql`now()` })
-    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id), isNull(dropThoughts.crumpledAt)))
+    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt)))
     .returning({ id: dropThoughts.id });
+  if (rows.length) await touch(paperId);
   return rows.length > 0;
 }
 
 /**
- * Moves thoughts on today's paper; a null spot sends one back into
- * the flow. Ids that aren't on today's paper are skipped. Returns how many moved.
+ * Moves thoughts on this paper; a null spot sends one back into the flow.
+ * Ids that aren't on this paper are skipped. Returns how many moved.
  */
-export async function arrangeThoughts(userId: string, placements: { id: string; x: number | null; y: number | null }[]): Promise<number> {
-  const today = await ensureTodayPaper(userId);
+export async function arrangeThoughts(userId: string, paperId: string, placements: { id: string; x: number | null; y: number | null }[]): Promise<number> {
   if (!placements.length) return 0;
   const ids = placements.map((p) => p.id);
   const at = (col: "x" | "y") => sql.join(placements.map((p) => sql`when ${p.id} then ${p[col]}::real`), sql` `);
   const rows = await db
     .update(dropThoughts)
     .set({ x: sql`case ${dropThoughts.id} ${at("x")} end`, y: sql`case ${dropThoughts.id} ${at("y")} end` })
-    .where(and(inArray(dropThoughts.id, ids), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)))
+    .where(and(inArray(dropThoughts.id, ids), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId)))
     .returning({ id: dropThoughts.id });
+  if (rows.length) await touch(paperId);
   return rows.length;
 }
 
-/** Sends every thought on today's paper back into the flow. */
-export async function tidyToday(userId: string): Promise<void> {
-  const today = await ensureTodayPaper(userId);
+/** Sends every thought on this paper back into the flow. */
+export async function tidyPaper(userId: string, paperId: string): Promise<void> {
   await db
     .update(dropThoughts)
     .set({ x: null, y: null })
-    .where(and(eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)));
+    .where(and(eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId)));
+  await touch(paperId);
 }
 
-/** Stamps today's desk as cleared (the evening ritual). */
-export async function clearDesk(userId: string): Promise<string> {
-  const today = await ensureTodayPaper(userId);
-  const [row] = await db.update(dropPapers).set({ clearedAt: sql`now()` }).where(eq(dropPapers.id, today.id)).returning({ clearedAt: dropPapers.clearedAt });
-  return row.clearedAt!;
+/* ---------- Search ---------- */
+
+/** Thoughts across all their papers whose words contain the term (any case), newest first. */
+export async function searchThoughts(userId: string, term: string): Promise<SearchHit[]> {
+  const rows = await db
+    .select({
+      thoughtId: dropThoughts.id,
+      text: dropThoughts.text,
+      paperId: dropPapers.id,
+      paperName: dropPapers.name,
+      paperCreatedAt: dropPapers.createdAt,
+    })
+    .from(dropThoughts)
+    .innerJoin(dropPapers, eq(dropPapers.id, dropThoughts.paperId))
+    .where(and(eq(dropThoughts.userId, userId), isNull(dropThoughts.crumpledAt), isNull(dropPapers.deletedAt), ilike(dropThoughts.text, `%${escapeLike(term)}%`)))
+    .orderBy(desc(dropThoughts.createdAt))
+    .limit(SEARCH_LIMIT);
+  return rows.map((r) => ({ ...r, paperCreatedAt: iso(r.paperCreatedAt) }));
 }
 
 /* ---------- Appearance ---------- */
@@ -310,56 +306,49 @@ export async function saveAppearance(userId: string, patch: { canvas?: string; t
   }
 }
 
-/* ---------- History ---------- */
+/* ---------- The evening email ---------- */
 
-export type PaperSummary = { date: string; total: number; done: number; cleared: boolean };
-
-/** Past papers, newest first, with how many thoughts and how many struck, and whether the desk was cleared. */
-export async function listHistory(userId: string): Promise<PaperSummary[]> {
-  const today = dropToday();
+/** Everyone who dropped something on `date` (a YYYY-MM-DD day in the Drop time zone), with those thoughts grouped by paper. */
+export async function digestsFor(date: string): Promise<{ email: string; name: string; groups: DigestGroup[]; latestPaperId: string | null }[]> {
+  const zone = dropZone();
   const rows = await db
     .select({
-      date: dropPapers.date,
-      cleared: sql<boolean>`${dropPapers.clearedAt} is not null`,
-      total: sql<number>`count(${dropThoughts.id})::int`,
-      done: sql<number>`count(${dropThoughts.id}) filter (where ${dropThoughts.status} = 'done')::int`,
+      userId: dropThoughts.userId,
+      email: users.email,
+      userName: users.name,
+      paperId: dropPapers.id,
+      paperName: dropPapers.name,
+      paperCreatedAt: dropPapers.createdAt,
+      id: dropThoughts.id,
+      text: dropThoughts.text,
+      status: dropThoughts.status,
+      hasImage: sql<boolean>`${dropThoughts.image} is not null`,
     })
-    .from(dropPapers)
-    .leftJoin(dropThoughts, and(eq(dropThoughts.paperId, dropPapers.id), isNull(dropThoughts.crumpledAt)))
-    .where(and(eq(dropPapers.userId, userId), lt(dropPapers.date, today)))
-    .groupBy(dropPapers.date, dropPapers.clearedAt)
-    .orderBy(desc(dropPapers.date))
-    .limit(365);
-  return rows.filter((r) => r.total > 0);
-}
+    .from(dropThoughts)
+    .innerJoin(dropPapers, eq(dropPapers.id, dropThoughts.paperId))
+    .innerJoin(users, eq(users.id, dropThoughts.userId))
+    .where(and(isNull(dropThoughts.crumpledAt), isNull(dropPapers.deletedAt), sql`(${dropThoughts.createdAt} at time zone ${zone})::date = ${date}::date`))
+    .orderBy(asc(dropThoughts.createdAt), asc(dropThoughts.id));
 
-export async function getPaper(userId: string, date: string): Promise<DropPaper | null> {
-  const [paper] = await db
-    .select(paperCols)
-    .from(dropPapers)
-    .where(and(eq(dropPapers.userId, userId), eq(dropPapers.date, date)));
-  if (!paper) return null;
-  return contentsOf(paper);
-}
-
-/** Everyone whose paper today has at least one thought dropped today. */
-export async function digestsFor(date: string): Promise<{ email: string; name: string; paper: DropPaper }[]> {
-  const papers = await db
-    .select({ id: dropPapers.id, date: dropPapers.date, clearedAt: dropPapers.clearedAt, email: users.email, name: users.name })
-    .from(dropPapers)
-    .innerJoin(users, eq(users.id, dropPapers.userId))
-    .where(eq(dropPapers.date, date));
-  const out = [];
-  for (const p of papers) {
-    const paper = await contentsOf(p);
-    if (paper.thoughts.some((t) => !t.carriedFrom)) out.push({ email: p.email, name: p.name, paper });
+  const people = new Map<string, { email: string; name: string; rows: DigestRow[] }>();
+  for (const r of rows) {
+    const who = people.get(r.userId) ?? { email: r.email, name: r.userName, rows: [] };
+    who.rows.push({
+      paperId: r.paperId,
+      paperName: r.paperName,
+      paperCreatedAt: iso(r.paperCreatedAt),
+      thought: { id: r.id, text: r.text, status: r.status, image: r.hasImage ? "yes" : null },
+    });
+    people.set(r.userId, who);
   }
-  return out;
+  return [...people.values()].map((who) => ({ email: who.email, name: who.name, ...groupDigest(who.rows, zone) }));
 }
 
-/** Sweeps up what was crumpled more than a week ago. */
-export async function sweepCrumpled(): Promise<{ thoughts: number }> {
+/** Sweeps up what was crumpled or deleted more than a week ago. */
+export async function sweepCrumpled(): Promise<{ thoughts: number; papers: number }> {
   const cutoff = sql`now() - make_interval(days => ${CRUMPLE_KEEP_DAYS})`;
   const thoughts = await db.delete(dropThoughts).where(lt(dropThoughts.crumpledAt, cutoff)).returning({ id: dropThoughts.id });
-  return { thoughts: thoughts.length };
+  // A paper's thoughts go with it.
+  const papers = await db.delete(dropPapers).where(lt(dropPapers.deletedAt, cutoff)).returning({ id: dropPapers.id });
+  return { thoughts: thoughts.length, papers: papers.length };
 }

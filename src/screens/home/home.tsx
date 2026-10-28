@@ -4,7 +4,7 @@ import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { PenIcon } from "@/components/icons";
 import { btn } from "@/components/btn";
 import { Logo, ThemeToggle } from "@/components/ui";
-import { CarryDemo, ClearDeskDemo, CrumpleDemo, DropDemo, EmailDemo, FoldDemo, PencilDemo, StrikeDemo } from "./demos";
+import { CrumpleDemo, DropDemo, EmailDemo, StrikeDemo } from "./demos";
 import { TryIt } from "./try-it";
 
 /**
@@ -13,20 +13,9 @@ import { TryIt } from "./try-it";
  */
 const FEATURES: { key: string; tag: string; title: string; line: string; demo: ReactNode; shipped: boolean }[] = [
   { key: "drop", tag: "drop", title: "Drop", line: "Type, Enter, gone from your head.", demo: <DropDemo />, shipped: true },
-  { key: "pencil", tag: "pencil or pen", title: "Pencil or pen", line: "Ideas in pencil, tasks in ink.", demo: <PencilDemo />, shipped: true },
   { key: "strike", tag: "strike", title: "Strike", line: "Cross it out like you mean it.", demo: <StrikeDemo />, shipped: true },
-  { key: "fold", tag: "fold", title: "Fold till later", line: "Not today? Fold it for Friday.", demo: <FoldDemo />, shipped: true },
   { key: "crumple", tag: "crumple", title: "Crumple", line: "Let go, literally.", demo: <CrumpleDemo />, shipped: true },
-  { key: "carry", tag: "carry over", title: "Carry over", line: "Tomorrow starts with what's left.", demo: <CarryDemo />, shipped: true },
-  { key: "clear", tag: "clear desk", title: "Clear desk", line: "30 seconds at night. Lighter head.", demo: <ClearDeskDemo />, shipped: true },
-  { key: "email", tag: "9 pm", title: "Your day, in your inbox", line: "A short email at 9 PM: what's open, what's done, what's coming.", demo: <EmailDemo />, shipped: true },
-];
-
-const DAY = [
-  { time: "9:00", title: "Morning", line: "Yesterday's leftovers are already waiting on a fresh sheet." },
-  { time: "all day", title: "Day", line: "Drop as things come up. Fold a few for Friday." },
-  { time: "21:00", title: "9 PM", line: "A short email: the day on one page." },
-  { time: "21:05", title: "Night", line: "Clear the desk: tomorrow, keep, or crumple. Stamped." },
+  { key: "email", tag: "9 pm", title: "Your day, in your inbox", line: "A short email at 9 PM with everything you dropped today.", demo: <EmailDemo />, shipped: true },
 ];
 
 /** Small hand-drawn doodles for the margins, in the note tints, very quiet. */
@@ -70,9 +59,6 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
             <Logo size="sm" />
           </Link>
           <span className="mx-auto hidden items-center gap-6 text-[15px] text-mute md:flex">
-            <a href="#how" className="hover:text-ink">
-              How it works
-            </a>
             <a href="#features" className="hover:text-ink">
               Features
             </a>
@@ -102,7 +88,7 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
               <br />
               <span className="highlight font-hand text-[58px] font-bold tracking-normal sm:text-[92px]">onto paper.</span>
             </h1>
-            <p className="max-w-[520px] text-[19px] leading-normal text-mute">Drop every thought in two seconds. Group it, fold it for later, and clear your desk every night.</p>
+            <p className="max-w-[520px] text-[19px] leading-normal text-mute">Drop every thought in two seconds and put it anywhere on the page.</p>
             <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-5">
               <Link href="/signup" className={`${btn.primary} h-[56px] px-7 text-[17px]`}>
                 Start writing, it&apos;s free
@@ -147,25 +133,6 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
               </li>
             ))}
           </ol>
-        </section>
-
-        {/* A day */}
-        <section id="how" className="mx-auto flex w-full max-w-[1120px] scroll-mt-20 flex-col gap-10 px-4 pb-24 sm:px-8">
-          <SectionTitle eyebrow="how it works">A day with pen &amp; paper</SectionTitle>
-          <div className="relative">
-            <svg aria-hidden="true" className="absolute top-1/2 right-6 left-6 hidden h-6 -translate-y-1/2 text-line md:block" preserveAspectRatio="none" viewBox="0 0 1000 24" fill="none">
-              <path d="M2 12C120 4 240 20 360 11s240-9 360 2 200 6 276-2" stroke="currentColor" strokeWidth="2" strokeDasharray="8 10" strokeLinecap="round" />
-            </svg>
-            <ol className="relative grid gap-4 md:grid-cols-4">
-              {DAY.map((d, i) => (
-                <li key={d.title} style={{ rotate: `${[-1, 1, -0.5, 0.8][i]}deg` }} className="flex flex-col gap-2 rounded-2xl border border-line bg-sheet p-5 shadow-[0_12px_30px_-24px_var(--shadow)]">
-                  <span className="font-hand text-[26px] leading-none font-bold text-red-text">{d.time}</span>
-                  <span className="text-[17px] font-semibold">{d.title}</span>
-                  <span className="text-[15px] text-mute">{d.line}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
         </section>
 
         {/* Everywhere */}

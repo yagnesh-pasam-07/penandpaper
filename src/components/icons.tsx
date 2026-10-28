@@ -66,6 +66,23 @@ export function PlusIcon({ size = 16 }: IconProps) {
   );
 }
 
+export function SearchIcon({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" strokeWidth={1.8} {...stroke}>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
+    </svg>
+  );
+}
+
+export function CaretIcon({ size = 12 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" strokeWidth={1.8} {...stroke}>
+      <path d="M3 4.5l3 3 3-3" />
+    </svg>
+  );
+}
+
 export function CloseIcon({ size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" strokeWidth={1.8} {...stroke}>

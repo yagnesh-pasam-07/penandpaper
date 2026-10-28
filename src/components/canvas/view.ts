@@ -33,6 +33,9 @@ export function wheelFactor(deltaY: number): number {
   return Math.exp(-Math.max(-25, Math.min(25, deltaY)) * 0.01);
 }
 
+/** Where a paper's view is remembered on this device: each paper keeps its own zoom and pan. */
+export const viewKey = (paperId: string) => `pp-drop-view:${paperId}`;
+
 /** Reads a saved view, or home if it's missing or wrong. */
 export function parseView(raw: string | null): View {
   try {

@@ -61,29 +61,8 @@
     {
       "idx": 8,
       "version": "7",
-      "when": 1793202558067,
-      "tag": "0008_eminent_starjammers",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1793202776424,
-      "tag": "0009_sleepy_risque",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1793203099214,
-      "tag": "0010_slim_umar",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1793203422221,
-      "tag": "0011_even_vampiro",
+      "when": 1793205483276,
+      "tag": "0008_papers_you_make",
       "breakpoints": true
     }
   ]

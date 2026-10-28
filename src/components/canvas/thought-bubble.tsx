@@ -1,24 +1,18 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { CheckIcon, CloseIcon, PenIcon, PencilIcon, WhenIcon } from "@/components/icons";
+import { CheckIcon, CloseIcon } from "@/components/icons";
 import { firstLink, isOnlyYoutube, linkify, youtubeId } from "@/lib/linkify";
 import { bubbleStyle, rand } from "./bubble";
 
 type Props = {
   text: string;
   done: boolean;
-  /** Pen is a task; pencil is an idea (graphite, untinted, never struck). */
-  kind?: "pen" | "pencil";
   shape: number;
   /** Makes the hand-drawn outline and the handwriting's wobble; keep it stable for the same thought. */
   seed?: string;
   /** When it was dropped; on the sheet it shows on hover, in the phone stream under the text. */
   meta?: ReactNode;
-  /** The day it was first dropped, when it rolled over: shown as a small mark. */
-  carried?: string;
-  /** Scheduled for (today or a day it was folded till): a small chip. */
-  when?: string;
   /** Just dropped: the ink writes on, then the note settles. */
   fresh?: boolean;
   /** Full-width card for the phone stream instead of a floating bubble. */
@@ -28,23 +22,12 @@ type Props = {
   movable?: boolean;
   /** Something dragged over it would land here: a soft red outline and a slight lift. */
   target?: boolean;
-  /** Plays on its way out: scrunched into a ball, or folded away. */
-  leaving?: "crumple" | "fold" | null;
+  /** Plays on its way out: scrunched into a ball. */
+  leaving?: "crumple" | null;
   /** Plays on its way back (undo). */
   returning?: boolean;
   /** A pasted or dropped picture: the note becomes a taped photo, the text its caption. */
   image?: string | null;
-  /** Earlier days these words were written afresh: earlier copies show through underneath, like pressing hard on a pad. */
-  echoes?: string[];
-  /**
-   * How much a pencil thought matters: 0 barely (small, light), 1 an ordinary
-   * thought, 2 and 3 written again (bigger, pressed harder, darker).
-   */
-  weight?: number;
-  /** "When": the W key or the calendar button. */
-  onWhen?: () => void;
-  /** Ink a pencil idea into a task, or pencil a task into an idea. */
-  onInk?: () => void;
   onEdit?: (text: string) => void;
   onToggle?: () => void;
   /** Crumple it (with undo, by whoever owns it). */
@@ -166,18 +149,15 @@ const toolButton = "flex size-8 items-center justify-center rounded-full border 
 
 /**
  * One thought on paper. Click to edit, double-click (or swipe right on a phone)
- * to strike it out, ✕ (Delete key, or swipe left) to crumple it. Pencil ideas
- * can't be struck: ink them first.
+ * to strike it out (again to take the line off), ✕ (Delete key, or swipe left)
+ * to crumple it.
  */
 export function ThoughtBubble({
   text,
   done,
-  kind = "pen",
   shape,
   seed,
   meta,
-  carried,
-  when,
   fresh,
   stream,
   readOnly,
@@ -186,10 +166,6 @@ export function ThoughtBubble({
   leaving,
   returning,
   image,
-  echoes,
-  weight = 1,
-  onWhen,
-  onInk,
   onEdit,
   onToggle,
   onDelete,
@@ -202,8 +178,7 @@ export function ThoughtBubble({
   const swipe = useRef<{ x: number; y: number; swiped: boolean } | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const fieldId = useId();
-  const pencil = kind === "pencil";
-  const strike = pencil ? undefined : onToggle;
+  const strike = onToggle;
 
   useEffect(() => {
     if (!editing) return;
@@ -276,7 +251,7 @@ export function ThoughtBubble({
     setDx(0);
   };
 
-  const drawn = bubbleStyle(shape, false, seed, pencil ? "pencil" : "pen");
+  const drawn = bubbleStyle(shape, false, seed);
   // A picture is taped on like a photo: white, square-ish corners.
   const look: CSSProperties = image
     ? { ...drawn, background: "var(--sheet)", borderRadius: 6, boxShadow: "0 1px 0 var(--line), 0 16px 30px -20px var(--shadow), inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent)" }
@@ -288,10 +263,7 @@ export function ThoughtBubble({
     ...(target ? { outline: "2px solid color-mix(in srgb, var(--red-text) 55%, transparent)", outlineOffset: 3 } : {}),
   };
   const shapeStyle = stream ? { ...settled, transform: `translateX(${dx}px)` } : settled;
-  const pressed = Math.min(2, echoes?.length ?? 0);
-  // Pencil with no box: its value shows in the hand itself (size, pressure, darkness).
-  const heftStyle: CSSProperties | undefined = pencil && !image ? PENCIL_WEIGHT[Math.max(0, Math.min(3, Math.round(weight)))] : undefined;
-  const motion = leaving === "crumple" ? "crumple-away" : leaving === "fold" ? "fold-away" : returning ? "uncrumple" : fresh ? "drop-in" : "";
+  const motion = leaving === "crumple" ? "crumple-away" : returning ? "uncrumple" : fresh ? "drop-in" : "";
 
   if (editing) {
     return (
@@ -330,20 +302,7 @@ export function ThoughtBubble({
             >
               {done ? "Unstrike" : "Strike out"}
             </button>
-          ) : (
-            onInk && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditing(false);
-                  onInk();
-                }}
-                className="h-9 rounded-[10px] border border-ink/20 px-3 text-sm font-medium"
-              >
-                Ink it
-              </button>
-            )
-          )}
+          ) : null}
           <span className="flex-1" />
           <button
             type="button"
@@ -360,10 +319,9 @@ export function ThoughtBubble({
     );
   }
 
-  const label = `${image ? "Picture: " : pencil ? "Idea: " : ""}${text}${done ? ", done" : ""}${when ? `, ${when}` : ""}`;
+  const label = `${image ? "Picture: " : ""}${text}${done ? ", struck out" : ""}`;
   const keys = [
     onEdit && "Enter to edit",
-    onWhen && "W for when",
     onDelete && "Delete to crumple",
   ]
     .filter(Boolean)
@@ -371,31 +329,6 @@ export function ThoughtBubble({
 
   return (
     <div className={`group relative ${stream ? "w-full" : "max-w-[300px]"} ${motion}`}>
-      {/* Written again and again: earlier copies show through underneath, like pressing hard on a pad. */}
-      {!stream &&
-        !pencil &&
-        Array.from({ length: pressed }, (_, i) => (
-          <span
-            key={i}
-            aria-hidden="true"
-            style={{ ...look, transform: `translate(${(i + 1) * 8}px, ${-(i + 1) * 8}px) rotate(${-(i + 1) * 1.5}deg)`, opacity: 0.24 - i * 0.1 }}
-            className="pointer-events-none absolute inset-0"
-          />
-        ))}
-      {/* Pencil has no box to echo: the earlier writing shows through as faint handwriting instead. */}
-      {!stream &&
-        pencil &&
-        !image &&
-        Array.from({ length: pressed }, (_, i) => (
-          <span
-            key={i}
-            aria-hidden="true"
-            style={{ ...heftStyle, transform: `translate(${(i + 1) * 5}px, ${-(i + 1) * 5}px) rotate(${-(i + 1) * 1.5}deg)`, opacity: 0.18 - i * 0.07 }}
-            className="hand pointer-events-none absolute inset-0 px-2 py-1.5 font-note text-[19px] leading-snug whitespace-pre-wrap sm:text-[20px]"
-          >
-            {text}
-          </span>
-        ))}
       {!readOnly && stream && dx !== 0 && (
         <span aria-hidden="true" className={`absolute inset-y-0 flex items-center font-hand text-xl text-red-text ${dx > 0 ? "left-0 pl-3" : "right-0 pr-3"}`}>
           {dx > 0 ? (done ? "unstrike" : "strike") : "crumple"}
@@ -405,14 +338,14 @@ export function ThoughtBubble({
         style={shapeStyle}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
-        // Selectable from the keyboard: Enter edits, W schedules, Delete crumples.
+        // Selectable from the keyboard: Enter edits, Delete crumples.
         tabIndex={readOnly ? undefined : 0}
         data-keys={readOnly ? undefined : ""}
         aria-label={readOnly ? undefined : `${label}. ${keys}.`}
         onKeyDown={(e) => {
           if (readOnly || e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
           const k = e.key.toLowerCase();
-          const act = k === "enter" ? startEdit : k === "w" ? onWhen : k === "delete" || k === "backspace" ? onDelete : undefined;
+          const act = k === "enter" ? startEdit : k === "delete" || k === "backspace" ? onDelete : undefined;
           if (!act) return;
           e.preventDefault();
           act();
@@ -421,7 +354,7 @@ export function ThoughtBubble({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`paper-note relative flex flex-col items-start gap-1.5 text-left ${image ? `px-3 pt-3 pb-2.5 ${stream ? "" : "w-[300px]"}` : pencil && !stream ? "px-2 py-1.5" : "px-6 py-5"} transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${pencil ? "is-pencil" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
+        className={`paper-note relative flex flex-col items-start gap-1.5 text-left ${image ? `px-3 pt-3 pb-2.5 ${stream ? "" : "w-[300px]"}` : "px-6 py-5"} transition-[background-color,transform] duration-300 ${done ? "is-done" : ""} ${readOnly ? "" : movable ? "cursor-grab select-none active:cursor-grabbing" : "cursor-text touch-pan-y select-none"}`}
       >
         {image && (
           <>
@@ -445,7 +378,7 @@ export function ThoughtBubble({
             style={fresh ? ({ "--write": writeOn(text) } as CSSProperties) : undefined}
             className={`hand font-note leading-snug break-words whitespace-pre-wrap ${image ? "px-1 text-[19px]" : "text-[19px] sm:text-[20px]"} ${fresh ? "write-on" : ""}`}
           >
-            <span className="pen-strike" style={heftStyle}>
+            <span className="pen-strike">
               <HandText text={text} seed={seed} />
             </span>
           </span>
@@ -453,28 +386,11 @@ export function ThoughtBubble({
           image && !readOnly && <span className="px-1 font-note text-[18px] text-mute">add a caption…</span>
         )}
         {!image && <LinkPreview text={text} />}
-        {(stream && meta) || when ? (
-          <span className="flex flex-wrap items-center gap-1.5">
-            {when && (
-              <span className="inline-flex h-5 items-center gap-1 rounded-full border border-line bg-sheet/70 px-1.5 text-[11px] font-medium text-mute">
-                <WhenIcon size={10} />
-                {when}
-              </span>
-            )}
-            {stream && meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
-          </span>
-        ) : null}
-        {carried && !pencil && (
-          <span title={`Carried from ${carried}`} aria-label={`Carried from ${carried}`} className="absolute top-2 left-2.5 text-[11px] leading-none text-mute">
-            ↻
-          </span>
-        )}
+        {stream && meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
       </div>
       {!stream && meta && (
         <span className="pointer-events-none absolute top-full left-1/2 mt-1.5 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap text-mute opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
           {meta}
-          {carried && !pencil ? ` · from ${carried}` : ""}
-          {echoes?.length ? ` · ${ordinal(echoes.length + 1)} time (${[...echoes.slice(-3).map(weekdayShort), "today"].join(", ")})` : ""}
         </span>
       )}
       {!readOnly && (
@@ -482,23 +398,6 @@ export function ThoughtBubble({
           {strike && (
             <button type="button" onClick={strike} aria-label={done ? `Unstrike "${text}"` : `Strike out "${text}"`} className={`${toolButton} ${done ? "bg-red! text-on-red" : "text-ink"}`}>
               <CheckIcon size={12} />
-            </button>
-          )}
-          {onInk && (
-            <button
-              type="button"
-              onClick={onInk}
-              onDoubleClick={(e) => e.stopPropagation()}
-              aria-label={pencil ? `Ink "${text}" into a task` : `Pencil "${text}" into an idea`}
-              title={pencil ? "Ink it (make it a task)" : "Pencil it (keep as an idea)"}
-              className={`${toolButton} ${pencil ? "text-red-text" : "text-mute"}`}
-            >
-              {pencil ? <PenIcon size={15} /> : <PencilIcon size={14} />}
-            </button>
-          )}
-          {onWhen && (
-            <button type="button" onClick={onWhen} aria-label={`When is "${text}" for?`} title="When (W)" className={`${toolButton} text-mute`}>
-              <WhenIcon size={13} />
             </button>
           )}
           <button type="button" onClick={startEdit} aria-label={`Edit "${text}"`} className={`${toolButton} text-[13px] font-semibold`}>
@@ -529,14 +428,3 @@ export function ThoughtBubble({
     </div>
   );
 }
-
-const weekdayShort = (date: string) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(`${date}T12:00:00Z`).getUTCDay()];
-const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
-
-/** Pencil written lightly to hard: a passing thought, an ordinary one, one that keeps coming back, one that matters. */
-const PENCIL_WEIGHT: CSSProperties[] = [
-  { fontSize: "0.95em", fontWeight: 400 },
-  { fontSize: "1.2em", fontWeight: 500 },
-  { fontSize: "1.45em", fontWeight: 600, color: "color-mix(in srgb, var(--graphite) 40%, var(--ink))" },
-  { fontSize: "1.8em", fontWeight: 700, color: "var(--ink)", textShadow: "0 0 0.8px var(--ink)" },
-];

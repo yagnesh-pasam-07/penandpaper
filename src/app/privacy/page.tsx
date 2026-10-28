@@ -41,7 +41,7 @@ export default function PrivacyPage() {
           their email addresses. Nobody outside a project can see it.
         </p>
         <h2>Email</h2>
-        <p>We email you only for sign-in links, invites from your lead, and your daily paper. No marketing.</p>
+        <p>We email you only for sign-in links, invites from your lead, and an end-of-day summary of what you dropped. No marketing.</p>
         <h2>Where it lives</h2>
         <p>Data is stored in Postgres on Neon and the app runs on Vercel. Emails are sent through Resend. Sign-in uses a secure cookie.</p>
         <Suspense>

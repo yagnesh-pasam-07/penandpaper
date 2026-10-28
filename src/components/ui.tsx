@@ -109,17 +109,11 @@ export function AccountMenu({ name, email, tint, onSignOut }: { name: string; em
         <Link href="/drop" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
           My paper
         </Link>
-        <Link href="/drop/history" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
-          Past papers
+        <Link href="/drop/library" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+          Library
         </Link>
         <Link href="/settings" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
           Settings
-        </Link>
-        <Link href="/projects" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
-          Team projects
-        </Link>
-        <Link href="/me" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
-          Team papers
         </Link>
         <button type="button" onClick={onSignOut} className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-text hover:bg-red-soft">
           Sign out

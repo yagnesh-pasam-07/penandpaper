@@ -1,14 +1,15 @@
 import { z } from "zod";
 import { MAX_IMAGE, MAX_THOUGHT } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
-import { addThought } from "@/modules/drop/server";
+import { addThought, PaperNotFound } from "@/modules/drop/server";
 
 const body = z
   .object({
+    /** The paper it goes on. */
+    paperId: z.uuid(),
     id: z.string().regex(/^[a-z0-9-]{6,40}$/),
     text: z.string().trim().max(MAX_THOUGHT),
     shape: z.number().int().min(0).max(5),
-    kind: z.enum(["pen", "pencil"]).default("pen"),
     /** A picture, already shrunk in the browser. */
     image: z
       .string()
@@ -28,9 +29,11 @@ export async function POST(request: Request) {
   if (user instanceof Response) return user;
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That thought didn't come through. Try again." }, { status: 400 });
+  const { paperId, ...input } = parsed.data;
   try {
-    return Response.json(await addThought(user.id, parsed.data), noStore);
-  } catch {
+    return Response.json(await addThought(user.id, paperId, input), noStore);
+  } catch (e) {
+    if (e instanceof PaperNotFound) return Response.json({ error: "That paper isn't there any more." }, { status: 404 });
     return Response.json({ error: "Couldn't save that thought." }, { status: 409 });
   }
 }

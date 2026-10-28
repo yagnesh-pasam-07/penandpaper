@@ -306,6 +306,17 @@ body {
 }
 .ink-in .paper-note { animation: ink-in 600ms ease-out; }
 
+/* A note found by search: a soft ring that breathes out twice. */
+@keyframes note-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--red) 55%, transparent); }
+  70% { box-shadow: 0 0 0 18px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.note-pulse { border-radius: 24px; animation: note-pulse 900ms ease-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .note-pulse { animation: none; outline: 2px solid var(--red); outline-offset: 6px; }
+}
+
 /* A rubber stamp coming down. */
 @keyframes stamp-in {
   0% { transform: scale(2.2) rotate(-14deg); opacity: 0; }

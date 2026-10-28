@@ -39,20 +39,11 @@ export function handRadius(seed: string): string {
 }
 
 /**
- * A note's look. Pen notes are cut paper: a tint, a hand-drawn edge, the
- * paper's grain and a faint lit top edge. Pencil ideas have no box at all:
- * just handwriting on the sheet, since only what's committed becomes a card.
+ * A note's look: cut paper with a tint, a hand-drawn edge, the paper's grain
+ * and a faint lit top edge.
  */
-export function bubbleStyle(shape: number, lifted = false, seed = String(shape), kind: "pen" | "pencil" = "pen"): CSSProperties {
+export function bubbleStyle(shape: number, lifted = false, seed = String(shape)): CSSProperties {
   const s = BUBBLE_SHAPES[Math.abs(shape) % BUBBLE_SHAPES.length];
-  if (kind === "pencil") {
-    return {
-      borderRadius: handRadius(seed),
-      backgroundColor: "transparent",
-      boxShadow: lifted ? "0 24px 40px -18px var(--shadow)" : "none",
-      transform: lifted ? "rotate(-7deg)" : `rotate(${s.rotate * 0.6}deg)`,
-    };
-  }
   // A faint ink edge, like the outline of a sketched note (lighter than the fill in the dark theme).
   const edge = "inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent), inset 0 1px 0 color-mix(in srgb, white 35%, transparent)";
   return {

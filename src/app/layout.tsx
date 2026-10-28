@@ -40,7 +40,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Pen & Paper",
-  description: "Plan the day, on paper. Drop thoughts, give them a time, hand them to your team.",
+  description: "Drop every thought onto paper.",
 };
 
 export const viewport: Viewport = {

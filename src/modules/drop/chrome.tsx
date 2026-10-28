@@ -34,13 +34,13 @@ export function meta(t: Pick<Thought, "createdAt">, tz: string): string {
   return clock(new Date(t.createdAt), tz);
 }
 
-/** One slim row: logo, the day (when there is one), then History, theme and the account. */
+/** One slim row: logo, the paper (when there is one), then the right-hand tools, theme and the account. */
 export function DropHeader({ me, title, right }: { me: Me; title?: ReactNode; right?: ReactNode }) {
   const router = useRouter();
   const signOut = useStore((s) => s.signOut);
   return (
     <header className="mx-auto flex w-full max-w-[1120px] items-center gap-3 px-4 pt-4 pb-1 sm:px-8">
-      <Link href="/drop" aria-label="Today's paper" className="shrink-0">
+      <Link href="/drop" aria-label="Latest paper" className="shrink-0">
         <span className="max-sm:hidden">
           <Logo size="sm" />
         </span>
@@ -84,20 +84,4 @@ export async function call<T>(url: string, init?: RequestInit): Promise<T> {
     throw new Error(body.error ?? "Couldn't reach your paper. Check your connection.");
   }
   return (res.status === 204 ? null : res.json()) as Promise<T>;
-}
-
-/** A red rubber stamp, slightly askew: "DESK CLEARED" and the date. */
-export function DeskStamp({ date, small = false, animate = false }: { date: string; small?: boolean; animate?: boolean }) {
-  return (
-    <span
-      role="img"
-      aria-label={`Desk cleared, ${date}`}
-      className={`inline-flex flex-col items-center rounded-[10px] border-red-text font-bold tracking-[0.14em] text-red-text uppercase ${animate ? "stamp-in" : ""} ${
-        small ? "-rotate-6 border-2 px-1.5 py-0.5 text-[9px] leading-tight" : "-rotate-[8deg] border-[3px] px-5 py-2.5 text-[28px] leading-none"
-      }`}
-    >
-      <span>Desk cleared</span>
-      <span className={`font-mono font-medium tracking-normal normal-case ${small ? "text-[8px]" : "mt-1.5 text-[13px]"}`}>{date}</span>
-    </span>
-  );
 }

@@ -1,181 +1,150 @@
 import { describe, expect, it } from "vitest";
 import { CANVASES, CANVAS_IDS, DEFAULT_CANVAS, parseCanvas, parseThemeMode, resolveTheme } from "@/lib/canvases";
 import { digestItems } from "./digest";
+import { viewKey } from "@/components/canvas/view";
 import {
-  applyPaperOp,
-  counts,
-  deskCards,
-  deskSummary,
-  droppedToday,
-  foldedItems,
+  cleanName,
+  digestTitle,
+  escapeLike,
   firstLink,
   firstYoutube,
+  groupDigest,
   isOnlyYoutube,
   linkify,
-  rollover,
-  PaperError,
+  madeOn,
+  MAX_PAPER_NAME,
+  MAX_SEARCH,
+  paperTitle,
+  previewNotes,
+  searchTerm,
+  snippetAround,
+  splitMatch,
   thoughtLabel,
-  pencilFade,
-  thisWeekend,
-  visiblePaper,
-  whenLabel,
   youtubeId,
-  type DropPaper,
-  type Thought,
+  type DigestRow,
 } from "./logic";
 
-const t = (id: string, text: string, status: "open" | "done", carriedFrom: string | null = null, more: Partial<Thought> = {}): Thought => ({
-  id,
-  text,
-  status,
-  kind: "pen",
-  shape: 1,
-  createdAt: "2026-10-17T04:00:00.000Z",
-  doneAt: status === "done" ? "2026-10-17T09:00:00.000Z" : null,
-  carriedFrom,
-  x: null,
-  y: null,
-  scheduledFor: null,
-  ...more,
-});
-
-const paper = (thoughts: Thought[]): DropPaper => ({ date: "2026-10-17", thoughts });
-
-describe("rollover", () => {
-  const yesterday = paper([t("a", "call bank", "done"), t("b", "renew passport", "open"), t("c", "old idea", "open", "2026-10-15")]);
-  let n = 0;
-  const carried = rollover(yesterday, () => `new${++n}`).thoughts;
-
-  it("brings only unstruck thoughts", () => {
-    expect(carried.map((x) => x.text)).toEqual(["renew passport", "old idea"]);
-  });
-  it("marks them carried from the day they were first dropped", () => {
-    expect(carried.map((x) => x.carriedFrom)).toEqual(["2026-10-17", "2026-10-15"]);
-  });
-  it("gives them new ids and keeps the first drop time", () => {
-    expect(carried.every((x) => x.id.startsWith("new"))).toBe(true);
-    expect(carried[0].createdAt).toBe("2026-10-17T04:00:00.000Z");
-  });
-  it("doesn't count carried thoughts as dropped today", () => {
-    expect(droppedToday({ date: "2026-10-18", thoughts: carried })).toBe(0);
-  });
-});
-
-/** The next day's paper, as the server builds it: carried copies plus whatever moved across. */
-function nextPaper(prev: DropPaper, date: string, newId: () => string): DropPaper {
-  const r = rollover(prev, newId);
-  const moved = prev.thoughts.flatMap((t) => {
-    const m = r.move.thoughts.find((x) => x.id === t.id);
-    return m ? [{ ...t, carriedFrom: m.carriedFrom }] : [];
-  });
-  return { date, thoughts: [...r.thoughts, ...moved] };
-}
-
-describe("folding till later (scheduling)", () => {
-  const mon = "2026-10-19";
-  const tue = "2026-10-20";
-  const base = paper([t("a", "call bank", "open"), t("m", "milk", "open"), t("e", "eggs", "open"), t("x", "pay rent", "open")]);
-  const today = { ...base, date: mon };
-  let folded = applyPaperOp(today, { kind: "schedule", id: "a", on: tue });
-  folded = applyPaperOp(folded, { kind: "schedule", id: "m", on: tue });
-
-  it("folds thoughts away from today", () => {
-    const shown = visiblePaper(folded);
-    expect(shown.thoughts.map((x) => x.id)).toEqual(["e", "x"]);
-    expect(foldedItems(folded).map((f) => [f.label, f.on])).toEqual([
-      ["call bank", tue],
-      ["milk", tue],
-    ]);
-    expect(counts(folded).open).toBe(2);
-  });
-
-  it("brings them onto tomorrow's paper (same ids), marked scheduled", () => {
-    let n = 0;
-    const next = nextPaper(folded, tue, () => `n${++n}`);
-    const shown = visiblePaper(next);
-    expect(next.thoughts.find((x) => x.id === "a")).toMatchObject({ scheduledFor: tue });
-    // Their day has come, so they show.
-    expect(shown.thoughts.filter((x) => ["a", "m"].includes(x.id))).toHaveLength(2);
-    // The ones left open today carry over as usual.
-    expect(shown.thoughts.some((x) => x.text === "pay rent" && x.carriedFrom === mon)).toBe(true);
-  });
-
-  it("keeps folding forward until the day comes, then carries like any other", () => {
-    const later = applyPaperOp({ ...base, date: mon }, { kind: "schedule", id: "a", on: "2026-10-22" });
-    let n = 0;
-    const tuePaper = nextPaper(later, tue, () => `n${++n}`);
-    expect(visiblePaper(tuePaper).thoughts.some((x) => x.id === "a")).toBe(false);
-    const thu = nextPaper(nextPaper(tuePaper, "2026-10-21", () => `n${++n}`), "2026-10-22", () => `n${++n}`);
-    expect(visiblePaper(thu).thoughts.find((x) => x.id === "a")).toMatchObject({ scheduledFor: "2026-10-22" });
-    const fri = nextPaper(thu, "2026-10-23", () => `n${++n}`);
-    expect(fri.thoughts.find((x) => x.text === "call bank")).toMatchObject({ scheduledFor: null, carriedFrom: mon });
-  });
-
-  it("refuses a day in the past", () => {
-    expect(() => applyPaperOp(today, { kind: "schedule", id: "a", on: "2026-10-18" })).toThrow(PaperError);
-  });
-
-  it("reads days as people say them", () => {
-    expect(whenLabel(mon, mon)).toBe("Today");
-    expect(whenLabel(tue, mon)).toBe("Tomorrow");
-    expect(whenLabel("2026-10-24", mon)).toBe("Sat");
-    expect(whenLabel("2026-11-02", mon)).toBe("Mon, 2 Nov");
-    expect(thisWeekend(mon)).toBe("2026-10-24");
-    expect(thisWeekend("2026-10-24")).toBe("2026-10-24");
-  });
-});
-
-describe("pencil and pen", () => {
-  const p = paper([t("i", "weekend photo walk", "open", null, { kind: "pencil" }), t("a", "call bank", "open"), t("b", "renew passport", "done")]);
-
-  it("counts only pen as open, and ideas apart", () => {
-    expect(counts(p)).toEqual({ open: 1, ideas: 1, done: 1 });
-  });
-  it("inks an idea into a task, and pencils a task (struck or not) back into an idea", () => {
-    expect(applyPaperOp(p, { kind: "ink", thought: "i", to: "pen" }).thoughts[0].kind).toBe("pen");
-    expect(applyPaperOp(p, { kind: "ink", thought: "b", to: "pencil" }).thoughts[2]).toMatchObject({ kind: "pencil", status: "open", doneAt: null });
-  });
-  it("carries pencil ideas over quietly, still in pencil", () => {
-    const next = rollover(p, () => "n").thoughts;
-    expect(next.find((x) => x.text === "weekend photo walk")).toMatchObject({ kind: "pencil" });
-  });
-});
-
-describe("clear desk", () => {
-  const p = paper(
-    [
-      t("a", "call bank", "open"),
-      t("i", "idea", "open", null, { kind: "pencil" }),
-      t("d", "done one", "done"),
-      t("f", "later", "open", null, { scheduledFor: "2026-10-30" }),
-    ],
-  );
-  it("reviews open pen thoughts only (not ideas, done or folded)", () => {
-    expect(deskCards(p)).toEqual([{ id: "a", text: "call bank" }]);
-  });
-  it("sums up the decisions in plain words", () => {
-    expect(deskSummary(["tomorrow", "tomorrow", "keep", "crumple"])).toBe("2 to tomorrow · 1 kept as an idea · 1 crumpled");
-    expect(deskSummary([])).toBe("Nothing left on your desk.");
-  });
+const row = (paperId: string, text: string, status: "open" | "done" = "open", more: { name?: string | null; madeAt?: string } = {}): DigestRow => ({
+  paperId,
+  paperName: more.name ?? null,
+  paperCreatedAt: more.madeAt ?? "2026-10-17T04:00:00.000Z",
+  thought: { id: `${paperId}-${text}`, text, status, image: null },
 });
 
 describe("digest", () => {
-  it("lists open tasks first, then struck ones", () => {
-    const p = paper([t("e", "eggs", "done"), t("l", "call bank", "open")]);
-    expect(digestItems(p)).toEqual([
-      { text: "call bank", done: false },
+  it("groups what was dropped by paper, in the order each paper first got a thought, struck ones struck", () => {
+    const { groups, latestPaperId } = groupDigest(
+      [row("a", "eggs", "done", { name: "Groceries" }), row("b", "call bank"), row("a", "milk", "open", { name: "Groceries" }), row("b", "pay rent")],
+      "Asia/Kolkata",
+    );
+    expect(digestItems(groups)).toEqual([
+      { group: "Groceries" },
       { text: "eggs", done: true },
-    ]);
-  });
-  it("puts ideas and what's coming up this week at the bottom", () => {
-    const p = { ...paper([t("l", "call bank", "open"), t("i", "photo walk", "open", null, { kind: "pencil" }), t("f", "pay rent", "open", null, { scheduledFor: "2026-10-20" })]), date: "2026-10-19" };
-    expect(digestItems(p)).toEqual([
+      { text: "milk", done: false },
+      { group: "Paper from 17 Oct 2026" },
       { text: "call bank", done: false },
-      { group: "Ideas" },
-      { text: "photo walk", done: false, quiet: true },
-      { group: "Coming up" },
-      { text: "Tomorrow · pay rent", done: false, quiet: true },
+      { text: "pay rent", done: false },
     ]);
+    // "Open my paper" goes to the paper written on last.
+    expect(latestPaperId).toBe("b");
+  });
+  it("reads a picture with no words as Image", () => {
+    const { groups } = groupDigest([{ ...row("a", ""), thought: { id: "i", text: "", status: "open", image: "data:image/webp;base64,AA" } }], "UTC");
+    expect(digestItems(groups)).toEqual([{ group: "Paper from 17 Oct 2026" }, { text: "Image", done: false }]);
+  });
+  it("is empty when nothing was dropped", () => {
+    expect(groupDigest([], "UTC")).toEqual({ groups: [], latestPaperId: null });
+    expect(digestItems([])).toEqual([]);
+  });
+  it("dates a paper by the day it was made in the given zone", () => {
+    // 20:00 UTC on the 17th is already the 18th in Kolkata.
+    expect(digestTitle({ name: null, createdAt: "2026-10-17T20:00:00.000Z" }, "Asia/Kolkata")).toBe("Paper from 18 Oct 2026");
+    expect(digestTitle({ name: null, createdAt: "2026-10-17T20:00:00.000Z" }, "UTC")).toBe("Paper from 17 Oct 2026");
+    expect(digestTitle({ name: "  Trip  ", createdAt: "2026-10-17T20:00:00.000Z" }, "UTC")).toBe("Trip");
+  });
+});
+
+describe("papers", () => {
+  it("names a paper, or calls it Untitled", () => {
+    expect(paperTitle({ name: "Groceries" })).toBe("Groceries");
+    expect(paperTitle({ name: "   " })).toBe("Untitled");
+    expect(paperTitle({ name: null })).toBe("Untitled");
+  });
+  it("keeps a name tidy: spaces collapsed, cut to length, and nothing at all means no name", () => {
+    expect(cleanName("  my   trip \n plan ")).toBe("my trip plan");
+    expect(cleanName("   ")).toBeNull();
+    expect(cleanName(null)).toBeNull();
+    expect(cleanName("x".repeat(MAX_PAPER_NAME + 20))).toHaveLength(MAX_PAPER_NAME);
+  });
+  it("shows the day a paper was made in the reader's zone", () => {
+    expect(madeOn("2026-10-28T01:00:00.000Z", "Asia/Kolkata")).toBe("28 Oct 2026");
+    expect(madeOn("2026-10-27T20:00:00.000Z", "Asia/Kolkata")).toBe("28 Oct 2026");
+    expect(madeOn("2026-10-27T20:00:00.000Z", "UTC")).toBe("27 Oct 2026");
+  });
+  it("keeps each paper's zoom and pan under its own key", () => {
+    expect(viewKey("a")).not.toBe(viewKey("b"));
+    expect(viewKey("abc")).toBe("pp-drop-view:abc");
+  });
+});
+
+describe("search", () => {
+  it("only searches from two letters, tidying spaces", () => {
+    expect(searchTerm("a")).toBeNull();
+    expect(searchTerm("   ")).toBeNull();
+    expect(searchTerm(null)).toBeNull();
+    expect(searchTerm("  video   idea ")).toBe("video idea");
+    expect(searchTerm("x".repeat(500))).toHaveLength(MAX_SEARCH);
+  });
+  it("treats % _ and \\ in a search as plain characters", () => {
+    expect(escapeLike("50%_off\\")).toBe("50\\%\\_off\\\\");
+    expect(escapeLike("plain")).toBe("plain");
+  });
+  it("cuts a long thought to the part around the match", () => {
+    const long = "the very long start of a thought about nothing in particular then the youtube video I wanted and then a long tail that goes on and on";
+    const snip = snippetAround(long, "YouTube");
+    expect(snip.toLowerCase()).toContain("youtube");
+    expect(snip.startsWith("…")).toBe(true);
+    expect(snip.endsWith("…")).toBe(true);
+    expect(snip.length).toBeLessThan(long.length);
+    expect(snippetAround("short one", "short")).toBe("short one");
+  });
+  it("splits a snippet at the match, whatever its case", () => {
+    expect(splitMatch("Watch the YouTube talk", "youtube")).toEqual([
+      { text: "Watch the ", match: false },
+      { text: "YouTube", match: true },
+      { text: " talk", match: false },
+    ]);
+    expect(splitMatch("nothing here", "zzz")).toEqual([{ text: "nothing here", match: false }]);
+  });
+});
+
+describe("library previews", () => {
+  const th = (id: string, text: string, x: number | null, y: number | null, status: "open" | "done" = "open") => ({ id, text, status, x, y });
+  it("keeps dragged notes in proportion and flows the rest into rows", () => {
+    const notes = previewNotes([th("a", "top left", 0, 0), th("b", "bottom right", 1, 600, "done"), th("c", "never moved", null, null), th("d", "also loose", null, null)]);
+    const by = Object.fromEntries(notes.map((n) => [n.id, n]));
+    expect(by.a.left).toBeLessThan(by.b.left);
+    expect(by.a.top).toBeLessThan(by.b.top);
+    expect(by.b.done).toBe(true);
+    // The loose ones sit in the first row, side by side.
+    expect(by.c.top).toBe(by.d.top);
+    expect(by.c.left).toBeLessThan(by.d.left);
+  });
+  it("keeps every mark on the card, and short", () => {
+    const notes = previewNotes([th("a", "x".repeat(200), 40, 99999), th("b", "", -3, -50)]);
+    for (const n of notes) {
+      expect(n.left).toBeGreaterThanOrEqual(0);
+      expect(n.left).toBeLessThanOrEqual(100);
+      expect(n.top).toBeGreaterThanOrEqual(0);
+      expect(n.top).toBeLessThanOrEqual(100);
+    }
+    expect(notes[0].text.length).toBeLessThanOrEqual(26);
+    expect(notes[1].text).toBe("Image");
+  });
+  it("shows no more than a card can hold", () => {
+    const many = Array.from({ length: 80 }, (_, i) => th(`n${i}`, `note ${i}`, null, null));
+    expect(previewNotes(many)).toHaveLength(24);
+    expect(previewNotes(many, 5)).toHaveLength(5);
   });
 });
 
@@ -199,23 +168,6 @@ describe("pictures", () => {
     expect(thoughtLabel({ text: "leave page bug", image: "data:image/webp;base64,AA" })).toBe("leave page bug");
     expect(thoughtLabel({ text: "", image: "data:image/webp;base64,AA" })).toBe("Image");
   });
-  it("carry over with their picture", () => {
-    const p = paper([t("a", "", "open", null, { image: "data:image/webp;base64,AA" })]);
-    expect(rollover(p, () => "n1").thoughts[0].image).toBe("data:image/webp;base64,AA");
-  });
-});
-
-describe("pencil thinks, pen commits", () => {
-  const pencil = (id: string, text: string, more: Partial<Thought> = {}) => t(id, text, "open", null, { kind: "pencil", ...more });
-
-  it("fades pencil a little each night, never ink", () => {
-    const old = pencil("a", "x", { carriedFrom: "2026-10-14" });
-    expect(pencilFade(pencil("a", "x"), "2026-10-17")).toBe(1);
-    expect(pencilFade(old, "2026-10-17")).toBeCloseTo(0.64);
-    expect(pencilFade({ ...old, carriedFrom: "2026-09-01" }, "2026-10-17")).toBe(0.4);
-    expect(pencilFade({ ...old, kind: "pen" }, "2026-10-17")).toBe(1);
-  });
-
 });
 
 describe("youtube previews", () => {

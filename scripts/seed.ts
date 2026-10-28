@@ -1,12 +1,13 @@
 /**
- * Seeds a week of Drop papers for one person, for trying the app locally.
+ * Seeds a few Drop papers (one named, a few from earlier days) for one person,
+ * for trying the app locally.
  *   npm run seed -- you@example.com
  * Uses DATABASE_URL from .env.local (the Neon "dev" branch). Refuses to run
  * against a database that already has papers for that person.
  */
 import { config } from "dotenv";
 import { neon } from "@neondatabase/serverless";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { users } from "../src/db/schema";
 import { dropPapers, dropThoughts } from "../src/modules/drop/schema";
@@ -31,8 +32,8 @@ const day = (offset: number) => {
 };
 const id = () => Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
 
-const week: { offset: number; thoughts: [string, boolean][] }[] = [
-  { offset: -4, thoughts: [["Book dentist appointment", true], ["Read the Stripe docs on webhooks https://docs.stripe.com/webhooks", true], ["Idea: weekly review on Fridays", false]] },
+const week: { offset: number; name?: string; thoughts: [string, boolean][] }[] = [
+  { offset: -4, name: "Reading list", thoughts: [["Book dentist appointment", true], ["Read the Stripe docs on webhooks https://docs.stripe.com/webhooks", true], ["Idea: weekly review on Fridays", false]] },
   { offset: -3, thoughts: [["Call the bank about the card", true], ["Buy a birthday gift for Amma", true], ["Pay electricity bill", true]] },
   { offset: -2, thoughts: [["Draft the Q4 plan", true], ["Reply to Ravi's email", true], ["Try the new coffee place on 5th", false]] },
   { offset: -1, thoughts: [["Renew passport", false], ["Fix the flaky login test", true], ["Ship the onboarding copy", true], ["Look into www.neon.tech branching", false]] },
@@ -45,14 +46,15 @@ async function main() {
     .onConflictDoUpdate({ target: users.email, set: { email } })
     .returning({ id: users.id });
 
-  for (const { offset, thoughts } of week) {
+  const [exists] = await db.select({ id: dropPapers.id }).from(dropPapers).where(eq(dropPapers.userId, user.id)).limit(1);
+  if (exists) {
+    console.error(`${email} already has papers; not seeding over them.`);
+    process.exit(1);
+  }
+  for (const { offset, name, thoughts } of week) {
     const date = day(offset);
-    const [exists] = await db.select({ id: dropPapers.id }).from(dropPapers).where(and(eq(dropPapers.userId, user.id), eq(dropPapers.date, date)));
-    if (exists) {
-      console.error(`${email} already has a paper on ${date}; not seeding over it.`);
-      process.exit(1);
-    }
-    const [paper] = await db.insert(dropPapers).values({ userId: user.id, date }).returning({ id: dropPapers.id });
+    const madeAt = `${date}T03:00:00Z`;
+    const [paper] = await db.insert(dropPapers).values({ userId: user.id, name: name ?? null, createdAt: new Date(madeAt), updatedAt: new Date(`${date}T12:00:00Z`) }).returning({ id: dropPapers.id });
     await db.insert(dropThoughts).values(
       thoughts.map(([text, done], i) => ({
         id: id(),
@@ -65,9 +67,9 @@ async function main() {
         doneAt: done ? `${date}T1${i}:00:00Z` : null,
       })),
     );
-    console.log(`  ${date}: ${thoughts.length} thoughts`);
+    console.log(`  ${name ?? "Untitled"} (${date}): ${thoughts.length} thoughts`);
   }
-  console.log(`Seeded ${week.length} past papers for ${email}. Sign in with that email and open /drop: yesterday's open thoughts roll over.`);
+  console.log(`Seeded ${week.length} papers for ${email}. Sign in with that email and open /drop, or the library.`);
 }
 
 main().catch((e) => {

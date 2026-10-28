@@ -1,1 +1,0 @@
-DROP TABLE "drop_links" CASCADE;

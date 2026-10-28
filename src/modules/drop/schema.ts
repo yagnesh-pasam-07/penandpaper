@@ -1,7 +1,7 @@
-import { date, index, integer, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
-/** One paper per person per day (in DROP_TIMEZONE). */
+/** A canvas a person made: as many as they like, each with its own thoughts. */
 export const dropPapers = pgTable(
   "drop_papers",
   {
@@ -9,12 +9,18 @@ export const dropPapers = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    date: date("date", { mode: "string" }).notNull(),
+    /** Optional; a paper without one reads as "Untitled". */
+    name: text("name"),
+    /** When it was made: the date the header and library show. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    /** When the desk was cleared that evening, if it was. */
-    clearedAt: timestamp("cleared_at", { withTimezone: true, mode: "string" }),
+    /** Last change (a thought added, moved, struck, crumpled, or the paper renamed): the last-touched paper is the one /drop opens. */
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Put away: hidden from the switcher and library unless "Archived" is on. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    /** Deleted: hidden everywhere, removed for good a week later (like a crumpled thought). */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("drop_papers_user_date_uq").on(t.userId, t.date)],
+  (t) => [index("drop_papers_user_idx").on(t.userId)],
 );
 
 /** Small per-person settings and one-time hints for Drop. */
@@ -42,19 +48,13 @@ export const dropThoughts = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     text: text("text").notNull(),
     status: text("status", { enum: ["open", "done"] }).notNull().default("open"),
-    /** Pen is a task; pencil is a loose idea. */
-    kind: text("kind", { enum: ["pen", "pencil"] }).notNull().default("pen"),
     shape: integer("shape").notNull().default(0),
-    /** When it was first dropped; kept when it rolls over. */
+    /** When it was dropped. */
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
     doneAt: timestamp("done_at", { withTimezone: true, mode: "string" }),
-    /** The day it was first dropped, when it rolled over from an earlier paper. */
-    carriedFrom: date("carried_from", { mode: "string" }),
     /** Where it was dragged on the sheet: centre x as a share of the reading column's width (below 0 or above 1 when dragged out to the sides), y in px. Null until moved. */
     x: real("x"),
     y: real("y"),
-    /** Folded away till this day. */
-    scheduledFor: date("scheduled_for", { mode: "string" }),
     /** Crumpled (thrown away): hidden everywhere, removed for good a week later. */
     crumpledAt: timestamp("crumpled_at", { withTimezone: true, mode: "string" }),
     /** A pasted or dropped picture, as a small data URL; `text` is then its caption (may be empty). */
