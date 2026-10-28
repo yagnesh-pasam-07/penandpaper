@@ -27,6 +27,11 @@
   --t5: #e8def8;
   --shadow: rgba(30, 29, 26, 0.1);
   --scrim: rgba(30, 29, 26, 0.28);
+  /* Canvas tokens. Dotted keeps today's dots; Grid is squares; Ruled is warm paper with thin vertical lines. */
+  --canvas-dotted-dot: var(--line);
+  --canvas-grid-line: color-mix(in srgb, var(--mute) 12%, transparent);
+  --canvas-ruled-bg: color-mix(in srgb, var(--bg) 60%, white);
+  --canvas-ruled-line: color-mix(in srgb, var(--mute) 8%, transparent);
   /* Paper grain: fine noise, a few percent, tiling without a visible repeat. */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.12 0 0 0 0 0.11 0 0 0 0 0.1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: light;
@@ -57,6 +62,10 @@
   --t5: #363047;
   --shadow: rgba(0, 0, 0, 0.45);
   --scrim: rgba(0, 0, 0, 0.55);
+  --canvas-dotted-dot: var(--line);
+  --canvas-grid-line: rgb(255 255 255 / 0.07);
+  --canvas-ruled-bg: var(--sheet);
+  --canvas-ruled-line: rgb(255 255 255 / 0.06);
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.97 0 0 0 0 0.92 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
@@ -199,6 +208,68 @@ body {
   background-size: 24px 24px;
 }
 
+/*
+ * The sheet notes land on, painted by the chosen canvas (html[data-canvas]) in
+ * CSS alone. Pan/zoom hooks: set --canvas-zoom, --canvas-x and --canvas-y on the
+ * sheet and the pattern scales and shifts with it. Dotted is the default and
+ * looks exactly as the old .dot-grid did.
+ */
+.canvas-surface {
+  background-image: radial-gradient(var(--canvas-dotted-dot) 1.2px, transparent 1.2px);
+  background-size: calc(24px * var(--canvas-zoom, 1)) calc(24px * var(--canvas-zoom, 1));
+  background-position: var(--canvas-x, 0px) var(--canvas-y, 0px);
+}
+[data-canvas="grid"] .canvas-surface {
+  --cell: calc(32px * var(--canvas-zoom, 1));
+  background-image:
+    linear-gradient(to right, transparent calc(100% - 1px), var(--canvas-grid-line) 0),
+    linear-gradient(to bottom, transparent calc(100% - 1px), var(--canvas-grid-line) 0);
+  background-size: var(--cell) var(--cell);
+  background-position: var(--canvas-x, 0px) var(--canvas-y, 0px);
+}
+[data-canvas="ruled"] .canvas-surface {
+  --cell: calc(32px * var(--canvas-zoom, 1));
+  background-color: var(--canvas-ruled-bg);
+  background-image: linear-gradient(to right, transparent calc(100% - 1px), var(--canvas-ruled-line) 0);
+  background-size: var(--cell) 100%;
+  background-repeat: repeat-x;
+  background-position: var(--canvas-x, 0px) 0;
+}
+/*
+ * Settings previews: each card shows its own canvas whatever the page is set to.
+ * These win over the page-wide rules above (one more class), and each one sets
+ * every property the others touch, so nothing leaks from the chosen canvas.
+ */
+.canvas-preview[data-canvas="dotted"] .canvas-surface {
+  background-color: transparent;
+  background-image: radial-gradient(var(--canvas-dotted-dot) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+  background-repeat: repeat;
+  background-position: 0 0;
+}
+.canvas-preview[data-canvas="grid"] .canvas-surface {
+  --cell: 32px;
+  background-color: transparent;
+  background-image:
+    linear-gradient(to right, transparent calc(100% - 1px), var(--canvas-grid-line) 0),
+    linear-gradient(to bottom, transparent calc(100% - 1px), var(--canvas-grid-line) 0);
+  background-size: var(--cell) var(--cell);
+  background-repeat: repeat;
+  background-position: 0 0;
+}
+.canvas-preview[data-canvas="ruled"] .canvas-surface {
+  --cell: 32px;
+  background-color: var(--canvas-ruled-bg);
+  background-image: linear-gradient(to right, transparent calc(100% - 1px), var(--canvas-ruled-line) 0);
+  background-size: var(--cell) 100%;
+  background-repeat: repeat-x;
+  background-position: 0 0;
+}
+/* The whole page is the canvas: sheets inside it let it show through instead of painting their own. */
+.canvas-page .canvas-surface {
+  background: none;
+}
+
 .ruled {
   background-image: linear-gradient(var(--line) 1px, transparent 1px);
   background-size: 100% 34px;
@@ -227,14 +298,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .drop-in { animation: none; }
 }
-
-/* One note sliding onto another (the stack hint and empty sheet). */
-@keyframes demo-slide {
-  0%, 15% { transform: translate(0, -50%) rotate(2deg); }
-  55%, 85% { transform: translate(-62%, -58%) rotate(-3deg); }
-  100% { transform: translate(0, -50%) rotate(2deg); }
-}
-.demo-slide { animation: demo-slide 3.2s ease-in-out infinite; }
 
 /* Pencil turned to ink: the graphite fills with colour. */
 @keyframes ink-in {
@@ -275,7 +338,7 @@ body {
 .demo-paused, .demo-paused * { animation-play-state: paused !important; }
 
 @media (prefers-reduced-motion: reduce) {
-  .demo-slide, .ink-in .paper-note, .stamp-in, .highlight, .drift { animation: none; }
+  .ink-in .paper-note, .stamp-in, .highlight, .drift { animation: none; }
 }
 
 /* A strip of masking tape holding a pasted picture on the paper. */

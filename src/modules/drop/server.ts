@@ -5,19 +5,16 @@ import { users } from "@/db/schema";
 import { uid } from "@/lib/mutations";
 import { addDays, todayIn } from "@/lib/time";
 import {
-  applyStackOp,
+  applyPaperOp,
   CRUMPLE_KEEP_DAYS,
   DROP_TIMEZONE,
   rollover,
-  settleStacks,
   type DropPaper,
   type Kind,
-  type Link,
-  type Stack,
-  type StackOp,
+  type PaperOp,
   type Thought,
 } from "./logic";
-import { dropLinks, dropPapers, dropPrefs, dropStacks, dropThoughts } from "./schema";
+import { dropPapers, dropPrefs, dropThoughts } from "./schema";
 
 const db = httpDb;
 
@@ -26,16 +23,6 @@ export function dropToday(): string {
 }
 
 type ThoughtRow = typeof dropThoughts.$inferSelect;
-type StackRow = typeof dropStacks.$inferSelect;
-type LinkRow = typeof dropLinks.$inferSelect;
-
-function toLink(r: LinkRow): Link {
-  return { id: r.id, from: r.fromId, to: r.toId, label: r.label, arrow: r.arrow };
-}
-
-function linkRow(l: Link, paperId: string, userId: string): typeof dropLinks.$inferInsert {
-  return { id: l.id, paperId, userId, fromId: l.from, toId: l.to, label: l.label, arrow: l.arrow };
-}
 
 function toThought(r: ThoughtRow): Thought {
   return {
@@ -49,52 +36,19 @@ function toThought(r: ThoughtRow): Thought {
     carriedFrom: r.carriedFrom,
     x: r.x,
     y: r.y,
-    stackId: r.stackId,
-    stackOrder: r.stackOrder,
     scheduledFor: r.scheduledFor,
-    rank: r.rank,
-    nextRank: r.nextRank,
     image: r.image,
   };
 }
 
-function toStack(r: StackRow): Stack {
-  return {
-    id: r.id,
-    name: r.name,
-    x: r.x,
-    y: r.y,
-    createdAt: new Date(r.createdAt).toISOString(),
-    carriedFrom: r.carriedFrom,
-    scheduledFor: r.scheduledFor,
-    rank: r.rank,
-    nextRank: r.nextRank,
-  };
-}
-
-/** A paper's thoughts and stacks, leaving out crumpled ones. */
+/** A paper's thoughts, leaving out crumpled ones. */
 async function contentsOf(paper: { id: string; date: string; clearedAt?: string | null }): Promise<DropPaper> {
-  const [thoughtRows, stackRows, linkRows] = await db.batch([
-    db
-      .select()
-      .from(dropThoughts)
-      .where(and(eq(dropThoughts.paperId, paper.id), isNull(dropThoughts.crumpledAt)))
-      .orderBy(asc(dropThoughts.createdAt), asc(dropThoughts.id)),
-    db
-      .select()
-      .from(dropStacks)
-      .where(and(eq(dropStacks.paperId, paper.id), isNull(dropStacks.crumpledAt)))
-      .orderBy(asc(dropStacks.createdAt), asc(dropStacks.id)),
-    db.select().from(dropLinks).where(eq(dropLinks.paperId, paper.id)).orderBy(asc(dropLinks.createdAt), asc(dropLinks.id)),
-  ]);
-  const stacks = stackRows.map(toStack);
-  const live = new Set(stacks.map((s) => s.id));
-  // A thought whose stack was thrown away is simply loose.
-  const thoughts = thoughtRows.map(toThought).map((t) => (t.stackId && !live.has(t.stackId) ? { ...t, stackId: null, stackOrder: 0, rank: null } : t));
-  // A line whose end was crumpled isn't drawn.
-  const ends = new Set([...thoughts.map((t) => t.id), ...live]);
-  const links = linkRows.map(toLink).filter((l) => ends.has(l.from) && ends.has(l.to));
-  return { date: paper.date, thoughts, stacks, links, clearedAt: paper.clearedAt ?? null };
+  const rows = await db
+    .select()
+    .from(dropThoughts)
+    .where(and(eq(dropThoughts.paperId, paper.id), isNull(dropThoughts.crumpledAt)))
+    .orderBy(asc(dropThoughts.createdAt), asc(dropThoughts.id));
+  return { date: paper.date, thoughts: rows.map(toThought), clearedAt: paper.clearedAt ?? null };
 }
 
 type PaperRef = { id: string; date: string; clearedAt: string | null };
@@ -103,7 +57,7 @@ const paperCols = { id: dropPapers.id, date: dropPapers.date, clearedAt: dropPap
 
 /**
  * Today's paper, made on first open of the day. Making it also brings over the
- * last paper's open thoughts (and their stacks), and moves along whatever was
+ * last paper's open thoughts, and moves along whatever was
  * folded for later; if two requests race, only the one that made the paper
  * does that.
  */
@@ -132,48 +86,14 @@ async function ensureTodayPaper(userId: string): Promise<PaperRef> {
     .limit(1);
   if (prev) {
     const carried = rollover(await contentsOf(prev), uid);
-    // Stacks first: carried and moved thoughts point at them.
-    if (carried.stacks.length) await db.insert(dropStacks).values(carried.stacks.map((s) => stackRow(s, created.id, userId)));
     const queries = [];
     if (carried.thoughts.length) queries.push(db.insert(dropThoughts).values(carried.thoughts.map((t) => thoughtRow(t, created.id, userId))));
-    if (carried.links.length) queries.push(db.insert(dropLinks).values(carried.links.map((l) => linkRow(l, created.id, userId))));
-    if (carried.move.stacks.length) {
-      const since = sql`coalesce(carried_from, ${prev.date}::date)`;
-      queries.push(
-        db
-          .update(dropStacks)
-          .set({ paperId: created.id, carriedFrom: since })
-          .where(and(inArray(dropStacks.id, carried.move.stacks), eq(dropStacks.userId, userId))),
-      );
-      queries.push(
-        db
-          .update(dropThoughts)
-          .set({ paperId: created.id, carriedFrom: since })
-          .where(and(inArray(dropThoughts.stackId, carried.move.stacks), eq(dropThoughts.userId, userId))),
-      );
-    }
     for (const m of carried.move.thoughts) {
-      queries.push(db.update(dropThoughts).set({ paperId: created.id, stackId: m.stackId, carriedFrom: m.carriedFrom }).where(and(eq(dropThoughts.id, m.id), eq(dropThoughts.userId, userId))));
+      queries.push(db.update(dropThoughts).set({ paperId: created.id, carriedFrom: m.carriedFrom }).where(and(eq(dropThoughts.id, m.id), eq(dropThoughts.userId, userId))));
     }
     if (queries.length) await db.batch(queries as unknown as Parameters<typeof db.batch>[0]);
   }
   return created;
-}
-
-function stackRow(s: Stack, paperId: string, userId: string): typeof dropStacks.$inferInsert {
-  return {
-    id: s.id,
-    paperId,
-    userId,
-    name: s.name,
-    x: s.x,
-    y: s.y,
-    createdAt: s.createdAt,
-    carriedFrom: s.carriedFrom,
-    scheduledFor: s.scheduledFor,
-    rank: s.rank,
-    nextRank: s.nextRank,
-  };
 }
 
 function thoughtRow(t: Thought, paperId: string, userId: string): typeof dropThoughts.$inferInsert {
@@ -189,65 +109,33 @@ function thoughtRow(t: Thought, paperId: string, userId: string): typeof dropTho
     carriedFrom: t.carriedFrom,
     x: t.x,
     y: t.y,
-    stackId: t.stackId,
-    stackOrder: t.stackOrder,
     scheduledFor: t.scheduledFor,
-    rank: t.rank,
-    nextRank: t.nextRank,
     image: t.image ?? null,
   };
 }
 
 /**
  * Saves the difference between two versions of today's paper, in one batch:
- * new stacks, regrouped, moved, folded or inked thoughts, renamed or moved
- * stacks, and what went away (crumpled, so it can be swept up later).
+ * moved, folded or inked thoughts, and what went away (crumpled, so it can be
+ * swept up later).
  */
-async function saveChanges(paperId: string, userId: string, before: DropPaper, after: DropPaper): Promise<void> {
+async function saveChanges(paperId: string, before: DropPaper, after: DropPaper): Promise<void> {
   const queries = [];
-  const oldStacks = new Map(before.stacks.map((s) => [s.id, s]));
-  const newStacks = new Map(after.stacks.map((s) => [s.id, s]));
-  const added = after.stacks.filter((s) => !oldStacks.has(s.id));
-  if (added.length) queries.push(db.insert(dropStacks).values(added.map((s) => stackRow(s, paperId, userId))));
-  for (const s of after.stacks) {
-    const was = oldStacks.get(s.id);
-    if (was && (was.name !== s.name || was.x !== s.x || was.y !== s.y || was.scheduledFor !== s.scheduledFor || was.rank !== s.rank || was.nextRank !== s.nextRank)) {
-      queries.push(
-        db
-          .update(dropStacks)
-          .set({ name: s.name, x: s.x, y: s.y, scheduledFor: s.scheduledFor, rank: s.rank, nextRank: s.nextRank })
-          .where(and(eq(dropStacks.id, s.id), eq(dropStacks.paperId, paperId))),
-      );
-    }
-  }
   const kept = new Map(after.thoughts.map((t) => [t.id, t]));
   for (const was of before.thoughts) {
     const t = kept.get(was.id);
     if (!t) continue;
-    const changed =
-      t.stackId !== was.stackId ||
-      t.stackOrder !== was.stackOrder ||
-      t.x !== was.x ||
-      t.y !== was.y ||
-      t.scheduledFor !== was.scheduledFor ||
-      t.kind !== was.kind ||
-      t.status !== was.status ||
-      t.rank !== was.rank ||
-      t.nextRank !== was.nextRank;
+    const changed = t.x !== was.x || t.y !== was.y || t.scheduledFor !== was.scheduledFor || t.kind !== was.kind || t.status !== was.status;
     if (changed) {
       queries.push(
         db
           .update(dropThoughts)
           .set({
-            stackId: t.stackId,
-            stackOrder: t.stackOrder,
             x: t.x,
             y: t.y,
             scheduledFor: t.scheduledFor,
             kind: t.kind,
             status: t.status,
-            rank: t.rank,
-            nextRank: t.nextRank,
             ...(t.status !== was.status ? { doneAt: t.status === "done" ? sql`now()` : null } : {}),
           })
           .where(and(eq(dropThoughts.id, t.id), eq(dropThoughts.paperId, paperId))),
@@ -256,20 +144,6 @@ async function saveChanges(paperId: string, userId: string, before: DropPaper, a
   }
   const gone = before.thoughts.filter((t) => !kept.has(t.id)).map((t) => t.id);
   if (gone.length) queries.push(db.update(dropThoughts).set({ crumpledAt: sql`now()` }).where(and(inArray(dropThoughts.id, gone), eq(dropThoughts.paperId, paperId))));
-  const goneStacks = before.stacks.filter((s) => !newStacks.has(s.id)).map((s) => s.id);
-  const oldLinks = new Map((before.links ?? []).map((l) => [l.id, l]));
-  const newLinks = new Map((after.links ?? []).map((l) => [l.id, l]));
-  const addedLinks = (after.links ?? []).filter((l) => !oldLinks.has(l.id));
-  if (addedLinks.length) queries.push(db.insert(dropLinks).values(addedLinks.map((l) => linkRow(l, paperId, userId))));
-  for (const l of after.links ?? []) {
-    const was = oldLinks.get(l.id);
-    if (was && (was.label !== l.label || was.arrow !== l.arrow)) {
-      queries.push(db.update(dropLinks).set({ label: l.label, arrow: l.arrow }).where(and(eq(dropLinks.id, l.id), eq(dropLinks.paperId, paperId))));
-    }
-  }
-  const goneLinks = (before.links ?? []).filter((l) => !newLinks.has(l.id)).map((l) => l.id);
-  if (goneLinks.length) queries.push(db.delete(dropLinks).where(and(inArray(dropLinks.id, goneLinks), eq(dropLinks.paperId, paperId))));
-  if (goneStacks.length) queries.push(db.update(dropStacks).set({ crumpledAt: sql`now()` }).where(and(inArray(dropStacks.id, goneStacks), eq(dropStacks.paperId, paperId))));
   if (queries.length) await db.batch(queries as unknown as Parameters<typeof db.batch>[0]);
 }
 
@@ -319,14 +193,12 @@ async function withEchoes(userId: string, paper: DropPaper): Promise<DropPaper> 
   };
 }
 
-/** Groups, regroups, renames, folds, inks or throws away on today's paper. Throws StackError when it doesn't fit. */
-export async function changeStacks(userId: string, op: StackOp): Promise<DropPaper> {
+/** Folds or inks a thought on today's paper. Throws PaperError when it doesn't fit. */
+export async function changePaper(userId: string, op: PaperOp): Promise<DropPaper> {
   const paper = await ensureTodayPaper(userId);
   const before = await contentsOf(paper);
-  const after = applyStackOp(before, op);
-  await saveChanges(paper.id, userId, before, after);
-  // Someone who has made a stack doesn't need the hint any more.
-  if (op.kind === "stack") await finishStackHint(userId);
+  const after = applyPaperOp(before, op);
+  await saveChanges(paper.id, before, after);
   return after;
 }
 
@@ -366,23 +238,19 @@ export async function updateThought(userId: string, id: string, patch: { text?: 
   return row ? toThought(row) : null;
 }
 
-/** Crumples a thought on today's paper (kept a week, then swept up). A stack left with one dissolves. */
+/** Crumples a thought on today's paper (kept a week, then swept up). */
 export async function crumpleThought(userId: string, id: string): Promise<boolean> {
   const today = await ensureTodayPaper(userId);
   const rows = await db
     .update(dropThoughts)
     .set({ crumpledAt: sql`now()` })
     .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id), isNull(dropThoughts.crumpledAt)))
-    .returning({ id: dropThoughts.id, stackId: dropThoughts.stackId });
-  if (!rows.length) return false;
-  // A stack of one dissolves, and the numbers close up.
-  const before = await contentsOf(today);
-  await saveChanges(today.id, userId, before, settleStacks(before));
-  return true;
+    .returning({ id: dropThoughts.id });
+  return rows.length > 0;
 }
 
 /**
- * Moves thoughts and stacks on today's paper; a null spot sends one back into
+ * Moves thoughts on today's paper; a null spot sends one back into
  * the flow. Ids that aren't on today's paper are skipped. Returns how many moved.
  */
 export async function arrangeThoughts(userId: string, placements: { id: string; x: number | null; y: number | null }[]): Promise<number> {
@@ -390,34 +258,21 @@ export async function arrangeThoughts(userId: string, placements: { id: string; 
   if (!placements.length) return 0;
   const ids = placements.map((p) => p.id);
   const at = (col: "x" | "y") => sql.join(placements.map((p) => sql`when ${p.id} then ${p[col]}::real`), sql` `);
-  const [thoughts, stacks] = await db.batch([
-    db
-      .update(dropThoughts)
-      .set({ x: sql`case ${dropThoughts.id} ${at("x")} end`, y: sql`case ${dropThoughts.id} ${at("y")} end` })
-      .where(and(inArray(dropThoughts.id, ids), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)))
-      .returning({ id: dropThoughts.id }),
-    db
-      .update(dropStacks)
-      .set({ x: sql`case ${dropStacks.id} ${at("x")} end`, y: sql`case ${dropStacks.id} ${at("y")} end` })
-      .where(and(inArray(dropStacks.id, ids), eq(dropStacks.userId, userId), eq(dropStacks.paperId, today.id)))
-      .returning({ id: dropStacks.id }),
-  ]);
-  return thoughts.length + stacks.length;
+  const rows = await db
+    .update(dropThoughts)
+    .set({ x: sql`case ${dropThoughts.id} ${at("x")} end`, y: sql`case ${dropThoughts.id} ${at("y")} end` })
+    .where(and(inArray(dropThoughts.id, ids), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)))
+    .returning({ id: dropThoughts.id });
+  return rows.length;
 }
 
-/** Sends every thought and stack on today's paper back into the flow. */
+/** Sends every thought on today's paper back into the flow. */
 export async function tidyToday(userId: string): Promise<void> {
   const today = await ensureTodayPaper(userId);
-  await db.batch([
-    db
-      .update(dropThoughts)
-      .set({ x: null, y: null })
-      .where(and(eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id))),
-    db
-      .update(dropStacks)
-      .set({ x: null, y: null })
-      .where(and(eq(dropStacks.userId, userId), eq(dropStacks.paperId, today.id))),
-  ]);
+  await db
+    .update(dropThoughts)
+    .set({ x: null, y: null })
+    .where(and(eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, today.id)));
 }
 
 /** Stamps today's desk as cleared (the evening ritual). */
@@ -427,19 +282,32 @@ export async function clearDesk(userId: string): Promise<string> {
   return row.clearedAt!;
 }
 
-/* ---------- One-time hints ---------- */
+/* ---------- Appearance ---------- */
 
-/** Whether the "drag one note onto another" hint may still show (not dismissed, no stack made yet). */
-export async function stackHintPending(userId: string): Promise<boolean> {
-  const [row] = await db.select({ done: dropPrefs.stackHintDoneAt }).from(dropPrefs).where(eq(dropPrefs.userId, userId));
-  return !row?.done;
+export type Appearance = { canvas: string | null; theme: string | null };
+
+/** The saved choice; nothing saved (the device's own choice stands) if the columns aren't there yet, i.e. before `npm run db:migrate`. */
+export async function getAppearance(userId: string): Promise<Appearance> {
+  try {
+    const [row] = await db.select({ canvas: dropPrefs.canvas, theme: dropPrefs.theme }).from(dropPrefs).where(eq(dropPrefs.userId, userId));
+    return { canvas: row?.canvas ?? null, theme: row?.theme ?? null };
+  } catch (e) {
+    console.error("getAppearance: run db:migrate to add the canvas and theme columns", e);
+    return { canvas: null, theme: null };
+  }
 }
 
-export async function finishStackHint(userId: string): Promise<void> {
-  await db
-    .insert(dropPrefs)
-    .values({ userId, stackHintDoneAt: sql`now()` })
-    .onConflictDoUpdate({ target: dropPrefs.userId, set: { stackHintDoneAt: sql`coalesce(${dropPrefs.stackHintDoneAt}, now())` } });
+/** Saves the canvas and/or theme choice (values are checked against the registry by the route). */
+export async function saveAppearance(userId: string, patch: { canvas?: string; theme?: string }): Promise<void> {
+  try {
+    await db
+      .insert(dropPrefs)
+      .values({ userId, ...patch })
+      .onConflictDoUpdate({ target: dropPrefs.userId, set: patch });
+  } catch (e) {
+    // Before `npm run db:migrate` the choice only lives on this device (localStorage).
+    console.error("saveAppearance: run db:migrate to add the canvas and theme columns", e);
+  }
 }
 
 /* ---------- History ---------- */
@@ -490,11 +358,8 @@ export async function digestsFor(date: string): Promise<{ email: string; name: s
 }
 
 /** Sweeps up what was crumpled more than a week ago. */
-export async function sweepCrumpled(): Promise<{ thoughts: number; stacks: number }> {
+export async function sweepCrumpled(): Promise<{ thoughts: number }> {
   const cutoff = sql`now() - make_interval(days => ${CRUMPLE_KEEP_DAYS})`;
-  const [thoughts, stacks] = await db.batch([
-    db.delete(dropThoughts).where(lt(dropThoughts.crumpledAt, cutoff)).returning({ id: dropThoughts.id }),
-    db.delete(dropStacks).where(lt(dropStacks.crumpledAt, cutoff)).returning({ id: dropStacks.id }),
-  ]);
-  return { thoughts: thoughts.length, stacks: stacks.length };
+  const thoughts = await db.delete(dropThoughts).where(lt(dropThoughts.crumpledAt, cutoff)).returning({ id: dropThoughts.id });
+  return { thoughts: thoughts.length };
 }

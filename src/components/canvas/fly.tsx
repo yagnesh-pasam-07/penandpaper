@@ -12,8 +12,10 @@ export function Fly({ from, children }: { from?: { x: number; y: number } | null
     const node = el.current;
     if (!from || !node || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const r = node.getBoundingClientRect();
-    const dx = from.x - (r.left + r.width / 2);
-    const dy = from.y - (r.top + r.height / 2);
+    // On a zoomed canvas the note is scaled: the offset is on screen, the animation is in the note's own units.
+    const k = node.offsetWidth ? r.width / node.offsetWidth : 1;
+    const dx = (from.x - (r.left + r.width / 2)) / k;
+    const dy = (from.y - (r.top + r.height / 2)) / k;
     node.animate(
       [
         { transform: `translate(${dx}px, ${dy}px) scale(0.92)`, opacity: 0.7 },

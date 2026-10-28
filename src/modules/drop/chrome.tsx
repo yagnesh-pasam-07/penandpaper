@@ -56,7 +56,7 @@ export function DropHeader({ me, title, right }: { me: Me; title?: ReactNode; ri
       )}
       <span className="ml-auto flex shrink-0 items-center gap-1.5">
         {right}
-        <ThemeToggle />
+        <ThemeToggle persist />
         <AccountMenu
           name={me.name}
           email={me.email}

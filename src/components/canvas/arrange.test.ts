@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRID, layout, snap } from "./arrange";
+import { columnOf, COLUMN_MAX, GRID, layout, savedSpot, snap } from "./arrange";
 
 const size = { w: 200, h: 100 };
 
@@ -74,5 +74,39 @@ describe("snap", () => {
     const { box } = snap({ x: 990, y: -40, ...size }, [], 1000);
     expect(box.x).toBe(888);
     expect(box.y).toBe(72);
+  });
+});
+
+describe("column on a page-wide canvas", () => {
+  it("centres the column and caps it", () => {
+    expect(columnOf(2000)).toEqual({ left: (2000 - COLUMN_MAX) / 2, width: COLUMN_MAX });
+    expect(columnOf(800)).toEqual({ left: 32, width: 736 });
+    expect(columnOf(800, false)).toEqual({ left: 0, width: 800 });
+  });
+
+  it("places old saved spots exactly where the column-wide sheet put them", () => {
+    const old = layout([{ id: "a", size, at: { x: 0.25, y: 300 } }], COLUMN_MAX, 0).boxes.get("a")!;
+    const col = columnOf(2000);
+    const now = layout([{ id: "a", size, at: { x: 0.25, y: 300 } }], 2000, 0, col).boxes.get("a")!;
+    expect(now.x - col.left).toBeCloseTo(old.x);
+    expect(now.y).toBe(old.y);
+  });
+
+  it("saves a spot outside the column as a share below 0 or above 1, and reads it back", () => {
+    const col = columnOf(2000);
+    const out = savedSpot({ x: 300, y: 240 }, col, 0);
+    expect(out.x).toBeLessThan(0);
+    const { boxes } = layout([{ id: "a", size, at: out }], 2000, 0, col);
+    expect(boxes.get("a")!.x).toBeCloseTo(300);
+    const far = savedSpot({ x: 1800, y: 240 }, col, 0);
+    expect(far.x).toBeGreaterThan(1);
+  });
+
+  it("flows new drops in the column, and never lets a bubble leave the canvas", () => {
+    const col = columnOf(2000);
+    const a = layout([{ id: "a", size, at: null }], 2000, undefined, col).boxes.get("a")!;
+    expect(a.x).toBeCloseTo(1000);
+    const edge = layout([{ id: "b", size, at: { x: -9, y: 100 } }], 2000, 0, col).boxes.get("b")!;
+    expect(edge.x - edge.w / 2).toBeGreaterThanOrEqual(0);
   });
 });

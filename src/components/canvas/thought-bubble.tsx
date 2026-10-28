@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { CheckIcon, CloseIcon, PenIcon, PencilIcon, WhenIcon } from "@/components/icons";
-import { linkify } from "@/lib/linkify";
+import { firstLink, isOnlyYoutube, linkify, youtubeId } from "@/lib/linkify";
 import { bubbleStyle, rand } from "./bubble";
-import { RankMark } from "./rank-mark";
 
 type Props = {
   text: string;
@@ -33,25 +32,15 @@ type Props = {
   leaving?: "crumple" | "fold" | null;
   /** Plays on its way back (undo). */
   returning?: boolean;
-  /** Its place in today's order, if numbered: a red circled number at the corner. */
-  rank?: number | null;
-  /** Keys 1–9 on a selected thought set its number (0 clears). */
-  onRank?: (rank: number | null) => void;
   /** A pasted or dropped picture: the note becomes a taped photo, the text its caption. */
   image?: string | null;
   /** Earlier days these words were written afresh: earlier copies show through underneath, like pressing hard on a pad. */
   echoes?: string[];
   /**
    * How much a pencil thought matters: 0 barely (small, light), 1 an ordinary
-   * thought, 2 and 3 written again or joined to others (bigger, pressed harder, darker).
+   * thought, 2 and 3 written again (bigger, pressed harder, darker).
    */
   weight?: number;
-  /** "Connect to…": the L key. */
-  onConnect?: () => void;
-  /** Joined to others by lines: shows the whole thread (the T key, or the thread button). */
-  onThread?: () => void;
-  /** "Stack with…": the S key when it's selected, or a long press on a phone. */
-  onStackWith?: () => void;
   /** "When": the W key or the calendar button. */
   onWhen?: () => void;
   /** Ink a pencil idea into a task, or pencil a task into an idea. */
@@ -63,8 +52,51 @@ type Props = {
 };
 
 const SWIPE = 64;
-/** How long a finger rests before a press opens "Stack with…". */
-const LONG_PRESS = 480;
+
+/** A link in a note shows a preview under it: a YouTube video its thumbnail, any other link its site and path. */
+function LinkPreview({ text }: { text: string }) {
+  const link = firstLink(text);
+  if (!link) return null;
+  // A press on the preview can still drag the note (data-drag); the browser's own link/image drag is off.
+  const stop = { "data-drag": "", draggable: false, onClick: (e: ReactMouseEvent) => e.stopPropagation(), onDoubleClick: (e: ReactMouseEvent) => e.stopPropagation() };
+  const video = youtubeId(link.href);
+  if (video) {
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Watch the YouTube video"
+        {...stop}
+        className="group/video flex w-[260px] max-w-full flex-col gap-1.5 text-left"
+      >
+        <span className="relative block aspect-video overflow-hidden rounded-xl bg-soft shadow-[inset_0_0_0_1px_var(--line)]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a YouTube thumbnail; nothing for next/image to optimise */}
+          <img src={`https://i.ytimg.com/vi/${video}/hqdefault.jpg`} alt="" loading="lazy" draggable={false} className="size-full object-cover transition-opacity group-hover/video:opacity-90" />
+          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
+            <span className="flex size-7 items-center justify-center rounded-full bg-black/55 pl-0.5 text-[10px] text-white backdrop-blur-sm transition-transform group-hover/video:scale-110">▶</span>
+          </span>
+        </span>
+        <span className="px-0.5 text-[11px] tracking-[0.04em] text-mute">YouTube · {link.host}</span>
+      </a>
+    );
+  }
+  // Any other link: the site, and where on it, as plain text (nothing is fetched).
+  const path = link.path.length > 48 ? `${link.path.slice(0, 47)}…` : link.path;
+  return (
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Open ${link.host}`}
+      {...stop}
+      className="flex w-[260px] max-w-full flex-col gap-0.5 rounded-lg border border-line bg-soft/60 px-3 py-2 text-left hover:bg-soft"
+    >
+      <span className="text-[11px] font-semibold tracking-[0.08em] text-mute uppercase">{link.host}</span>
+      {path && <span className="truncate font-note text-[16px] text-ink">{path}</span>}
+    </a>
+  );
+}
 
 /**
  * Handwriting, word by word: each word sits a touch differently (tilt,
@@ -153,14 +185,9 @@ export function ThoughtBubble({
   target,
   leaving,
   returning,
-  rank,
-  onRank,
   image,
   echoes,
   weight = 1,
-  onConnect,
-  onThread,
-  onStackWith,
   onWhen,
   onInk,
   onEdit,
@@ -173,7 +200,6 @@ export function ThoughtBubble({
   const [zoom, setZoom] = useState(false);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipe = useRef<{ x: number; y: number; swiped: boolean } | null>(null);
-  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const fieldId = useId();
   const pencil = kind === "pencil";
@@ -190,15 +216,9 @@ export function ThoughtBubble({
   useEffect(
     () => () => {
       if (clickTimer.current) clearTimeout(clickTimer.current);
-      if (press.current) clearTimeout(press.current);
     },
     [],
   );
-
-  const endPress = () => {
-    if (press.current) clearTimeout(press.current);
-    press.current = null;
-  };
 
   const startEdit = () => {
     if (readOnly || !onEdit) return;
@@ -229,21 +249,11 @@ export function ThoughtBubble({
     // Swipes only in the phone stream; on the sheet a touch drags.
     if (readOnly || !stream || e.pointerType === "mouse") return;
     swipe.current = { x: e.clientX, y: e.clientY, swiped: false };
-    if (onStackWith) {
-      press.current = setTimeout(() => {
-        press.current = null;
-        // Counts as handled, so letting go doesn't also open the editor.
-        if (swipe.current) swipe.current.swiped = true;
-        navigator.vibrate?.(10);
-        onStackWith();
-      }, LONG_PRESS);
-    }
   };
   const onPointerMove = (e: ReactPointerEvent) => {
     const s = swipe.current;
     if (!s) return;
     const x = e.clientX - s.x;
-    if (Math.hypot(x, e.clientY - s.y) > 8) endPress();
     if (Math.abs(e.clientY - s.y) > 30) {
       swipe.current = null;
       setDx(0);
@@ -253,7 +263,6 @@ export function ThoughtBubble({
     setDx(Math.max(onDelete ? -SWIPE * 1.4 : 0, Math.min(x, strike ? SWIPE * 1.4 : 0)));
   };
   const onPointerUp = () => {
-    endPress();
     const s = swipe.current;
     if (s && dx >= SWIPE) {
       s.swiped = true;
@@ -351,14 +360,10 @@ export function ThoughtBubble({
     );
   }
 
-  const label = `${rank ? `Number ${rank}: ` : ""}${image ? "Picture: " : pencil ? "Idea: " : ""}${text}${done ? ", done" : ""}${when ? `, ${when}` : ""}`;
+  const label = `${image ? "Picture: " : pencil ? "Idea: " : ""}${text}${done ? ", done" : ""}${when ? `, ${when}` : ""}`;
   const keys = [
     onEdit && "Enter to edit",
-    onRank && "1 to 9 to number",
-    onStackWith && "S to stack",
     onWhen && "W for when",
-    onConnect && "L to connect",
-    onThread && "T for its thread",
     onDelete && "Delete to crumple",
   ]
     .filter(Boolean)
@@ -400,17 +405,14 @@ export function ThoughtBubble({
         style={shapeStyle}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
-        // Selectable from the keyboard: Enter edits, S stacks, W schedules, Delete crumples.
+        // Selectable from the keyboard: Enter edits, W schedules, Delete crumples.
         tabIndex={readOnly ? undefined : 0}
         data-keys={readOnly ? undefined : ""}
         aria-label={readOnly ? undefined : `${label}. ${keys}.`}
         onKeyDown={(e) => {
           if (readOnly || e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
           const k = e.key.toLowerCase();
-          const digit = /^[0-9]$/.test(k) && onRank ? () => onRank(k === "0" ? null : Number(k)) : undefined;
-          const act =
-            digit ??
-            (k === "enter" ? startEdit : k === "s" ? onStackWith : k === "w" ? onWhen : k === "l" ? onConnect : k === "t" ? onThread : k === "delete" || k === "backspace" ? onDelete : undefined);
+          const act = k === "enter" ? startEdit : k === "w" ? onWhen : k === "delete" || k === "backspace" ? onDelete : undefined;
           if (!act) return;
           e.preventDefault();
           act();
@@ -438,7 +440,7 @@ export function ThoughtBubble({
             />
           </>
         )}
-        {text ? (
+        {text && (image || !isOnlyYoutube(text)) ? (
           <span
             style={fresh ? ({ "--write": writeOn(text) } as CSSProperties) : undefined}
             className={`hand font-note leading-snug break-words whitespace-pre-wrap ${image ? "px-1 text-[19px]" : "text-[19px] sm:text-[20px]"} ${fresh ? "write-on" : ""}`}
@@ -450,6 +452,7 @@ export function ThoughtBubble({
         ) : (
           image && !readOnly && <span className="px-1 font-note text-[18px] text-mute">add a caption…</span>
         )}
+        {!image && <LinkPreview text={text} />}
         {(stream && meta) || when ? (
           <span className="flex flex-wrap items-center gap-1.5">
             {when && (
@@ -461,13 +464,12 @@ export function ThoughtBubble({
             {stream && meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
           </span>
         ) : null}
-        {carried && !pencil && !rank && (
+        {carried && !pencil && (
           <span title={`Carried from ${carried}`} aria-label={`Carried from ${carried}`} className="absolute top-2 left-2.5 text-[11px] leading-none text-mute">
             ↻
           </span>
         )}
       </div>
-      {rank ? <RankMark n={rank} struck={done} className="absolute -top-5 -left-5 z-10" /> : null}
       {!stream && meta && (
         <span className="pointer-events-none absolute top-full left-1/2 mt-1.5 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap text-mute opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
           {meta}
@@ -492,11 +494,6 @@ export function ThoughtBubble({
               className={`${toolButton} ${pencil ? "text-red-text" : "text-mute"}`}
             >
               {pencil ? <PenIcon size={15} /> : <PencilIcon size={14} />}
-            </button>
-          )}
-          {onThread && (
-            <button type="button" onClick={onThread} aria-label={`Show the thread of "${text}"`} title="Its thread (T)" className={`${toolButton} text-[13px] text-mute`}>
-              ⤳
             </button>
           )}
           {onWhen && (

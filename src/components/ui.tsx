@@ -6,6 +6,7 @@ import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { BackIcon, MoonIcon, PenIcon, SunIcon } from "./icons";
 import type { Tint } from "@/lib/types";
 import { btn } from "./btn";
+import { applyAppearance, saveAppearance } from "@/lib/appearance";
 
 /* ---------- Buttons ---------- */
 
@@ -27,29 +28,25 @@ export function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 /* ---------- Theme ---------- */
 
-const THEME_EVENT = "pp-theme";
-
 function readTheme(): "light" | "dark" {
   return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
 }
 
 function subscribeTheme(cb: () => void) {
-  window.addEventListener(THEME_EVENT, cb);
-  return () => window.removeEventListener(THEME_EVENT, cb);
+  window.addEventListener("pp-appearance", cb);
+  return () => window.removeEventListener("pp-appearance", cb);
 }
 
-export function ThemeToggle() {
+/** Flips light and dark in one tap; Settings has the System option. */
+export function ThemeToggle({ persist = false }: { persist?: boolean }) {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "light" as const);
   const next = theme === "dark" ? "light" : "dark";
   return (
     <button
       type="button"
       onClick={() => {
-        document.documentElement.setAttribute("data-theme", next);
-        try {
-          localStorage.setItem("pp-theme", next);
-        } catch {}
-        window.dispatchEvent(new Event(THEME_EVENT));
+        applyAppearance({ mode: next });
+        if (persist) void saveAppearance({ theme: next });
       }}
       aria-label={next === "dark" ? "Switch to Ink (dark) theme" : "Switch to Paper (light) theme"}
       className="flex size-10 items-center justify-center rounded-full text-mute hover:bg-soft hover:text-ink"
@@ -114,6 +111,9 @@ export function AccountMenu({ name, email, tint, onSignOut }: { name: string; em
         </Link>
         <Link href="/drop/history" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
           Past papers
+        </Link>
+        <Link href="/settings" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+          Settings
         </Link>
         <Link href="/projects" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
           Team projects

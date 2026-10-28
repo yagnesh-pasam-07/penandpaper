@@ -1,31 +1,26 @@
 import { describe, expect, it } from "vitest";
+import { CANVASES, CANVAS_IDS, DEFAULT_CANVAS, parseCanvas, parseThemeMode, resolveTheme } from "@/lib/canvases";
 import { digestItems } from "./digest";
 import {
-  applyStackOp,
+  applyPaperOp,
   counts,
   deskCards,
   deskSummary,
   droppedToday,
   foldedItems,
+  firstLink,
+  firstYoutube,
+  isOnlyYoutube,
   linkify,
-  membersOf,
-  nextUp,
-  rankedIds,
   rollover,
-  tapRank,
-  StackError,
-  threadOf,
+  PaperError,
   thoughtLabel,
-  guessLinks,
-  keywords,
   pencilFade,
-  themeOf,
-  tomorrowIds,
   thisWeekend,
   visiblePaper,
   whenLabel,
+  youtubeId,
   type DropPaper,
-  type Stack,
   type Thought,
 } from "./logic";
 
@@ -40,20 +35,11 @@ const t = (id: string, text: string, status: "open" | "done", carriedFrom: strin
   carriedFrom,
   x: null,
   y: null,
-  stackId: null,
-  stackOrder: 0,
   scheduledFor: null,
-  rank: null,
-  nextRank: null,
   ...more,
 });
 
-/** Each id with its number, in rank order. */
-const ranks = (p: DropPaper) => rankedIds(p).map((id) => [id, p.thoughts.find((t) => t.id === id)?.rank ?? p.stacks.find((s) => s.id === id)?.rank]);
-
-const stack = (id: string, more: Partial<Stack> = {}): Stack => ({ id, name: null, x: 0.5, y: 200, createdAt: "2026-10-17T05:00:00.000Z", carriedFrom: null, scheduledFor: null, rank: null, nextRank: null, ...more });
-
-const paper = (thoughts: Thought[], stacks: Stack[] = []): DropPaper => ({ date: "2026-10-17", thoughts, stacks });
+const paper = (thoughts: Thought[]): DropPaper => ({ date: "2026-10-17", thoughts });
 
 describe("rollover", () => {
   const yesterday = paper([t("a", "call bank", "done"), t("b", "renew passport", "open"), t("c", "old idea", "open", "2026-10-15")]);
@@ -71,112 +57,18 @@ describe("rollover", () => {
     expect(carried[0].createdAt).toBe("2026-10-17T04:00:00.000Z");
   });
   it("doesn't count carried thoughts as dropped today", () => {
-    expect(droppedToday({ date: "2026-10-18", thoughts: carried, stacks: [] })).toBe(0);
-  });
-});
-
-describe("stack rollover", () => {
-  const yesterday = paper(
-    [
-      t("m", "milk", "open", null, { stackId: "s1", stackOrder: 0 }),
-      t("e", "eggs", "open", null, { stackId: "s1", stackOrder: 1 }),
-      t("b", "bread", "done", null, { stackId: "s1", stackOrder: 2 }),
-      t("p", "pack bag", "open", null, { stackId: "s2", stackOrder: 0 }),
-      t("q", "passport", "done", null, { stackId: "s2", stackOrder: 1 }),
-    ],
-    [stack("s1", { name: "Groceries", x: 0.3, y: 180 }), stack("s2", { x: 0.7, y: 240 })],
-  );
-  let n = 0;
-  const next = rollover(yesterday, () => `n${++n}`);
-
-  it("carries a stack with its open thoughts only (2 open + 1 done → 2)", () => {
-    expect(next.stacks).toHaveLength(1);
-    const [s] = next.stacks;
-    expect(s).toMatchObject({ name: "Groceries", x: 0.3, y: 180, carriedFrom: "2026-10-17" });
-    expect(membersOf(next, s.id).map((x) => x.text)).toEqual(["eggs", "milk"]);
-  });
-  it("leaves the old paper's stack untouched (it keeps all 3)", () => {
-    expect(membersOf(yesterday, "s1")).toHaveLength(3);
-  });
-  it("lets a stack with one open thought go loose where the stack was", () => {
-    const pack = next.thoughts.find((x) => x.text === "pack bag")!;
-    expect(pack).toMatchObject({ stackId: null, x: 0.7, y: 240 });
-  });
-});
-
-describe("stack changes", () => {
-  const base = paper([t("a", "milk", "open", null, { x: 0.2, y: 100 }), t("b", "eggs", "open"), t("c", "bread", "open")]);
-  const now = "2026-10-17T10:00:00.000Z";
-
-  it("drops a thought onto another: a stack at the target's spot", () => {
-    const after = applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now);
-    expect(after.stacks).toEqual([{ id: "s1", name: null, x: 0.2, y: 100, createdAt: now, carriedFrom: null, scheduledFor: null, rank: null, nextRank: null }]);
-    expect(membersOf(after, "s1").map((x) => x.id)).toEqual(["b", "a"]);
-    expect(after.thoughts.find((x) => x.id === "a")).toMatchObject({ x: null, y: null });
-  });
-
-  it("drops a thought onto a stack (or a thought in one): it joins on top", () => {
-    const pair = applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now);
-    const three = applyStackOp(pair, { kind: "stack", thought: "c", onto: "a", newStackId: "unused" }, now);
-    expect(three.stacks).toHaveLength(1);
-    expect(membersOf(three, "s1")[0].id).toBe("c");
-  });
-
-  it("sinks done thoughts to the bottom of a stack", () => {
-    const s = paper(
-      [t("a", "a", "done", null, { stackId: "s", stackOrder: 2 }), t("b", "b", "open", null, { stackId: "s", stackOrder: 0 })],
-      [stack("s")],
-    );
-    expect(membersOf(s, "s").map((x) => x.id)).toEqual(["b", "a"]);
-  });
-
-  it("dissolves a stack taken down to one thought, leaving it where the stack was", () => {
-    const pair = applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now);
-    const out = applyStackOp(pair, { kind: "takeOut", thought: "b", x: 0.8, y: 300 }, now);
-    expect(out.stacks).toEqual([]);
-    expect(out.thoughts.find((x) => x.id === "b")).toMatchObject({ stackId: null, x: 0.8, y: 300 });
-    expect(out.thoughts.find((x) => x.id === "a")).toMatchObject({ stackId: null, x: 0.2, y: 100 });
-  });
-
-  it("dissolves the old stack when its second-last thought joins another", () => {
-    let p = applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now);
-    p = applyStackOp(paper([...p.thoughts, t("d", "jam", "open")], p.stacks), { kind: "stack", thought: "b", onto: "d", newStackId: "s2" }, now);
-    expect(p.stacks.map((s) => s.id)).toEqual(["s2"]);
-  });
-
-  it("unstacks into loose thoughts near the stack", () => {
-    const three = applyStackOp(applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now), { kind: "stack", thought: "c", onto: "s1", newStackId: "x" }, now);
-    const loose = applyStackOp(three, { kind: "unstack", stack: "s1", spots: [{ id: "c", x: 0.25, y: 120 }] }, now);
-    expect(loose.stacks).toEqual([]);
-    expect(loose.thoughts.find((x) => x.id === "c")).toMatchObject({ x: 0.25, y: 120, stackId: null });
-    expect(loose.thoughts.find((x) => x.id === "a")).toMatchObject({ x: 0.2, y: 100, stackId: null });
-  });
-
-  it("names a stack (trimmed; blank clears it) and crumples it with its thoughts", () => {
-    const pair = applyStackOp(base, { kind: "stack", thought: "b", onto: "a", newStackId: "s1" }, now);
-    expect(applyStackOp(pair, { kind: "rename", stack: "s1", name: "  Groceries " }, now).stacks[0].name).toBe("Groceries");
-    expect(applyStackOp(pair, { kind: "rename", stack: "s1", name: "   " }, now).stacks[0].name).toBeNull();
-    const gone = applyStackOp(pair, { kind: "crumple", stack: "s1" }, now);
-    expect(gone.stacks).toEqual([]);
-    expect(gone.thoughts.map((x) => x.id)).toEqual(["c"]);
-  });
-
-  it("refuses a thought stacking on itself", () => {
-    expect(() => applyStackOp(base, { kind: "stack", thought: "a", onto: "a", newStackId: "s1" }, now)).toThrow(StackError);
+    expect(droppedToday({ date: "2026-10-18", thoughts: carried })).toBe(0);
   });
 });
 
 /** The next day's paper, as the server builds it: carried copies plus whatever moved across. */
 function nextPaper(prev: DropPaper, date: string, newId: () => string): DropPaper {
   const r = rollover(prev, newId);
-  const since = (x: { carriedFrom: string | null }) => x.carriedFrom ?? prev.date;
-  const movedStacks = prev.stacks.filter((s) => r.move.stacks.includes(s.id)).map((s) => ({ ...s, carriedFrom: since(s) }));
   const moved = prev.thoughts.flatMap((t) => {
-    if (t.stackId && r.move.stacks.includes(t.stackId)) return [{ ...t, carriedFrom: since(t) }];
     const m = r.move.thoughts.find((x) => x.id === t.id);
-    return m ? [{ ...t, stackId: m.stackId, carriedFrom: m.carriedFrom }] : [];
+    return m ? [{ ...t, carriedFrom: m.carriedFrom }] : [];
   });
-  return { date, thoughts: [...r.thoughts, ...moved], stacks: [...r.stacks, ...movedStacks] };
+  return { date, thoughts: [...r.thoughts, ...moved] };
 }
 
 describe("folding till later (scheduling)", () => {
@@ -184,34 +76,32 @@ describe("folding till later (scheduling)", () => {
   const tue = "2026-10-20";
   const base = paper([t("a", "call bank", "open"), t("m", "milk", "open"), t("e", "eggs", "open"), t("x", "pay rent", "open")]);
   const today = { ...base, date: mon };
-  const stacked = applyStackOp(today, { kind: "stack", thought: "e", onto: "m", newStackId: "s1" }, "2026-10-19T08:00:00.000Z");
-  let folded = applyStackOp(stacked, { kind: "schedule", id: "a", on: tue });
-  folded = applyStackOp(folded, { kind: "schedule", id: "s1", on: tue });
+  let folded = applyPaperOp(today, { kind: "schedule", id: "a", on: tue });
+  folded = applyPaperOp(folded, { kind: "schedule", id: "m", on: tue });
 
-  it("folds a thought and a stack away from today", () => {
+  it("folds thoughts away from today", () => {
     const shown = visiblePaper(folded);
-    expect(shown.thoughts.map((x) => x.id)).toEqual(["x"]);
-    expect(shown.stacks).toEqual([]);
+    expect(shown.thoughts.map((x) => x.id)).toEqual(["e", "x"]);
     expect(foldedItems(folded).map((f) => [f.label, f.on])).toEqual([
-      ["Stack of 2", tue],
       ["call bank", tue],
+      ["milk", tue],
     ]);
-    expect(counts(folded).open).toBe(1);
+    expect(counts(folded).open).toBe(2);
   });
 
-  it("brings them onto tomorrow's paper (same ids, stack intact), marked scheduled", () => {
+  it("brings them onto tomorrow's paper (same ids), marked scheduled", () => {
     let n = 0;
     const next = nextPaper(folded, tue, () => `n${++n}`);
     const shown = visiblePaper(next);
-    expect(shown.thoughts.find((x) => x.id === "a")).toMatchObject({ scheduledFor: tue });
-    expect(shown.stacks.map((x) => x.id)).toEqual(["s1"]);
-    expect(membersOf(shown, "s1")).toHaveLength(2);
-    // The one left open today carries over as usual.
+    expect(next.thoughts.find((x) => x.id === "a")).toMatchObject({ scheduledFor: tue });
+    // Their day has come, so they show.
+    expect(shown.thoughts.filter((x) => ["a", "m"].includes(x.id))).toHaveLength(2);
+    // The ones left open today carry over as usual.
     expect(shown.thoughts.some((x) => x.text === "pay rent" && x.carriedFrom === mon)).toBe(true);
   });
 
   it("keeps folding forward until the day comes, then carries like any other", () => {
-    const later = applyStackOp({ ...base, date: mon }, { kind: "schedule", id: "a", on: "2026-10-22" });
+    const later = applyPaperOp({ ...base, date: mon }, { kind: "schedule", id: "a", on: "2026-10-22" });
     let n = 0;
     const tuePaper = nextPaper(later, tue, () => `n${++n}`);
     expect(visiblePaper(tuePaper).thoughts.some((x) => x.id === "a")).toBe(false);
@@ -222,7 +112,7 @@ describe("folding till later (scheduling)", () => {
   });
 
   it("refuses a day in the past", () => {
-    expect(() => applyStackOp(today, { kind: "schedule", id: "a", on: "2026-10-18" })).toThrow(StackError);
+    expect(() => applyPaperOp(today, { kind: "schedule", id: "a", on: "2026-10-18" })).toThrow(PaperError);
   });
 
   it("reads days as people say them", () => {
@@ -242,8 +132,8 @@ describe("pencil and pen", () => {
     expect(counts(p)).toEqual({ open: 1, ideas: 1, done: 1 });
   });
   it("inks an idea into a task, and pencils a task (struck or not) back into an idea", () => {
-    expect(applyStackOp(p, { kind: "ink", thought: "i", to: "pen" }).thoughts[0].kind).toBe("pen");
-    expect(applyStackOp(p, { kind: "ink", thought: "b", to: "pencil" }).thoughts[2]).toMatchObject({ kind: "pencil", status: "open", doneAt: null });
+    expect(applyPaperOp(p, { kind: "ink", thought: "i", to: "pen" }).thoughts[0].kind).toBe("pen");
+    expect(applyPaperOp(p, { kind: "ink", thought: "b", to: "pencil" }).thoughts[2]).toMatchObject({ kind: "pencil", status: "open", doneAt: null });
   });
   it("carries pencil ideas over quietly, still in pencil", () => {
     const next = rollover(p, () => "n").thoughts;
@@ -258,16 +148,10 @@ describe("clear desk", () => {
       t("i", "idea", "open", null, { kind: "pencil" }),
       t("d", "done one", "done"),
       t("f", "later", "open", null, { scheduledFor: "2026-10-30" }),
-      t("m", "milk", "open", null, { stackId: "s1", stackOrder: 1 }),
-      t("e", "eggs", "done", null, { stackId: "s1" }),
     ],
-    [stack("s1", { name: "Groceries" })],
   );
-  it("reviews open pen thoughts only (not ideas, done or folded), stacks as one card", () => {
-    expect(deskCards(p)).toEqual([
-      { kind: "stack", id: "s1", label: "Groceries", open: [{ id: "m", text: "milk" }] },
-      { kind: "thought", id: "a", text: "call bank" },
-    ]);
+  it("reviews open pen thoughts only (not ideas, done or folded)", () => {
+    expect(deskCards(p)).toEqual([{ id: "a", text: "call bank" }]);
   });
   it("sums up the decisions in plain words", () => {
     expect(deskSummary(["tomorrow", "tomorrow", "keep", "crumple"])).toBe("2 to tomorrow · 1 kept as an idea · 1 crumpled");
@@ -275,103 +159,12 @@ describe("clear desk", () => {
   });
 });
 
-describe("number it", () => {
-  const base = paper(["a", "b", "c", "d", "e", "f", "g"].map((id) => t(id, `thought ${id}`, "open")));
-  const tap = (p: DropPaper, id: string) => applyStackOp(p, tapRank(p, id));
-
-  it("numbers in the order tapped, and a second tap takes the number off and closes the gap", () => {
-    let p = tap(tap(tap(base, "c"), "a"), "e");
-    expect(ranks(p)).toEqual([["c", 1], ["a", 2], ["e", 3]]);
-    p = tap(p, "c");
-    expect(ranks(p)).toEqual([["a", 1], ["e", 2]]);
-  });
-
-  it("sets a number directly and shifts the others", () => {
-    let p = tap(tap(tap(base, "a"), "b"), "c");
-    p = applyStackOp(p, { kind: "rank", id: "c", rank: 1 });
-    expect(ranks(p)).toEqual([["c", 1], ["a", 2], ["b", 3]]);
-    p = applyStackOp(p, { kind: "rank", id: "d", rank: 2 });
-    expect(ranks(p)).toEqual([["c", 1], ["d", 2], ["a", 3], ["b", 4]]);
-    p = applyStackOp(p, { kind: "rank", id: "a", rank: null });
-    expect(ranks(p)).toEqual([["c", 1], ["d", 2], ["b", 3]]);
-  });
-
-  it("moves numbered ones into the top row (their placed spots let go), in order", () => {
-    const placed = paper([t("a", "a", "open", null, { x: 0.8, y: 300 }), t("b", "b", "open", null, { x: 0.2, y: 120 })]);
-    const p = applyStackOp(applyStackOp(placed, { kind: "rank", id: "b", rank: 1 }), { kind: "rank", id: "a", rank: 2 });
-    expect(p.thoughts.map((x) => [x.id, x.x, x.y, x.rank])).toEqual([
-      ["a", null, null, 2],
-      ["b", null, null, 1],
-    ]);
-  });
-
-  it("has no six limit: a seventh gets 7, and giving a new one 2 shifts the rest down", () => {
-    let p = paper(["a", "b", "c", "d", "e", "f", "g", "h"].map((id) => t(id, `thought ${id}`, "open")));
-    for (const id of ["a", "b", "c", "d", "e", "f", "g"]) p = tap(p, id);
-    expect(ranks(p).at(-1)).toEqual(["g", 7]);
-    p = applyStackOp(p, { kind: "rank", id: "h", rank: 2 });
-    expect(ranks(p).map(([id]) => id)).toEqual(["a", "h", "b", "c", "d", "e", "f", "g"]);
-    expect(ranks(p).map(([, n]) => n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-  });
-
-  it("closes up when a numbered thought is crumpled, folded or stacked; a new stack takes the target's number", () => {
-    let p = { ...tap(tap(tap(base, "a"), "b"), "c"), date: "2026-10-19" };
-    p = applyStackOp(p, { kind: "schedule", id: "a", on: "2026-10-22" });
-    expect(ranks(p)).toEqual([["b", 1], ["c", 2]]);
-    p = applyStackOp(p, { kind: "stack", thought: "b", onto: "c", newStackId: "s1" });
-    expect(ranks(p)).toEqual([["s1", 1]]);
-  });
-
-  it("shows the first numbered thing not done yet as Next", () => {
-    let p = tap(tap(base, "b"), "a");
-    expect(nextUp(p)).toMatchObject({ id: "b", rank: 1 });
-    p = { ...p, thoughts: p.thoughts.map((x) => (x.id === "b" ? { ...x, status: "done" as const } : x)) };
-    expect(nextUp(p)).toMatchObject({ id: "a", rank: 2, label: "thought a" });
-  });
-
-  it("clears numbers at rollover, except tomorrow's top 3 picked at Clear desk", () => {
-    let p = tap(tap(tap(base, "a"), "b"), "c");
-    p = applyStackOp(p, { kind: "nextRank", ids: ["e", "a"] });
-    let n = 0;
-    const next = rollover(p, () => `n${++n}`).thoughts;
-    const byText = (s: string) => next.find((x) => x.text === s)!;
-    expect(byText("thought e").rank).toBe(1);
-    expect(byText("thought a").rank).toBe(2);
-    expect(byText("thought b").rank).toBeNull();
-    expect(next.every((x) => x.nextRank === null)).toBe(true);
-  });
-});
-
 describe("digest", () => {
-  it("groups thoughts under their stack, then the loose ones", () => {
-    const p = paper(
-      [
-        t("m", "milk", "open", null, { stackId: "s1", stackOrder: 0 }),
-        t("e", "eggs", "done", null, { stackId: "s1", stackOrder: 1 }),
-        t("x", "a", "open", null, { stackId: "s2" }),
-        t("y", "b", "open", null, { stackId: "s2", stackOrder: 1 }),
-        t("l", "call bank", "open"),
-      ],
-      [stack("s1", { name: "Groceries" }), stack("s2")],
-    );
+  it("lists open tasks first, then struck ones", () => {
+    const p = paper([t("e", "eggs", "done"), t("l", "call bank", "open")]);
     expect(digestItems(p)).toEqual([
-      { group: "Groceries" },
-      { text: "milk", done: false },
-      { text: "eggs", done: true },
-      { group: "Stack of 2" },
-      { text: "b", done: false },
-      { text: "a", done: false },
-      { group: "Loose thoughts" },
       { text: "call bank", done: false },
-    ]);
-  });
-  it("lists numbered thoughts first, in order, with their numbers", () => {
-    const p = paper([t("a", "call bank", "open", null, { rank: 2 }), t("b", "pay rent", "done", null, { rank: 1 }), t("c", "renew passport", "open")]);
-    expect(digestItems(p)).toEqual([
-      { text: "1. pay rent", done: true },
-      { text: "2. call bank", done: false },
-      { group: "Loose thoughts" },
-      { text: "renew passport", done: false },
+      { text: "eggs", done: true },
     ]);
   });
   it("puts ideas and what's coming up this week at the bottom", () => {
@@ -401,55 +194,6 @@ describe("linkify", () => {
   });
 });
 
-describe("connections", () => {
-  const base = paper([t("a", "world map", "open"), t("b", "india map", "open"), t("c", "kerala trip", "open"), t("d", "radiation", "open")]);
-
-  it("joins two notes once, labels and restyles the line, and removes it", () => {
-    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
-    p = applyStackOp(p, { kind: "link", id: "l2", from: "b", to: "a" });
-    expect(p.links).toEqual([{ id: "l1", from: "a", to: "b", label: null, arrow: true }]);
-    p = applyStackOp(p, { kind: "linkStyle", id: "l1", label: "  for the trip  ", arrow: false });
-    expect(p.links?.[0]).toMatchObject({ label: "for the trip", arrow: false });
-    p = applyStackOp(p, { kind: "unlink", id: "l1" });
-    expect(p.links).toEqual([]);
-  });
-
-  it("won't join a note to itself or to something not on the paper", () => {
-    expect(() => applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "a" })).toThrow(StackError);
-    expect(() => applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "zz" })).toThrow(StackError);
-  });
-
-  it("drops a line when one of its ends is crumpled", () => {
-    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
-    p = applyStackOp(applyStackOp(p, { kind: "stack", thought: "c", onto: "b", newStackId: "s1" }), { kind: "crumple", stack: "s1" });
-    expect(p.links).toEqual([]);
-  });
-
-  it("follows a whole thread, through a stack", () => {
-    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
-    p = applyStackOp(p, { kind: "link", id: "l2", from: "b", to: "c" });
-    expect(threadOf(p, "c")).toEqual([
-      { id: "c", depth: 0 },
-      { id: "b", depth: 1 },
-      { id: "a", depth: 2 },
-    ]);
-    expect(threadOf(p, "d")).toEqual([]);
-    p = applyStackOp(p, { kind: "stack", thought: "d", onto: "a", newStackId: "s1" });
-    expect(threadOf(p, "b").map((x) => x.id)).toEqual(["b", "s1", "c"]);
-  });
-
-  it("carries lines whose two ends both carry over", () => {
-    let p = applyStackOp(base, { kind: "link", id: "l1", from: "a", to: "b" });
-    p = applyStackOp(p, { kind: "link", id: "l2", from: "b", to: "c" });
-    p = { ...p, thoughts: p.thoughts.map((x) => (x.id === "c" ? { ...x, status: "done" as const } : x)) };
-    let n = 0;
-    const next = rollover(p, () => `n${++n}`);
-    const idOf = (text: string) => next.thoughts.find((x) => x.text === text)!.id;
-    expect(next.links).toHaveLength(1);
-    expect(next.links[0]).toMatchObject({ from: idOf("world map"), to: idOf("india map") });
-  });
-});
-
 describe("pictures", () => {
   it("read as their caption, or as Image without one", () => {
     expect(thoughtLabel({ text: "leave page bug", image: "data:image/webp;base64,AA" })).toBe("leave page bug");
@@ -463,29 +207,6 @@ describe("pictures", () => {
 
 describe("pencil thinks, pen commits", () => {
   const pencil = (id: string, text: string, more: Partial<Thought> = {}) => t(id, text, "open", null, { kind: "pencil", ...more });
-  const base = paper([pencil("a", "Sravanthi mam tasks"), pencil("b", "Ravi anna about payroll"), pencil("c", "tanuj issue"), pencil("d", "data migration")]);
-
-  it("inks a thought into tomorrow where it's dropped; the rest move down, no limit", () => {
-    let p = applyStackOp(base, { kind: "shape", id: "a", at: 1 });
-    p = applyStackOp(p, { kind: "shape", id: "b", at: 2 });
-    p = applyStackOp(p, { kind: "shape", id: "c", at: 3 });
-    p = applyStackOp(p, { kind: "shape", id: "d", at: 3 });
-    expect(tomorrowIds(p)).toEqual(["a", "b", "d", "c"]);
-    expect(p.thoughts.filter((x) => x.kind === "pen").map((x) => x.id).sort()).toEqual(["a", "b", "c", "d"]);
-    p = applyStackOp(p, { kind: "shape", id: "b", at: null });
-    expect(tomorrowIds(p)).toEqual(["a", "d", "c"]);
-  });
-
-  it("wakes up numbered, in ink, in that order", () => {
-    let p = applyStackOp(base, { kind: "shape", id: "c", at: 1 });
-    p = applyStackOp(p, { kind: "shape", id: "a", at: 2 });
-    let n = 0;
-    const next = rollover(p, () => `n${++n}`).thoughts;
-    const byText = (s: string) => next.find((x) => x.text === s)!;
-    expect([byText("tanuj issue").rank, byText("Sravanthi mam tasks").rank, byText("data migration").rank]).toEqual([1, 2, null]);
-    expect(byText("tanuj issue").kind).toBe("pen");
-    expect(byText("data migration").kind).toBe("pencil");
-  });
 
   it("fades pencil a little each night, never ink", () => {
     const old = pencil("a", "x", { carriedFrom: "2026-10-14" });
@@ -495,18 +216,68 @@ describe("pencil thinks, pen commits", () => {
     expect(pencilFade({ ...old, kind: "pen" }, "2026-10-17")).toBe(1);
   });
 
-  it("guesses related thoughts by a shared telling word, skipping joined and waved-off pairs", () => {
-    const p = paper([pencil("a", "world map of places"), pencil("b", "india map"), pencil("c", "travel planning using the maps"), pencil("d", "radiation")]);
-    expect(keywords("travel planning using the maps")).toEqual(new Set(["travel", "planning", "map"]));
-    const g = guessLinks(p);
-    expect(g.map((x) => [x.from, x.to].sort().join())).toEqual(["a,b", "a,c", "b,c"]);
-    const linked = applyStackOp(p, { kind: "link", id: "l1", from: "a", to: "b" });
-    expect(guessLinks(linked, new Set(["a|c"])).map((x) => [x.from, x.to].sort().join())).toEqual(["b,c"]);
-  });
+});
 
-  it("notices a word that keeps coming up (four or more)", () => {
-    const p = paper(["india map", "world map", "map of trips", "maps for travel", "radiation"].map((text, i) => pencil(`t${i}`, text)));
-    expect(themeOf(p)).toEqual({ word: "map", ids: ["t0", "t1", "t2", "t3"] });
-    expect(themeOf(paper([pencil("a", "india map")]))).toBeNull();
+describe("youtube previews", () => {
+  it("reads the video id from watch, short, shorts and embed links", () => {
+    for (const url of [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s",
+      "https://youtu.be/dQw4w9WgXcQ?si=abc",
+      "https://m.youtube.com/shorts/dQw4w9WgXcQ",
+      "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    ]) {
+      expect(youtubeId(url)).toBe("dQw4w9WgXcQ");
+    }
+  });
+  it("ignores other sites and malformed ids", () => {
+    expect(youtubeId("https://vimeo.com/76979871")).toBeNull();
+    expect(youtubeId("https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ")).toBeNull();
+    expect(youtubeId("https://www.youtube.com/watch?v=short")).toBeNull();
+  });
+  it("knows when a note is only a video link", () => {
+    expect(isOnlyYoutube("  https://youtu.be/dQw4w9WgXcQ?si=abc\n")).toBe(true);
+    expect(isOnlyYoutube("watch https://youtu.be/dQw4w9WgXcQ")).toBe(false);
+    expect(isOnlyYoutube("https://docs.stripe.com")).toBe(false);
+  });
+  it("finds the first video in a note", () => {
+    expect(firstYoutube("watch this: www.youtube.com/watch?v=dQw4w9WgXcQ later")).toEqual({ id: "dQw4w9WgXcQ", href: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" });
+    expect(firstYoutube("read https://docs.stripe.com")).toBeNull();
+  });
+});
+
+describe("link previews", () => {
+  it("takes the first link apart into its site and path", () => {
+    expect(firstLink("read https://www.docs.stripe.com/webhooks/signatures/ later")).toEqual({
+      href: "https://www.docs.stripe.com/webhooks/signatures/",
+      host: "docs.stripe.com",
+      path: "webhooks/signatures",
+    });
+    expect(firstLink("see www.neon.tech")).toEqual({ href: "https://www.neon.tech", host: "neon.tech", path: "" });
+  });
+  it("is null when there's no link", () => {
+    expect(firstLink("just words, no link.com")).toBeNull();
+  });
+});
+
+describe("appearance", () => {
+  it("falls back to Dotted for anything it doesn't know", () => {
+    expect(parseCanvas("ruled")).toBe("ruled");
+    expect(parseCanvas("sparkles")).toBe(DEFAULT_CANVAS);
+    expect(parseCanvas("grid")).toBe("grid");
+    expect(parseCanvas(null)).toBe("dotted");
+  });
+  it("keeps one entry per canvas id, each with tokens for both themes", () => {
+    expect(new Set(CANVAS_IDS).size).toBe(CANVASES.length);
+    for (const c of CANVASES) expect(c.tokens.light.length && c.tokens.dark.length).toBeTruthy();
+  });
+  it("reads the theme mode, defaulting to System", () => {
+    expect(parseThemeMode("dark")).toBe("dark");
+    expect(parseThemeMode("blue")).toBe("system");
+  });
+  it("resolves System from the OS, and explicit choices as they are", () => {
+    expect(resolveTheme("system", true)).toBe("dark");
+    expect(resolveTheme("system", false)).toBe("light");
+    expect(resolveTheme("light", true)).toBe("light");
+    expect(resolveTheme("dark", false)).toBe("dark");
   });
 });

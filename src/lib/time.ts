@@ -55,6 +55,11 @@ export function longDate(date: string): string {
   return `${wd}, ${dm}`;
 }
 
+/** "28 October 2026" */
+export function fullDate(date: string): string {
+  return toUtcDate(date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+
 /** Minutes the zone is ahead of UTC at the given instant. */
 export function tzOffsetMinutes(tz: string, at: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {

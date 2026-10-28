@@ -17,7 +17,7 @@ const body = z
       .nullable()
       .optional(),
     /** Where it was pasted on the sheet. */
-    x: z.number().min(0).max(1).nullable().optional(),
+    x: z.number().min(-8).max(9).nullable().optional(),
     y: z.number().min(-20000).max(20000).nullable().optional(),
   })
   // Words, a picture, or both.

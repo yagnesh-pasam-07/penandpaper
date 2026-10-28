@@ -5,7 +5,7 @@ import { arrangeThoughts, tidyToday } from "@/modules/drop/server";
 const body = z.union([
   z.object({
     placements: z
-      .array(z.object({ id: z.string().regex(/^[a-z0-9-]{6,40}$/), x: z.number().min(0).max(1), y: z.number().min(-20000).max(20000) }))
+      .array(z.object({ id: z.string().regex(/^[a-z0-9-]{6,40}$/), x: z.number().min(-8).max(9), y: z.number().min(-20000).max(20000) }))
       .min(1)
       .max(500),
   }),

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { getToday, stackHintPending } from "@/modules/drop/server";
+import { AppearanceSync } from "@/components/appearance";
+import { getAppearance, getToday } from "@/modules/drop/server";
 import { DropCanvas } from "@/modules/drop/ui";
 import { currentUser } from "@/server/session";
 
@@ -13,8 +14,13 @@ async function Today() {
   await connection();
   const user = await currentUser();
   if (!user) redirect("/login?next=/drop");
-  const [paper, stackHint] = await Promise.all([getToday(user.id), stackHintPending(user.id)]);
-  return <DropCanvas initial={paper} me={{ name: user.name, email: user.email }} stackHint={stackHint} />;
+  const [paper, appearance] = await Promise.all([getToday(user.id), getAppearance(user.id)]);
+  return (
+    <>
+      <AppearanceSync canvas={appearance.canvas} theme={appearance.theme} />
+      <DropCanvas initial={paper} me={{ name: user.name, email: user.email }} />
+    </>
+  );
 }
 
 export default function DropPage() {

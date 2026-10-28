@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
-import { StackCard, StackRow } from "@/components/canvas/stack-card";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { DeskStamp } from "@/modules/drop/chrome";
 
@@ -64,33 +63,6 @@ export function DropDemo() {
           <ThoughtBubble key={`${t}-${frame > i}`} text={t} done={false} shape={i} seed={`drop-${i}`} fresh={i === frame - 1} readOnly />
         ))}
         {frame === 0 && <span className="font-hand text-[22px] text-mute">a fresh sheet…</span>}
-      </Mini>
-    </div>
-  );
-}
-
-export function StackDemoCard() {
-  const [frame, ref, active] = useLoop(4, 1500, 3);
-  const members = ["milk", "eggs", "bread"];
-  return (
-    <div ref={ref}>
-      <Mini active={active}>
-        {frame < 2 ? (
-          <div className="relative h-[110px] w-[300px]">
-            <span className="absolute top-2 left-0">
-              <ThoughtBubble text="milk" done={false} shape={4} seed="st-a" readOnly />
-            </span>
-            <span className="absolute top-6 transition-[left,transform] duration-700 ease-in-out" style={{ left: frame === 0 ? 170 : 14, transform: frame === 0 ? "none" : "rotate(-4deg)" }}>
-              <ThoughtBubble text="eggs" done={false} shape={2} seed="st-b" readOnly target={frame === 1} />
-            </span>
-          </div>
-        ) : (
-          <StackCard name={frame === 3 ? "Groceries" : null} count={3} done={0} top={{ text: "eggs", shape: 4, seed: "st-a", done: false }} peek={members} open={frame === 3} onToggleOpen={() => {}}>
-            {members.map((m) => (
-              <StackRow key={m} text={m} done={false} readOnly />
-            ))}
-          </StackCard>
-        )}
       </Mini>
     </div>
   );

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Caveat, Gurajada, Instrument_Sans, JetBrains_Mono, Kalam } from "next/font/google";
+import { AppearanceBoot } from "@/components/appearance";
 import { StoreBoot } from "@/components/hydration";
 import "./globals.css";
 
@@ -51,14 +52,17 @@ export const viewport: Viewport = {
   ],
 };
 
-// Runs before first paint: saved choice wins, otherwise follow the OS setting.
-const themeScript = `(function(){try{var t=localStorage.getItem("pp-theme");if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`;
+// Runs before first paint, so nothing flashes: the saved theme mode (light, dark or
+// system, which follows the OS) and the saved canvas. Keys match src/lib/canvases.ts.
+const themeScript = `(function(){try{var d=document.documentElement,m=localStorage.getItem("pp-theme"),c=localStorage.getItem("pp-canvas");if(m!=="light"&&m!=="dark")m="system";var t=m==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.setAttribute("data-theme",t);d.setAttribute("data-theme-mode",m);d.setAttribute("data-canvas",c==="ruled"||c==="grid"?c:"dotted")}catch(e){}})()`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       data-theme="light"
+      data-theme-mode="system"
+      data-canvas="dotted"
       suppressHydrationWarning
       className={`${instrument.variable} ${caveat.variable} ${kalam.variable} ${gurajada.variable} ${jetbrains.variable} h-full antialiased`}
     >
@@ -68,6 +72,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       {/* Browser extensions often add attributes to <body>; don't treat that as a hydration error. */}
       <body className="min-h-full bg-bg text-ink" suppressHydrationWarning>
         <StoreBoot />
+        <AppearanceBoot />
         {/* Grain for pencil strokes (used only on pencil ideas). */}
         <svg aria-hidden="true" width="0" height="0" className="absolute">
           <filter id="pencil-grain">

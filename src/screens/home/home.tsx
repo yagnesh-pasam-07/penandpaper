@@ -4,7 +4,7 @@ import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { PenIcon } from "@/components/icons";
 import { btn } from "@/components/btn";
 import { Logo, ThemeToggle } from "@/components/ui";
-import { CarryDemo, ClearDeskDemo, CrumpleDemo, DropDemo, EmailDemo, FoldDemo, PencilDemo, StackDemoCard, StrikeDemo } from "./demos";
+import { CarryDemo, ClearDeskDemo, CrumpleDemo, DropDemo, EmailDemo, FoldDemo, PencilDemo, StrikeDemo } from "./demos";
 import { TryIt } from "./try-it";
 
 /**
@@ -13,7 +13,6 @@ import { TryIt } from "./try-it";
  */
 const FEATURES: { key: string; tag: string; title: string; line: string; demo: ReactNode; shipped: boolean }[] = [
   { key: "drop", tag: "drop", title: "Drop", line: "Type, Enter, gone from your head.", demo: <DropDemo />, shipped: true },
-  { key: "stack", tag: "stack", title: "Stack", line: "Pile related thoughts together.", demo: <StackDemoCard />, shipped: true },
   { key: "pencil", tag: "pencil or pen", title: "Pencil or pen", line: "Ideas in pencil, tasks in ink.", demo: <PencilDemo />, shipped: true },
   { key: "strike", tag: "strike", title: "Strike", line: "Cross it out like you mean it.", demo: <StrikeDemo />, shipped: true },
   { key: "fold", tag: "fold", title: "Fold till later", line: "Not today? Fold it for Friday.", demo: <FoldDemo />, shipped: true },
@@ -25,7 +24,7 @@ const FEATURES: { key: string; tag: string; title: string; line: string; demo: R
 
 const DAY = [
   { time: "9:00", title: "Morning", line: "Yesterday's leftovers are already waiting on a fresh sheet." },
-  { time: "all day", title: "Day", line: "Drop as things come up. Stack them, fold a few for Friday." },
+  { time: "all day", title: "Day", line: "Drop as things come up. Fold a few for Friday." },
   { time: "21:00", title: "9 PM", line: "A short email: the day on one page." },
   { time: "21:05", title: "Night", line: "Clear the desk: tomorrow, keep, or crumple. Stamped." },
 ];
