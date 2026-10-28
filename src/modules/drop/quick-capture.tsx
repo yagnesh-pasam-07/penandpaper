@@ -71,33 +71,55 @@ export function QuickCapture({ paperName }: { paperName: string | null }) {
     );
   }
 
+  const grow = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  };
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[420px] flex-col gap-2 bg-bg p-3 text-ink">
-      <label htmlFor="quick-thought" className="text-[13px] font-medium text-mute">
-        {paperName ? `To \u201c${paperName}\u201d` : "To your latest paper"}
-      </label>
-      <textarea
-        id="quick-thought"
-        ref={box}
-        value={text}
-        maxLength={MAX_THOUGHT}
-        placeholder="Type a thought. Enter saves."
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing) return;
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            void save();
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            window.close();
-          }
-        }}
-        className="min-h-0 flex-1 resize-none rounded-xl border border-line bg-sheet p-3 font-note text-[19px] leading-snug outline-none focus:border-red-text"
-      />
-      <p role="status" className="min-h-5 text-[13px] text-red-text">
-        {error}
-      </p>
+    <main className="flex min-h-dvh w-full items-center justify-center bg-bg p-4 text-ink">
+      <div className="flex w-full max-w-[480px] flex-col gap-3">
+        <label htmlFor="quick-thought" className="flex items-baseline justify-between gap-3 px-1">
+          <span className="font-hand text-[26px] leading-none font-bold">Quick thought</span>
+          <span className="truncate text-[13px] text-mute">{paperName ? `to \u201c${paperName}\u201d` : "to your latest paper"}</span>
+        </label>
+        <textarea
+          id="quick-thought"
+          ref={box}
+          rows={2}
+          value={text}
+          maxLength={MAX_THOUGHT}
+          placeholder="What's on your mind?"
+          onChange={(e) => {
+            setText(e.target.value);
+            grow(e.currentTarget);
+          }}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void save();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              window.close();
+            }
+          }}
+          className="w-full resize-none rounded-2xl border border-line bg-sheet px-4 py-3 font-note text-[21px] leading-snug shadow-[0_18px_40px_-28px_var(--shadow)] outline-none placeholder:text-mute focus:border-red-text"
+        />
+        <div className="flex items-center justify-between gap-3 px-1">
+          <p role="status" className={`min-h-5 text-[13px] ${error ? "text-red-text" : "text-mute"}`}>
+            {error || "Enter saves \u00b7 Shift+Enter new line \u00b7 Esc closes"}
+          </p>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={busy || !text.trim()}
+            className="h-9 rounded-xl bg-ink px-4 text-sm font-semibold text-bg disabled:opacity-40"
+          >
+            {busy ? "Saving\u2026" : "Save"}
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

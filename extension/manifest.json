@@ -1,21 +1,50 @@
 {
   "manifest_version": 3,
   "name": "Pen & Paper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Save the page you're on, a selection, a link or an image to your latest Pen & Paper paper.",
-  "permissions": ["activeTab", "contextMenus", "scripting", "storage"],
-  "action": { "default_title": "Save to Pen & Paper (Alt+Shift+P)" },
-  "background": { "service_worker": "background.js", "type": "module" },
-  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "scripting",
+    "storage"
+  ],
+  "action": {
+    "default_title": "Save to Pen & Paper (Alt+Shift+P)"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "commands": {
     "_execute_action": {
-      "suggested_key": { "default": "Alt+Shift+P" },
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
       "description": "Save this page to Pen & Paper"
     },
     "quick-thought": {
-      "suggested_key": { "default": "Alt+Shift+N" },
-      "description": "Type a thought and save it to Pen & Paper"
+      "suggested_key": {
+        "default": "Alt+Shift+N"
+      },
+      "description": "Type a thought in a box on the page and save it to Pen & Paper"
     }
   },
-  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "host_permissions": [
+    "https://penandpaper-app.vercel.app/*",
+    "http://localhost:3000/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ]
 }

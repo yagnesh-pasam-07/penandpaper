@@ -61,6 +61,23 @@ export function isSameSite(headers: { get(name: string): string | null }, origin
   return headers.get("origin") === origin;
 }
 
+/**
+ * Whether the request was sent by a browser extension: its `Origin` is the
+ * extension's own (`chrome-extension://<id>`, `moz-extension://<id>`). A browser
+ * sets `Origin` itself and a web page can't change it, so no website can pass
+ * as an extension. This only says where the request came from; the caller
+ * still has to be signed in, which for an extension means the browser sent the
+ * user's session cookie (it does for hosts the extension has permission for).
+ */
+export function isExtensionOrigin(headers: { get(name: string): string | null }): boolean {
+  return /^(chrome|moz)-extension:\/\/[a-z0-9-]+$/i.test(headers.get("origin") ?? "");
+}
+
+/** Who may save a quick thought: this site's own page, or the browser extension. */
+export function canCapture(headers: { get(name: string): string | null }, origin: string): boolean {
+  return isSameSite(headers, origin) || isExtensionOrigin(headers);
+}
+
 /** Where a share came from, besides a phone's share sheet: the browser extension says `from=ext`. */
 export type ShareSource = "ext";
 

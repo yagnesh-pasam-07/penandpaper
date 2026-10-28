@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { noStore, requireUser } from "@/modules/drop/http";
-import { captureText, isSameSite } from "@/modules/drop/share";
+import { canCapture, captureText } from "@/modules/drop/share";
 import { captureThought } from "@/modules/drop/server";
 
 const body = z.object({
@@ -9,9 +9,14 @@ const body = z.object({
   text: z.string().max(20_000),
 });
 
-/** Saves a thought from the quick box (`/capture`) onto the paper touched last. Only this site's own page may send it. */
+/**
+ * Saves a thought from the quick box (`/capture`) or the browser extension onto
+ * the paper touched last. Only this site's own page or an extension may send it
+ * (a web page can't send an extension `Origin`), and either way the user must be
+ * signed in.
+ */
 export async function POST(request: Request) {
-  if (!isSameSite(request.headers, new URL(request.url).origin)) return Response.json({ error: "Not from this site." }, { status: 403 });
+  if (!canCapture(request.headers, new URL(request.url).origin)) return Response.json({ error: "Not from this site." }, { status: 403 });
   const user = await requireUser();
   if (user instanceof Response) return user;
   const parsed = body.safeParse(await request.json().catch(() => null));

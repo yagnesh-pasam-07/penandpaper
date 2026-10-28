@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAX_THOUGHT } from "./logic";
-import { buildShareText, captureText, cleanUrl, isSameSite, pictureDataUrl, shareId, shareQuery, shareSource } from "./share";
+import { buildShareText, canCapture, captureText, cleanUrl, isExtensionOrigin, isSameSite, pictureDataUrl, shareId, shareQuery, shareSource } from "./share";
 
 describe("cleanUrl", () => {
   it("keeps http and https addresses exactly as sent", () => {
@@ -74,6 +74,30 @@ describe("isSameSite", () => {
     expect(isSameSite(headers({ origin }), origin)).toBe(true);
     expect(isSameSite(headers({ origin: "https://evil.example" }), origin)).toBe(false);
     expect(isSameSite(headers({}), origin)).toBe(false);
+  });
+});
+
+describe("isExtensionOrigin and canCapture", () => {
+  const origin = "https://penandpaper-app.vercel.app";
+  const headers = (h: Record<string, string>) => ({ get: (k: string) => h[k.toLowerCase()] ?? null });
+  it("an extension's own Origin counts, whatever Sec-Fetch-Site says", () => {
+    for (const site of ["none", "cross-site", "same-site", ""]) {
+      const h = headers({ origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop", ...(site ? { "sec-fetch-site": site } : {}) });
+      expect(isExtensionOrigin(h)).toBe(true);
+      expect(canCapture(h, origin)).toBe(true);
+    }
+    expect(canCapture(headers({ origin: "moz-extension://1a2b3c4d-1111-2222-3333-444455556666" }), origin)).toBe(true);
+  });
+  it("a website, a look-alike or no Origin at all does not", () => {
+    for (const o of ["https://evil.example", "https://chrome-extension.evil.example", "chrome-extension://", "chrome-extension://abc/path", "http://chrome-extension://abc", "null", ""]) {
+      expect(isExtensionOrigin(headers({ origin: o }))).toBe(false);
+      expect(canCapture(headers({ origin: o, "sec-fetch-site": "cross-site" }), origin)).toBe(false);
+    }
+    expect(canCapture(headers({}), origin)).toBe(false);
+  });
+  it("this site's own page still counts", () => {
+    expect(canCapture(headers({ "sec-fetch-site": "same-origin" }), origin)).toBe(true);
+    expect(canCapture(headers({ origin }), origin)).toBe(true);
   });
 });
 
