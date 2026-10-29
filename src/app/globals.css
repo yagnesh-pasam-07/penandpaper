@@ -396,3 +396,18 @@ body {
   transition: opacity 600ms ease-out 700ms, transform 600ms ease-out 700ms;
 }
 [data-armed="true"] [data-pain]:not(.is-in) .pain-fix { opacity: 0; transform: translateY(8px); }
+
+/* The homepage hero has a light and a dark screenshot; the page shows the one that matches the theme. */
+.shot-dark { display: none; }
+[data-theme="dark"] .shot-light { display: none; }
+[data-theme="dark"] .shot-dark { display: block; }
+
+/* The hero screenshots swap with a short fade. */
+@keyframes shot-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.shot-fade { animation: shot-fade 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .shot-fade { animation: none; }
+}

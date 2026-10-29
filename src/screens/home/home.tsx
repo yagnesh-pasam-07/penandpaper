@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { btn } from "@/components/btn";
 import { Logo, ThemeToggle } from "@/components/ui";
-import { Everywhere, HeroShot } from "./everywhere";
+import { Everywhere, HeroGallery } from "./everywhere";
 import { PainPoints } from "./pain-points";
 import { TryIt } from "./try-it";
 
@@ -55,7 +55,7 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
           </div>
         </section>
         <div className="mx-auto w-full max-w-[980px] px-4 pb-8 sm:px-8">
-          <HeroShot />
+          <HeroGallery />
         </div>
 
         <PainPoints />

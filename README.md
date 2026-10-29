@@ -81,7 +81,7 @@ Pen & Paper installs as an app, and other apps can share to it.
 
 The public homepage is deliberately small: a headline, three old habits struck through with the red pen and what to do instead, the try-it paper, a quiet row for the web, the Mac app and Chrome (with the voice shortcut), a closing line, and a footer with the creator and a feedback address. Mac and Chrome are marked "Early access" and have no download links.
 
-There is one screenshot slot under the headline. Until `public/shots/web.png` exists it shows a dashed "your screenshot goes here" placeholder. Drop `web.png` (or `.webp`, `.jpg`) into `public/shots/` and the page picks it up with no code change; redeploy (or reload the dev server) after adding it. Size and tips are in `public/shots/README.md`.
+The hero shows a screenshot of the app with a few small text tabs under it (Canvas, Writer, Library, Search, Tonight, Grid, Ruled, and Light & dark). Each tab is a file in `public/shots/` — `web`, `writer`, `library`, `search`, `tonight`, `grid`, `ruled` — and a `-dark` twin (`writer-dark`, and so on) shows in the dark theme. A tab appears only when its light file exists; the "Light & dark" tab joins the Grid pair on a slant. With only `web` present there are no tabs, and with nothing present a dashed "your screenshot goes here" placeholder shows. Add or replace files with no code change; reload the dev server or redeploy afterwards. Sizes and tips are in `public/shots/README.md`.
 
 ## Run it locally
 
