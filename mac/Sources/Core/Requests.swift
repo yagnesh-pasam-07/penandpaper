@@ -61,8 +61,7 @@ public enum API {
         return request
     }
 
-    /// `DELETE /api/drop/thoughts/<id>?paper=<paperId>`: crumples a note. The site only
-    /// accepts a browser session for this today, so the app doesn't offer Undo yet.
+    /// `DELETE /api/drop/thoughts/<id>?paper=<paperId>`: crumples a note (204). A Bearer token is accepted.
     public static func undo(server: String, token: String, paperId: String, id: String) -> URLRequest? {
         guard var parts = URLComponents(string: "\(serverOrDefault(server))/api/drop/thoughts/\(id)") else { return nil }
         parts.queryItems = [URLQueryItem(name: "paper", value: paperId)]

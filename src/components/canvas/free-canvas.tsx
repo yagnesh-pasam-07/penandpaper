@@ -1,8 +1,8 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { columnOf, layout, savedSpot, snap, type Box, type Point, type Size } from "./arrange";
-import { HOME, isHome, type View } from "./view";
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { columnOf, layout, limitSpot, savedSpot, settleShift, snap, type Box, type Point, type Size } from "./arrange";
+import { autoPanVelocity, HOME, isHome, type View } from "./view";
 
 type Item = { id: string; x: number | null; y: number | null };
 export type Placement = { id: string; x: number; y: number };
@@ -15,7 +15,10 @@ const DRAG_START = 5;
 type Drag = {
   id: string;
   pointer: number;
-  from: Point;
+  /** Where the press was, on screen (for the click-or-drag threshold). */
+  fromScreen: Point;
+  /** Where the press was, on the canvas: the note moves by how far the pointer has moved from here. */
+  fromCanvas: Point;
   start: Box;
   dx: number;
   dy: number;
@@ -37,6 +40,7 @@ export function FreeCanvas<T extends Item>({
   minHeight = 420,
   bare = false,
   view = HOME,
+  onPanBy,
 }: {
   items: T[];
   label: string;
@@ -62,12 +66,17 @@ export function FreeCanvas<T extends Item>({
    * stay in canvas units): pointer travel is divided by the zoom to match.
    */
   view?: View;
+  /** Called every frame while a note is carried near the window's edge: shift the view by this many screen px. */
+  onPanBy?: (dx: number, dy: number) => void;
 }) {
   const sheet = useRef<HTMLElement>(null);
   const nodes = useRef(new Map<string, HTMLElement>());
   const [width, setWidth] = useState(0);
   const [sizes, setSizes] = useState<Record<string, Size>>({});
   const [drag, setDrag] = useState<Drag | null>(null);
+  const dragRef = useRef<Drag | null>(null);
+  /** The pointer's latest place on screen while a drag is on. */
+  const pointerRef = useRef<Point | null>(null);
   const justDragged = useRef(false);
 
   // Measure before paint so bubbles don't jump on load; keep measuring as
@@ -101,7 +110,7 @@ export function FreeCanvas<T extends Item>({
   if (drag?.moving) {
     const others = [...boxes].filter(([id]) => id !== drag.id).map(([, b]) => b);
     const raw = { ...drag.start, x: drag.start.x + drag.dx, y: drag.start.y + drag.dy };
-    guides = snap(raw, others, width).guides;
+    guides = snap(raw, others).guides;
     // Follows the pointer, then settles on release.
     boxes.set(drag.id, raw);
   }
@@ -110,13 +119,41 @@ export function FreeCanvas<T extends Item>({
   const height = Math.max(typeof minHeight === "number" ? minHeight : 0, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
-  const latest = useRef({ boxes, items, width, lift, onArrange, column, zoom: view.zoom });
+  const latest = useRef({ boxes, items, width, lift, onArrange, onPanBy, column, zoom: view.zoom });
   useLayoutEffect(() => {
-    latest.current = { boxes, items, width, lift, onArrange, column, zoom: view.zoom };
+    latest.current = { boxes, items, width, lift, onArrange, onPanBy, column, zoom: view.zoom };
   });
 
   // Saved spots are relative to the reading column and the arranged group, not the screen.
-  const saved = (b: Box) => savedSpot(b, latest.current.column, latest.current.lift);
+  // They are held inside the API's sanity limits, so even a very far drop is saved.
+  const saved = (b: Box) => limitSpot(savedSpot(b, latest.current.column, latest.current.lift));
+
+  /** A point on screen as a point on the canvas, read through the sheet's own transform (pan and zoom both). */
+  const canvasAt = (clientX: number, clientY: number): Point => {
+    const r = sheet.current?.getBoundingClientRect();
+    const k = latest.current.zoom;
+    return { x: (clientX - (r?.left ?? 0)) / k, y: (clientY - (r?.top ?? 0)) / k };
+  };
+
+  // Where the pointer is on the canvas, anywhere in the window (not only over the sheet), for a paste or a dropped file.
+  useEffect(() => {
+    if (!spotRef) return;
+    const track = (e: PointerEvent | DragEvent) => {
+      if (!latest.current.width) return;
+      const c = canvasAt(e.clientX, e.clientY);
+      spotRef.current = saved({ x: c.x, y: c.y, w: 0, h: 0 });
+    };
+    const leave = () => (spotRef.current = null);
+    window.addEventListener("pointermove", track);
+    window.addEventListener("dragover", track);
+    document.documentElement.addEventListener("mouseleave", leave);
+    return () => {
+      window.removeEventListener("pointermove", track);
+      window.removeEventListener("dragover", track);
+      document.documentElement.removeEventListener("mouseleave", leave);
+    };
+    // The handlers read everything else from `latest`.
+  }, [spotRef]);
 
   /** The bubbles still flowing, pinned where they sit (so moving one never shuffles the others). */
   const pins = (except: string): Placement[] =>
@@ -130,34 +167,84 @@ export function FreeCanvas<T extends Item>({
   /** Where a drag lets go: snapped against the others. */
   const landing = (d: Drag): Box => {
     const others = [...latest.current.boxes].filter(([id]) => id !== d.id).map(([, b]) => b);
-    return snap({ ...d.start, x: d.start.x + d.dx, y: d.start.y + d.dy }, others, latest.current.width).box;
+    return snap({ ...d.start, x: d.start.x + d.dx, y: d.start.y + d.dy }, others).box;
   };
 
-  const begin = (first: Drag) => {
-    let d = first;
-    setDrag(d);
+  /**
+   * The dragged note follows the pointer in canvas units: where the pointer is on the canvas now,
+   * minus where the press began. Reading it through the live transform means panning (a wheel,
+   * or the edge auto-pan) while carrying keeps the note under the pointer at any zoom.
+   */
+  const follow = () => {
+    const d = dragRef.current;
+    const p = pointerRef.current;
+    if (!d || !p) return;
+    const c = canvasAt(p.x, p.y);
+    const moving = d.moving || Math.hypot(p.x - d.fromScreen.x, p.y - d.fromScreen.y) > DRAG_START;
+    const next = { ...d, dx: c.x - d.fromCanvas.x, dy: c.y - d.fromCanvas.y, moving };
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  // The view moved under a drag (edge auto-pan): the note has to catch up with the pointer.
+  useLayoutEffect(() => {
+    if (dragRef.current?.moving) follow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.x, view.y, view.zoom]);
+
+  const begin = (first: Drag, at: Point) => {
+    dragRef.current = first;
+    pointerRef.current = at;
+    setDrag(first);
     const move = (ev: PointerEvent) => {
-      if (ev.pointerId !== d.pointer) return;
-      // Pointer travel is on screen; the note moves in canvas units.
-      const k = latest.current.zoom;
-      const dx = (ev.clientX - d.from.x) / k;
-      const dy = (ev.clientY - d.from.y) / k;
-      const moving = d.moving || Math.hypot(dx * k, dy * k) > DRAG_START;
-      d = { ...d, dx, dy, moving };
-      if (d.moving) ev.preventDefault();
-      setDrag(d);
+      const d = dragRef.current;
+      if (!d || ev.pointerId !== d.pointer) return;
+      pointerRef.current = { x: ev.clientX, y: ev.clientY };
+      follow();
+      if (dragRef.current?.moving) ev.preventDefault();
     };
+    // Near the window's edge the view drifts, so a note can be carried well past one screen.
+    let raf = 0;
+    const tick = () => {
+      const d = dragRef.current;
+      const p = pointerRef.current;
+      if (d?.moving && p && latest.current.onPanBy) {
+        const v = autoPanVelocity(p, { w: window.innerWidth, h: window.innerHeight });
+        if (v.x || v.y) latest.current.onPanBy(v.x, v.y);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
     const stop = (ev: PointerEvent) => {
-      if (ev.pointerId !== d.pointer) return;
+      const d = dragRef.current;
+      if (!d || ev.pointerId !== d.pointer) return;
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
       window.removeEventListener("pointercancel", stop);
+      cancelAnimationFrame(raf);
       const { width: w, onArrange: arrange } = latest.current;
       if (ev.type === "pointerup" && d.moving && w > 0) {
         justDragged.current = true;
         setTimeout(() => (justDragged.current = false), 0);
-        arrange?.([{ id: d.id, ...saved(landing(d)) }, ...pins(d.id)]);
+        const placements = [{ id: d.id, ...saved(landing(d)) }, ...pins(d.id)];
+        arrange?.(placements);
+        // Every bubble is placed now; the group re-anchors to the sheet's top. Pan the other way so nothing moves on screen.
+        const { items, boxes: now, lift: held, zoom: k, onPanBy: pan } = latest.current;
+        const moved = new Map(placements.map((p) => [p.id, p.y]));
+        const placed = items.flatMap((it) => {
+          const h = now.get(it.id)?.h;
+          const y = moved.get(it.id) ?? it.y;
+          return h === undefined || y === null ? [] : [{ y, h }];
+        });
+        const shift = settleShift(placed, held);
+        if (shift) {
+          // Re-anchor now (not at the next new drop or reload) and pan the same amount, so both agree.
+          setHeld(null);
+          pan?.(0, -shift * k);
+        }
       }
+      dragRef.current = null;
+      pointerRef.current = null;
       setDrag(null);
     };
     window.addEventListener("pointermove", move);
@@ -170,7 +257,8 @@ export function FreeCanvas<T extends Item>({
     if ((e.target as HTMLElement).closest("button:not([data-drag]), a:not([data-drag]), textarea, input")) return;
     const start = boxes.get(id);
     if (!start) return;
-    begin({ id, pointer: e.pointerId, from: { x: e.clientX, y: e.clientY }, start, dx: 0, dy: 0, moving: false });
+    const at = { x: e.clientX, y: e.clientY };
+    begin({ id, pointer: e.pointerId, fromScreen: at, fromCanvas: canvasAt(at.x, at.y), start, dx: 0, dy: 0, moving: false }, at);
   };
 
   return (
@@ -183,20 +271,9 @@ export function FreeCanvas<T extends Item>({
         ...(isHome(view) ? {} : { transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: "0 0" }),
       }}
       className={`${bare ? "" : "canvas-surface rounded-[22px]"} relative ${className}`}
-      onPointerMove={(e) => {
-        if (!spotRef || !sheet.current || !width) return;
-        const r = sheet.current.getBoundingClientRect();
-        spotRef.current = saved({ x: (e.clientX - r.left) / view.zoom, y: (e.clientY - r.top) / view.zoom, w: 0, h: 0 });
-      }}
-      onDragOver={(e) => {
-        if (!spotRef || !sheet.current || !width) return;
-        const r = sheet.current.getBoundingClientRect();
-        spotRef.current = saved({ x: (e.clientX - r.left) / view.zoom, y: (e.clientY - r.top) / view.zoom, w: 0, h: 0 });
-      }}
-      onPointerLeave={() => spotRef && (spotRef.current = null)}
     >
-      {guides.x !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 w-px bg-red-text/60" style={{ left: guides.x }} />}
-      {guides.y !== undefined && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 h-px bg-red-text/60" style={{ top: guides.y }} />}
+      {guides.x !== undefined && <span aria-hidden="true" className="pointer-events-none absolute w-px bg-red-text/60" style={{ left: guides.x, top: -200000, height: 400000 }} />}
+      {guides.y !== undefined && <span aria-hidden="true" className="pointer-events-none absolute h-px bg-red-text/60" style={{ top: guides.y, left: -200000, width: 400000 }} />}
       {items.map((it) => {
         const b = boxes.get(it.id);
         const dragging = drag?.moving && drag.id === it.id;

@@ -6,35 +6,77 @@ import SwiftUI
 final class ListeningModel: ObservableObject {
     @Published var seconds = 0
     @Published var level: CGFloat = 0
+    /// The words heard so far (on-device recognition shows them live).
+    @Published var partial = ""
+    @Published var finishing = false
 }
 
 private struct ListeningPill: View {
     @ObservedObject var model: ListeningModel
     var body: some View {
-        HStack(spacing: 10) {
-            Circle().fill(Theme.red).frame(width: 10, height: 10).opacity(0.6 + 0.4 * model.level)
-            Text("Listening… \(VoiceHold.clock(seconds: model.seconds))").font(.system(size: 13, weight: .semibold)).foregroundColor(Theme.ink).monospacedDigit()
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.line)
-                    Capsule().fill(Theme.red).frame(width: max(4, geo.size.width * model.level))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Circle().fill(Theme.red).frame(width: 10, height: 10).opacity(0.6 + 0.4 * model.level)
+                Text(model.finishing ? "Finishing…" : "Listening… \(VoiceHold.clock(seconds: model.seconds))")
+                    .font(.system(size: 13, weight: .semibold)).foregroundColor(Theme.ink).monospacedDigit()
+                Spacer(minLength: 0)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.line)
+                        Capsule().fill(Theme.red).frame(width: max(4, geo.size.width * model.level))
+                    }
                 }
+                .frame(width: 70, height: 6)
             }
-            .frame(width: 70, height: 6)
+            if !model.partial.isEmpty {
+                Text(model.partial).font(.system(size: 14)).foregroundColor(Theme.ink).lineLimit(2).truncationMode(.head)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Capsule().fill(Theme.bg))
-        .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
-        .fixedSize()
+        .frame(width: 340, height: 74, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 22).fill(Theme.bg))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Theme.line, lineWidth: 1))
     }
 }
 
-/// Hold ⌥Space to talk: records the microphone to a temporary .m4a while the key is
-/// down, shows a small "Listening…" pill with a level meter, and hands the file to the
-/// outbox on release. A tap shorter than 0.3 s is ignored; a hold stops at 60 s.
+/// The small "Listening…" panel, shared by both ways of listening.
+@MainActor
+func showListeningPill(_ model: ListeningModel) -> FloatingPanel {
+    let host = NSHostingView(rootView: ListeningPill(model: model))
+    host.setFrameSize(NSSize(width: 340, height: 74))
+    let panel = FloatingPanel(size: host.frame.size, acceptsKey: false, content: host)
+    panel.ignoresMouseEvents = true
+    let frame = FloatingPanel.activeScreen.visibleFrame
+    panel.setFrameOrigin(NSPoint(x: frame.midX - panel.frame.width / 2, y: frame.maxY - panel.frame.height - 60))
+    panel.orderFrontRegardless()
+    return panel
+}
+
+/// Hold the talk key. By default the words are recognised on this Mac (`LocalVoice`); with the
+/// "server transcription" setting on, the recording goes to the site instead (`ServerVoiceRecorder`).
 @MainActor
 final class VoiceRecorder {
     static let shared = VoiceRecorder()
+    private var usingServer = false
+
+    func pressed() {
+        usingServer = Settings.shared.useServerTranscription
+        if usingServer { ServerVoiceRecorder.shared.pressed() } else { LocalVoice.shared.pressed() }
+    }
+
+    func released() {
+        if usingServer { ServerVoiceRecorder.shared.released() } else { LocalVoice.shared.released() }
+    }
+}
+
+/// The server way: records the microphone to a temporary .m4a while the key is down,
+/// shows a small "Listening…" pill with a level meter, and hands the file to the outbox on
+/// release (the site transcribes it, which needs an OpenAI key there). A tap shorter than
+/// 0.3 s is ignored; a hold stops at 60 s.
+@MainActor
+final class ServerVoiceRecorder {
+    static let shared = ServerVoiceRecorder()
     private var recorder: AVAudioRecorder?
     private var fileURL: URL?
     private var startedAt: Date?
@@ -121,13 +163,6 @@ final class VoiceRecorder {
     }
 
     private func showPill() {
-        let host = NSHostingView(rootView: ListeningPill(model: model))
-        host.setFrameSize(host.fittingSize)
-        let panel = FloatingPanel(size: host.fittingSize, acceptsKey: false, content: host)
-        panel.ignoresMouseEvents = true
-        let frame = FloatingPanel.activeScreen.visibleFrame
-        panel.setFrameOrigin(NSPoint(x: frame.midX - panel.frame.width / 2, y: frame.maxY - panel.frame.height - 60))
-        panel.orderFrontRegardless()
-        pill = panel
+        pill = showListeningPill(model)
     }
 }

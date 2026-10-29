@@ -57,6 +57,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Pen &amp; Paper listens only while you hold the talk shortcut, to turn what you say into a note.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Pen &amp; Paper turns what you say into text while you hold the talk shortcut. On most languages this happens on your Mac.</string>
 </dict>
 </plist>
 PLIST

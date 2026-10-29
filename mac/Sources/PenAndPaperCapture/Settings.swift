@@ -31,6 +31,19 @@ final class Settings {
         }
     }
 
+    /// The language hold-to-talk listens for (nil: follow the Mac's own language).
+    var speechLocale: String? {
+        get { defaults.string(forKey: "speechLocale") }
+        set { defaults.set(newValue, forKey: "speechLocale") }
+    }
+
+    /// Off by default: voice is recognised on this Mac. On: the recording goes to the site's
+    /// /api/drop/transcribe (which needs an OpenAI key on the server).
+    var useServerTranscription: Bool {
+        get { defaults.bool(forKey: "useServerTranscription") }
+        set { defaults.set(newValue, forKey: "useServerTranscription") }
+    }
+
     /// The last paper name the site told us a note would land on, so the box can say it before any network call.
     var cachedPaperName: String? {
         get { defaults.string(forKey: "paperName") }

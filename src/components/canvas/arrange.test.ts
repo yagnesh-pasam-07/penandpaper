@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnOf, COLUMN_MAX, GRID, layout, savedSpot, snap } from "./arrange";
+import { columnOf, COLUMN_MAX, GRID, inRange, layout, limitSpot, savedSpot, settleShift, snap, X_SHARE_LIMIT, Y_LIMIT } from "./arrange";
 
 const size = { w: 200, h: 100 };
 
@@ -52,28 +52,31 @@ describe("snap", () => {
   const other = { x: 300, y: 200, ...size };
 
   it("lines up with a neighbour's centre when close", () => {
-    const { box, guides } = snap({ x: 309, y: 420, ...size }, [other], 1000);
+    const { box, guides } = snap({ x: 309, y: 420, ...size }, [other]);
     expect(box.x).toBe(300);
     expect(guides.x).toBe(300);
   });
 
   it("lines up start edges", () => {
-    const { box, guides } = snap({ x: 410, y: 400, w: 400, h: 100 }, [other], 1000);
+    const { box, guides } = snap({ x: 410, y: 400, w: 400, h: 100 }, [other]);
     expect(box.x - 200).toBe(200);
     expect(guides.x).toBe(200);
   });
 
   it("clicks onto the dots when nothing is near", () => {
-    const { box, guides } = snap({ x: 700, y: 650, ...size }, [other], 1000);
+    const { box, guides } = snap({ x: 700, y: 650, ...size }, [other]);
     expect((box.x - GRID / 2) % GRID).toBe(0);
     expect((box.y - GRID / 2) % GRID).toBe(0);
     expect(guides).toEqual({ x: undefined, y: undefined });
   });
 
-  it("stays on the sheet", () => {
-    const { box } = snap({ x: 990, y: -40, ...size }, [], 1000);
-    expect(box.x).toBe(888);
-    expect(box.y).toBe(72);
+  it("can settle anywhere: no edge pulls it back", () => {
+    const left = snap({ x: -5000, y: -3000, ...size }, []);
+    expect(left.box.x).toBeLessThan(0);
+    expect(left.box.y).toBeLessThan(0);
+    const far = snap({ x: 90000, y: 120000, ...size }, []);
+    expect(far.box.x).toBeGreaterThan(80000);
+    expect(far.box.y).toBeGreaterThan(100000);
   });
 });
 
@@ -102,11 +105,64 @@ describe("column on a page-wide canvas", () => {
     expect(far.x).toBeGreaterThan(1);
   });
 
-  it("flows new drops in the column, and never lets a bubble leave the canvas", () => {
+  it("flows new drops in the column, and puts a placed bubble exactly where it was left, even off the page", () => {
     const col = columnOf(2000);
     const a = layout([{ id: "a", size, at: null }], 2000, undefined, col).boxes.get("a")!;
     expect(a.x).toBeCloseTo(1000);
-    const edge = layout([{ id: "b", size, at: { x: -9, y: 100 } }], 2000, 0, col).boxes.get("b")!;
-    expect(edge.x - edge.w / 2).toBeGreaterThanOrEqual(0);
+    const out = layout([{ id: "b", size, at: { x: -9, y: -400 } }], 2000, 0, col).boxes.get("b")!;
+    expect(out.x).toBeCloseTo(col.left - 9 * col.width);
+    expect(out.y).toBe(-400);
+    const below = layout([{ id: "c", size, at: { x: 40, y: 150000 } }], 2000, 0, col).boxes.get("c")!;
+    expect(below.x).toBeCloseTo(col.left + 40 * col.width);
+    expect(below.y).toBe(150000);
+  });
+});
+
+describe("saved range", () => {
+  it("accepts far-away spots and refuses absurd or non-finite ones", () => {
+    expect(inRange({ x: -150, y: -180000 })).toBe(true);
+    expect(inRange({ x: X_SHARE_LIMIT, y: Y_LIMIT })).toBe(true);
+    expect(inRange({ x: X_SHARE_LIMIT + 1, y: 0 })).toBe(false);
+    expect(inRange({ x: 0, y: -Y_LIMIT - 1 })).toBe(false);
+    expect(inRange({ x: Number.NaN, y: 0 })).toBe(false);
+  });
+
+  it("holds a far drop inside the limits instead of losing it", () => {
+    expect(limitSpot({ x: 5000, y: -9e9 })).toEqual({ x: X_SHARE_LIMIT, y: -Y_LIMIT });
+    expect(limitSpot({ x: 0.5, y: 300 })).toEqual({ x: 0.5, y: 300 });
+  });
+
+  it("is wider than the old -8..9 shares and ±20,000 px", () => {
+    expect(inRange({ x: -50, y: 100000 })).toBe(true);
+  });
+});
+
+describe("dropping above everything", () => {
+  const tall = { w: 200, h: 100 };
+  it("re-anchors the group to the sheet's top, and says how far, so the canvas can pan the other way", () => {
+    // Two placed bubbles shown with a lift of 100; a third dropped far above them.
+    const saved = [{ y: 300, h: 100 }, { y: 420, h: 100 }, { y: -900, h: 100 }];
+    const shift = settleShift(saved, 100);
+    // The topmost bubble (centre -900) ends with its top at 22, so everything moves by this much.
+    const natural = 22 - (-900 - 50);
+    expect(shift).toBe(natural - 100);
+    // Screen y of any bubble before and after differs by exactly the shift: panning by -shift keeps it still.
+    const before = 300 + 100;
+    const after = 300 + (22 - (-950));
+    expect(after - before).toBe(shift);
+  });
+
+  it("is zero when the drop doesn't change what sits on top, and when there is nothing placed", () => {
+    expect(settleShift([{ y: 300, h: 100 }, { y: 500, h: 100 }], 22 - 250)).toBe(0);
+    expect(settleShift([], 40)).toBe(0);
+  });
+
+  it("matches what layout() does on the next render", () => {
+    const at = [{ id: "a", x: 0.2, y: -900 }, { id: "b", x: 0.5, y: 300 }];
+    const items = at.map((p) => ({ id: p.id, size: tall, at: { x: p.x, y: p.y } }));
+    const { boxes, lift } = layout(items, 1000);
+    expect(lift).toBe(22 - (-900 - 50));
+    expect(boxes.get("a")!.y - tall.h / 2).toBe(22);
+    expect(settleShift(at.map((p) => ({ y: p.y, h: tall.h })), 0)).toBe(lift);
   });
 });

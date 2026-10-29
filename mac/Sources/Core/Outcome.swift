@@ -56,6 +56,14 @@ public enum Outcomes {
         }
     }
 
+    /// Words said aloud and saved: "Saved: call the bank about…".
+    public static func spoken(_ text: String) -> String {
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return words.isEmpty ? "Saved" : "Saved: \(preview(words))"
+    }
+
+    public static let nothingHeard = "Didn't catch anything."
+
     /// The first few words of a transcript, for a toast.
     public static func preview(_ text: String, limit: Int = 48) -> String {
         let flat = text.split(whereSeparator: { $0.isNewline || $0 == " " }).joined(separator: " ")

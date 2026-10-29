@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useRef, useState, type KeyboardEvent as ReactKey
 import { PenIcon } from "@/components/icons";
 import { imageFiles, shrinkImage, type Picture } from "./image";
 import { MAX_THOUGHT } from "./logic";
+import { SPEECH_LANGS, parseSpeechLang } from "./speech";
 import { useVoice } from "./use-voice";
 import { formatElapsed, insertAtCursor } from "./voice";
 
@@ -78,10 +79,20 @@ export function Writer({
     draftRef.current = draft;
   }, [draft]);
 
+  // Where the cursor was when listening began: live words are previewed there and land there.
+  // State draws the preview; the ref lets callbacks read the latest value.
+  const [anchorAt, setAnchorAt] = useState<{ start: number; end: number } | null>(null);
+  const anchor = useRef<{ start: number; end: number } | null>(null);
+  useEffect(() => {
+    anchor.current = anchorAt;
+  }, [anchorAt]);
+
   /** Spoken words go in at the cursor (or over the selection); they are not dropped until you say so. */
   const insertSpoken = (words: string) => {
     const el = area.current;
-    const at = insertAtCursor(draftRef.current, words, el?.selectionStart ?? draftRef.current.length, el?.selectionEnd ?? draftRef.current.length);
+    const where = anchor.current ?? { start: el?.selectionStart ?? draftRef.current.length, end: el?.selectionEnd ?? draftRef.current.length };
+    setAnchorAt(null);
+    const at = insertAtCursor(draftRef.current, words, where.start, where.end);
     onDraft(at.text);
     requestAnimationFrame(() => {
       area.current?.focus();
@@ -91,6 +102,20 @@ export function Writer({
   const voice = useVoice(insertSpoken);
   const listening = voice.state.kind === "recording";
   const working = voice.state.kind === "transcribing";
+  /** The text on screen: while the browser is still working out the words, they show at the cursor as a preview. */
+  const preview = voice.interim
+    ? insertAtCursor(draft, voice.interim, anchorAt?.start ?? draft.length, anchorAt?.end ?? draft.length).text
+    : draft;
+  /** Starts or stops speaking, remembering the cursor so the words land where it was. */
+  const speak = () => {
+    if (!listening) {
+      const el = area.current;
+      const here = { start: el?.selectionStart ?? draft.length, end: el?.selectionEnd ?? draft.length };
+      anchor.current = here;
+      setAnchorAt(here);
+    }
+    voice.toggle();
+  };
 
   /** Pastes or picks a picture onto this thought (the first, if there are several). */
   const attach = async (files: File[]) => {
@@ -126,7 +151,7 @@ export function Writer({
     // ⌘/Ctrl+Shift+M starts or stops recording from anywhere in the writer.
     if (voice.supported && (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "m") {
       e.preventDefault();
-      voice.toggle();
+      speak();
       return;
     }
     if (e.key !== "Tab" || !card.current) return;
@@ -163,9 +188,10 @@ export function Writer({
           </span>
           <textarea
             ref={area}
-            value={draft}
+            value={preview}
+            readOnly={!!voice.interim}
             maxLength={MAX_THOUGHT}
-            rows={Math.min(6, Math.max(2, draft.split("\n").length, Math.ceil(draft.length / 44)))}
+            rows={Math.min(6, Math.max(2, preview.split("\n").length, Math.ceil(preview.length / 44)))}
             aria-label="Thought"
             enterKeyHint="send"
             placeholder="What's on your mind?"
@@ -185,8 +211,10 @@ export function Writer({
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 // Esc while recording only throws the recording away.
-                if (listening || working) voice.cancel();
-                else onClose();
+                if (listening || working) {
+                  setAnchorAt(null);
+                  voice.cancel();
+                } else onClose();
               }
             }}
             className={`ruled-line hand min-h-[72px] flex-1 resize-none bg-transparent font-note text-[22px] leading-[36px] caret-ink outline-none placeholder:font-sans placeholder:text-lg placeholder:text-mute focus-visible:outline-none text-ink`}
@@ -260,14 +288,38 @@ export function Writer({
                 e.target.value = "";
               }}
             />
+            {voice.supported && voice.engine === "speech" && !listening && !working && (
+              <select
+                value={voice.lang}
+                onChange={(e) => {
+                  const next = parseSpeechLang(e.target.value);
+                  if (next) voice.setLang(next);
+                }}
+                aria-label="Speech language"
+                title="Speech language"
+                className="h-9 max-w-[96px] cursor-pointer rounded-lg bg-transparent px-1.5 text-[13px] text-mute hover:bg-soft hover:text-ink"
+              >
+                {SPEECH_LANGS.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {voice.supported && (
               <button
                 type="button"
-                onClick={voice.toggle}
+                onClick={speak}
                 disabled={working}
                 aria-pressed={listening}
                 aria-label={listening ? "Stop recording" : "Speak a thought"}
-                title={listening ? "Stop recording" : "Speak a thought (⌘⇧M)"}
+                title={
+                  listening
+                    ? "Stop recording"
+                    : voice.engine === "speech"
+                      ? "Speak a thought (⌘⇧M). Chrome's built-in recogniser sends your voice to Google; Safari uses Apple."
+                      : "Speak a thought (⌘⇧M)"
+                }
                 className={`flex size-9 items-center justify-center rounded-lg disabled:opacity-40 ${listening ? "bg-red text-on-red" : "hover:bg-soft hover:text-ink"}`}
               >
                 {listening ? <StopIcon /> : <MicIcon />}

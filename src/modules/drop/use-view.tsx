@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { HOME, isHome, MAX_ZOOM, MIN_ZOOM, parseView, wheelFactor, zoomAround, ZOOM_STEP, type View } from "@/components/canvas/view";
+import { boundsOf, fitView, HOME, isHome, MAX_ZOOM, MIN_ZOOM, parseView, PATTERN_MIN_ZOOM, wheelFactor, zoomAround, ZOOM_STEP, type Rect, type View } from "@/components/canvas/view";
 
 /** Presses on these never start a pan: they have their own jobs. */
 const OWN = "button, a, input, textarea, select, summary, header, [data-note], [role='dialog'], [role='menu'], [data-no-pan]";
@@ -38,7 +38,9 @@ export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefOb
     loaded.current = true;
   }, [setView, storageKey]);
   useEffect(() => {
-    if (!loaded.current) return;
+    // The first render after mount still shows home while the restored view is on its way (the ref already
+    // holds it): writing then would wipe the saved view, so wait until the state has caught up with the ref.
+    if (!loaded.current || view !== ref.current) return;
     try {
       if (isHome(view)) localStorage.removeItem(storageKey);
       else localStorage.setItem(storageKey, JSON.stringify(view));
@@ -52,10 +54,12 @@ export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefOb
     if (!p) return;
     if (!o || o.width === 0) {
       for (const name of ["--canvas-zoom", "--canvas-x", "--canvas-y"]) p.style.removeProperty(name);
+      p.removeAttribute("data-far");
       return;
     }
     const r = p.getBoundingClientRect();
     p.style.setProperty("--canvas-zoom", String(view.zoom));
+    p.toggleAttribute("data-far", view.zoom < PATTERN_MIN_ZOOM);
     p.style.setProperty("--canvas-x", `${o.left - r.left + view.x}px`);
     p.style.setProperty("--canvas-y", `${o.top - r.top + view.y}px`);
   });
@@ -65,6 +69,24 @@ export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefOb
     setView((v) => zoomAround(v, v.zoom * factor, centre));
   };
   const reset = () => setView(HOME);
+  /** Shifts the view by screen pixels (the edge auto-pan while a note is carried). */
+  const panBy = useCallback((dx: number, dy: number) => setView((v) => ({ ...v, x: v.x + dx, y: v.y + dy })), [setView]);
+  /** Zooms and pans so every note is on screen; with no notes, back home. */
+  const fit = () => {
+    const o = origin.current?.getBoundingClientRect();
+    const notes = [...(page.current?.querySelectorAll<HTMLElement>("[data-note]") ?? [])];
+    if (!o || !notes.length) return setView(HOME);
+    const v = ref.current;
+    const rects: Rect[] = notes.map((n) => {
+      const r = n.getBoundingClientRect();
+      const at = (x: number, y: number) => ({ x: (x - o.left - v.x) / v.zoom, y: (y - o.top - v.y) / v.zoom });
+      const a = at(r.left, r.top);
+      const b = at(r.right, r.bottom);
+      return { minX: a.x, minY: a.y, maxX: b.x, maxY: b.y };
+    });
+    const bounds = boundsOf(rects);
+    if (bounds) setView(fitView(bounds, { w: window.innerWidth, h: window.innerHeight }, { x: o.left, y: o.top }));
+  };
   // The listeners below are bound once; they call the latest of these.
   const api = useRef({ zoomBy, reset });
   useLayoutEffect(() => {
@@ -135,11 +157,11 @@ export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefOb
     };
   }, [page, origin, setView]);
 
-  return { view, zoomBy, reset };
+  return { view, zoomBy, reset, panBy, fit };
 }
 
-/** − 100% + at the bottom right; the percentage puts the view back at home. */
-export function ViewControls({ view, onZoom, onReset }: { view: View; onZoom: (factor: number) => void; onReset: () => void }) {
+/** − 100% + at the bottom right; the percentage puts the view back at home, and "Fit all" shows every note. */
+export function ViewControls({ view, onZoom, onReset, onFit }: { view: View; onZoom: (factor: number) => void; onReset: () => void; onFit: () => void }) {
   const btn = "flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-[14px] font-medium text-mute hover:bg-soft hover:text-ink disabled:opacity-40";
   return (
     <div
@@ -156,6 +178,10 @@ export function ViewControls({ view, onZoom, onReset }: { view: View; onZoom: (f
       </button>
       <button type="button" onClick={() => onZoom(ZOOM_STEP)} disabled={view.zoom >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in (Ctrl/⌘ +)" className={btn}>
         +
+      </button>
+      <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-line" />
+      <button type="button" onClick={onFit} aria-label="Fit all notes on screen" title="Fit all notes on screen" className={btn}>
+        Fit all
       </button>
     </div>
   );

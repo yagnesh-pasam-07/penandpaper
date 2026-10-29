@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { X_SHARE_LIMIT, Y_LIMIT } from "@/components/canvas/arrange";
 import { MAX_IMAGE, MAX_THOUGHT } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
 import { addThought, PaperNotFound } from "@/modules/drop/server";
@@ -18,8 +19,8 @@ const body = z
       .nullable()
       .optional(),
     /** Where it was pasted on the sheet. */
-    x: z.number().min(-8).max(9).nullable().optional(),
-    y: z.number().min(-20000).max(20000).nullable().optional(),
+    x: z.number().min(-X_SHARE_LIMIT).max(X_SHARE_LIMIT).nullable().optional(),
+    y: z.number().min(-Y_LIMIT).max(Y_LIMIT).nullable().optional(),
   })
   // Words, a picture, or both.
   .refine((b) => b.text.length > 0 || !!b.image);

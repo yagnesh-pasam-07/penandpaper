@@ -1,6 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  defaultSpeechLang,
+  parseSpeechLang,
+  resultsFrom,
+  SPEECH_LANG_KEY,
+  speechCtor,
+  speechErrorMessage,
+  speechTag,
+  spokenSoFar,
+  type SpeechLang,
+  type SpeechRecognizerCtor,
+  type SpeechRecognizerLike,
+} from "./speech";
 import { audioExtension, MAX_RECORDING_MS, pickRecorderMime } from "./voice";
 
 export type VoiceState =
@@ -9,24 +22,60 @@ export type VoiceState =
   | { kind: "transcribing" }
   | { kind: "failed"; message: string; canRetry: boolean };
 
+/** "speech" is the browser's own recogniser (no key); "recorder" records and sends the audio to the server. */
+export type VoiceEngine = "speech" | "recorder";
+
 const noSubscribe = () => () => {};
 
-/** The recording type this browser can make, or null when it can't record at all (then there is no mic button). */
+/** The recording type this browser can make, or null when it can't record at all. */
 function recorderMime(): string | null {
   if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) return null;
   return pickRecorderMime((type) => MediaRecorder.isTypeSupported(type));
 }
 
+/** The browser's recogniser first (it needs no server key); otherwise recording for the server; otherwise nothing. */
+function detectEngine(): VoiceEngine | null {
+  if (speechCtor(window as never)) return "speech";
+  return recorderMime() ? "recorder" : null;
+}
+
+const LANG_EVENT = "pp-voice-lang";
+
+function subscribeLang(onChange: () => void) {
+  window.addEventListener(LANG_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(LANG_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function readLang(): SpeechLang {
+  try {
+    const stored = parseSpeechLang(localStorage.getItem(SPEECH_LANG_KEY));
+    if (stored) return stored;
+  } catch {
+    // Storage may be blocked; the browser's own language still gives a sensible start.
+  }
+  return defaultSpeechLang(navigator.language);
+}
+
 /**
- * Record from the microphone and turn it into words: `toggle` starts or stops,
- * `cancel` throws the recording away, and `retry` sends a failed one again
- * (once). Stops by itself after a minute. The words go to `onText`; nothing is
- * sent to the server until the recording stops.
+ * Speak a thought. Uses the browser's own speech recogniser when it has one
+ * (Chrome, Edge, Safari: no server, no key; the words appear live in `interim`),
+ * and otherwise records the microphone and sends it to /api/drop/transcribe.
+ * `toggle` starts or stops, `cancel` throws it away, `retry` sends a failed
+ * recording again (once). It stops by itself after a minute, and the words go
+ * to `onText` once, when it stops.
  */
 export function useVoice(onText: (text: string) => void) {
+  const engine = useSyncExternalStore<VoiceEngine | null>(noSubscribe, detectEngine, () => null);
   const mime = useSyncExternalStore(noSubscribe, recorderMime, () => null);
+  const lang = useSyncExternalStore<SpeechLang>(subscribeLang, readLang, () => "en");
   const [state, setState] = useState<VoiceState>({ kind: "idle" });
   const [elapsed, setElapsed] = useState(0);
+  // What the recogniser has heard so far, shown in the writer before it is final.
+  const [interim, setInterim] = useState("");
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -34,10 +83,22 @@ export function useVoice(onText: (text: string) => void) {
   const kept = useRef<Blob | null>(null);
   const retried = useRef(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recognizer = useRef<SpeechRecognizerLike | null>(null);
+  const heard = useRef("");
+  const failure = useRef<string | null>(null);
   const onTextRef = useRef(onText);
   useEffect(() => {
     onTextRef.current = onText;
   }, [onText]);
+
+  const setLang = useCallback((next: SpeechLang) => {
+    try {
+      localStorage.setItem(SPEECH_LANG_KEY, next);
+    } catch {
+      // Not remembered, still used for this session through the event below.
+    }
+    window.dispatchEvent(new Event(LANG_EVENT));
+  }, []);
 
   const release = useCallback(() => {
     if (timer.current) clearInterval(timer.current);
@@ -45,6 +106,68 @@ export function useVoice(onText: (text: string) => void) {
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
   }, []);
+
+  /* ---------- Engine 1: the browser's recogniser ---------- */
+
+  const startSpeech = useCallback(() => {
+    const Ctor: SpeechRecognizerCtor | null = speechCtor(window as never);
+    if (!Ctor || recognizer.current) return;
+    cancelled.current = false;
+    failure.current = null;
+    heard.current = "";
+    setInterim("");
+    const rec = new Ctor();
+    rec.lang = speechTag(lang, navigator.language);
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.onresult = (event) => {
+      heard.current = spokenSoFar(resultsFrom(event.results));
+      setInterim(heard.current);
+    };
+    rec.onerror = (event) => {
+      const message = speechErrorMessage(event.error);
+      if (message) failure.current = message;
+    };
+    rec.onend = () => {
+      recognizer.current = null;
+      release();
+      const words = heard.current.trim();
+      heard.current = "";
+      setInterim("");
+      if (cancelled.current) {
+        setState({ kind: "idle" });
+        return;
+      }
+      if (failure.current) {
+        setState({ kind: "failed", message: failure.current, canRetry: false });
+        return;
+      }
+      if (!words) {
+        setState({ kind: "failed", message: "Didn't catch anything.", canRetry: false });
+        return;
+      }
+      setState({ kind: "idle" });
+      onTextRef.current(words);
+    };
+    recognizer.current = rec;
+    try {
+      rec.start();
+    } catch {
+      recognizer.current = null;
+      setState({ kind: "failed", message: "Couldn't start listening. Try again.", canRetry: false });
+      return;
+    }
+    const startedAt = Date.now();
+    setElapsed(0);
+    setState({ kind: "recording" });
+    timer.current = setInterval(() => {
+      const ms = Date.now() - startedAt;
+      setElapsed(ms);
+      if (ms >= MAX_RECORDING_MS) recognizer.current?.stop();
+    }, 200);
+  }, [lang, release]);
+
+  /* ---------- Engine 2: record and send to the server ---------- */
 
   const send = useCallback(async (blob: Blob) => {
     setState({ kind: "transcribing" });
@@ -71,7 +194,7 @@ export function useVoice(onText: (text: string) => void) {
     }
   }, []);
 
-  const start = useCallback(async () => {
+  const startRecorder = useCallback(async () => {
     if (!mime || recorder.current) return;
     cancelled.current = false;
     kept.current = null;
@@ -112,14 +235,25 @@ export function useVoice(onText: (text: string) => void) {
     }, 200);
   }, [mime, release, send]);
 
+  /* ---------- Shared controls ---------- */
+
   const stop = useCallback(() => {
-    if (recorder.current?.state === "recording") recorder.current.stop();
+    if (recognizer.current) recognizer.current.stop();
+    else if (recorder.current?.state === "recording") recorder.current.stop();
   }, []);
 
   const cancel = useCallback(() => {
     cancelled.current = true;
     kept.current = null;
-    if (recorder.current?.state === "recording") recorder.current.stop();
+    if (recognizer.current) {
+      recognizer.current.abort();
+      // Some browsers don't fire `end` after `abort`; make sure the state resets.
+      recognizer.current = null;
+      heard.current = "";
+      setInterim("");
+      release();
+      setState({ kind: "idle" });
+    } else if (recorder.current?.state === "recording") recorder.current.stop();
     else {
       release();
       setState({ kind: "idle" });
@@ -127,9 +261,10 @@ export function useVoice(onText: (text: string) => void) {
   }, [release]);
 
   const toggle = useCallback(() => {
-    if (recorder.current) stop();
-    else void start();
-  }, [start, stop]);
+    if (recognizer.current || recorder.current) stop();
+    else if (engine === "speech") startSpeech();
+    else if (engine === "recorder") void startRecorder();
+  }, [engine, startRecorder, startSpeech, stop]);
 
   const retry = useCallback(() => {
     if (!kept.current || retried.current) return;
@@ -137,15 +272,29 @@ export function useVoice(onText: (text: string) => void) {
     void send(kept.current);
   }, [send]);
 
-  // Leaving while recording throws the recording away and lets go of the microphone.
+  // Leaving while listening throws it away and lets go of the microphone.
   useEffect(
     () => () => {
       cancelled.current = true;
+      recognizer.current?.abort();
+      recognizer.current = null;
       if (recorder.current?.state === "recording") recorder.current.stop();
       release();
     },
     [release],
   );
 
-  return { supported: mime !== null, state, elapsed, toggle, cancel, retry, canRetry: state.kind === "failed" && state.canRetry };
+  return {
+    supported: engine !== null,
+    engine,
+    state,
+    elapsed,
+    interim,
+    lang,
+    setLang,
+    toggle,
+    cancel,
+    retry,
+    canRetry: state.kind === "failed" && state.canRetry,
+  };
 }

@@ -13,9 +13,10 @@ final class Capture {
     private var timer: Timer?
     private let monitor = NWPathMonitor()
 
-    /// Undo needs `DELETE /api/drop/thoughts/<id>` to accept the token. It only accepts a
-    /// browser session today, so the toast doesn't offer Undo. Flip this when the site does.
-    static let undoSupported = false
+    /// The toast offers Undo: `DELETE /api/drop/thoughts/<id>?paper=<paperId>` accepts the token.
+    static let undoSupported = true
+    /// Notes that were spoken, so their toast names the words ("Saved: call the bank…").
+    private var spoken = Set<String>()
 
     func start() {
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in Task { @MainActor in await self?.flush() } }
@@ -37,7 +38,17 @@ final class Capture {
         Task { await flush(force: id, announce: id) }
     }
 
-    // MARK: Voice notes
+    /// Words recognised on this Mac: saved like a typed note, announced with the first words.
+    func saveSpoken(_ text: String) {
+        let words = cleanedThought(text)
+        guard !words.isEmpty else { return }
+        let id = newThoughtId()
+        spoken.insert(id)
+        store.add(OutboxItem(id: id, kind: .text, text: words, createdAt: Date().timeIntervalSince1970 * 1000))
+        Task { await flush(force: id, announce: id) }
+    }
+
+    // MARK: Voice notes (server transcription)
 
     /// `file` is the finished recording; it moves into the outbox folder and is sent.
     func saveVoice(file: URL) {
@@ -68,15 +79,23 @@ final class Capture {
         for item in store.due(force: force) {
             let answer = await send(item, server: server, token: token)
             let outcome = item.kind == .text ? Outcomes.typed(status: answer.status, response: answer.response) : Outcomes.voice(status: answer.status, response: answer.response)
+            var undo: (() -> Void)?
+            var message = outcome.message
             if outcome.kind == .saved {
                 if let name = answer.response.paperName, !name.isEmpty { Settings.shared.cachedPaperName = name }
                 store.remove(id: item.id)
+                if spoken.remove(item.id) != nil { message = Outcomes.spoken(item.text ?? "") }
+                if Capture.undoSupported, let paperId = answer.response.paperId, !paperId.isEmpty {
+                    let id = item.id
+                    undo = { Task { @MainActor in Capture.shared.undoSave(id: id, paperId: paperId) } }
+                }
             } else if outcome.keep {
                 store.markFailed(id: item.id)
             } else {
                 store.remove(id: item.id)
+                spoken.remove(item.id)
             }
-            if item.id == announce { Toast.show(outcome.message) }
+            if item.id == announce { Toast.show(message, undo: undo) }
         }
     }
 
@@ -89,6 +108,18 @@ final class Capture {
             let boundary = Multipart.newBoundary()
             let body = Multipart.body(boundary: boundary, fields: [("save", "1"), ("id", item.id)], file: (name: "audio", filename: "voice.m4a", mime: "audio/mp4", data: audio))
             return await Net.send(API.transcribe(server: server, token: token, id: item.id, boundary: boundary), body: body)
+        }
+    }
+
+    /// Undo: crumples the note on the site (it stays recoverable for a week there).
+    func undoSave(id: String, paperId: String) {
+        guard let token = Keychain.token(), let request = API.undo(server: Settings.shared.server, token: token, paperId: paperId, id: id) else {
+            Toast.show("Couldn't undo that.")
+            return
+        }
+        Task {
+            let answer = await Net.send(request)
+            Toast.show((200..<300).contains(answer.status) ? "Undone." : "Couldn't undo that.")
         }
     }
 

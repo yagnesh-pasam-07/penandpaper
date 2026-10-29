@@ -85,7 +85,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
   // Zoom and pan: the page carries the pattern, the sheet's wrapper is the origin the notes are measured from.
   const page = useRef<HTMLDivElement>(null);
   const origin = useRef<HTMLDivElement>(null);
-  const { view, zoomBy, reset } = useCanvasView(page, origin, viewKey(paperId));
+  const { view, zoomBy, reset, panBy, fit } = useCanvasView(page, origin, viewKey(paperId));
   const pending = useRef(0);
   // Saves go out one at a time, in order: drops land in the order typed, and
   // an edit never overtakes the drop it edits.
@@ -521,6 +521,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
               <FreeCanvas
                 bare
                 view={view}
+                onPanBy={panBy}
                 minHeight="calc(100dvh - 12rem)"
                 label={paperTitle(initial)}
                 items={onSheet}
@@ -541,7 +542,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
         <p className="text-center text-[13px] text-mute sm:hidden">Tap to edit · swipe right to strike, left to crumple</p>
       </main>
 
-      {onSheet.length > 0 && <ViewControls view={view} onZoom={(f) => zoomBy(f)} onReset={reset} />}
+      {onSheet.length > 0 && <ViewControls view={view} onZoom={(f) => zoomBy(f)} onReset={reset} onFit={fit} />}
 
       <PenButton ref={penButton} hidden={writing} onOpen={() => setWriting(true)} />
       {writing && mounted && (

@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Core
 import ServiceManagement
+import Speech
 import SwiftUI
 
 /// Click it, then press the shortcut you want. Needs ⌘, ⌃ or ⌥; Esc cancels.
@@ -79,6 +80,9 @@ private struct SettingsView: View {
     @State private var testResult = ""
     @State private var testing = false
     @State private var serverNote = ""
+    @State private var speechOptions = SpeechLocale.options(supported: SFSpeechRecognizer.supportedLocales().map(\.identifier))
+    @State private var speechLocale = SettingsView.initialLocale()
+    @State private var serverVoice = Settings.shared.useServerTranscription
 
     var body: some View {
         Form {
@@ -103,6 +107,15 @@ private struct SettingsView: View {
                 HStack { Text("Hold to talk"); Spacer(); HotKeyField(combo: $voice).frame(width: 150, height: 26) }
                 Text("Each needs ⌘, ⌃ or ⌥. Click a box, then press the keys.").font(.caption).foregroundColor(.secondary)
             }
+            Section("Voice") {
+                Picker("Language", selection: $speechLocale) {
+                    ForEach(speechOptions, id: \.self) { id in Text(SettingsView.name(of: id)).tag(id) }
+                }
+                Text(speechNote()).font(.caption).foregroundColor(.secondary)
+                Toggle("Use server transcription (needs an OpenAI key on the server)", isOn: $serverVoice)
+                Text("Off by default. Voice is turned into text on this Mac, so it needs no key and no account.")
+                    .font(.caption).foregroundColor(.secondary)
+            }
             Section {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { enabled in AppDelegate.shared?.setLaunchAtLogin(enabled) }
@@ -111,9 +124,30 @@ private struct SettingsView: View {
         .formStyle(.grouped)
         .onChange(of: quick) { Settings.shared.quickKey = $0 }
         .onChange(of: voice) { Settings.shared.voiceKey = $0 }
+        .onChange(of: speechLocale) { Settings.shared.speechLocale = $0 }
+        .onChange(of: serverVoice) { Settings.shared.useServerTranscription = $0 }
         .padding(8)
         .frame(width: 460)
         .onDisappear { commitServer() }
+    }
+
+    /// The language shown first: the saved one, else what hold-to-talk would pick on its own.
+    private static func initialLocale() -> String {
+        let supported = SFSpeechRecognizer.supportedLocales().map(\.identifier)
+        return SpeechLocale.choose(saved: Settings.shared.speechLocale, current: Locale.current.identifier, supported: supported) ?? "en-US"
+    }
+
+    private static func name(of id: String) -> String {
+        let locale = Locale.current
+        return "\(locale.localizedString(forIdentifier: id) ?? id) (\(id))"
+    }
+
+    /// Whether the chosen language is understood on this Mac or by Apple's servers.
+    private func speechNote() -> String {
+        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: speechLocale)) else { return "This Mac can't recognise that language." }
+        return recognizer.supportsOnDeviceRecognition
+            ? "Recognised on this Mac: your voice doesn't leave it."
+            : "This language isn't available on this Mac, so Apple's servers do the listening. Download it in System Settings → Keyboard → Dictation to keep it on this Mac."
     }
 
     private func commitServer() {

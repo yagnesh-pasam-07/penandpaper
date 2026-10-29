@@ -219,3 +219,99 @@ final class HotKeyTests: XCTestCase {
         XCTAssertNil(HotKeyCombo.decode(nil))
     }
 }
+
+final class SpeechLocaleTests: XCTestCase {
+    let supported = ["en_US", "en_IN", "hi_IN", "fr_FR", "de_DE", "te_IN"]
+
+    func testNormalizeUsesHyphens() {
+        XCTAssertEqual(SpeechLocale.normalize("en_IN"), "en-IN")
+        XCTAssertEqual(SpeechLocale.normalize(" hi-IN "), "hi-IN")
+    }
+
+    func testTheSavedChoiceWinsWhenSupported() {
+        XCTAssertEqual(SpeechLocale.choose(saved: "hi-IN", current: "en_US", supported: supported), "hi-IN")
+        XCTAssertEqual(SpeechLocale.choose(saved: "te_IN", current: "en_US", supported: supported), "te-IN")
+    }
+
+    func testFallsBackToTheMacsOwnLanguageThenSameLanguage() {
+        XCTAssertEqual(SpeechLocale.choose(saved: nil, current: "fr_FR", supported: supported), "fr-FR")
+        // en_GB isn't offered, so the same language is used, Indian English first.
+        XCTAssertEqual(SpeechLocale.choose(saved: nil, current: "en_GB", supported: supported), "en-IN")
+        // A saved language that isn't there falls through to the Mac's own.
+        XCTAssertEqual(SpeechLocale.choose(saved: "ja-JP", current: "de_DE", supported: supported), "de-DE")
+    }
+
+    func testEnglishThenAnythingThenNothing() {
+        XCTAssertEqual(SpeechLocale.choose(saved: nil, current: "ja_JP", supported: supported), "en-IN")
+        XCTAssertEqual(SpeechLocale.choose(saved: nil, current: "ja_JP", supported: ["fr_FR", "de_DE"]), "fr-FR")
+        XCTAssertNil(SpeechLocale.choose(saved: "hi-IN", current: "en_US", supported: []))
+    }
+
+    func testTeluguIsMissingOnSomeMacsAndSomethingElseIsPicked() {
+        let withoutTelugu = ["en_US", "hi_IN"]
+        XCTAssertEqual(SpeechLocale.choose(saved: "te-IN", current: "en_US", supported: withoutTelugu), "en-US")
+    }
+
+    func testOptionsPutTheCuratedOnesFirstAndOnlyWhatIsSupported() {
+        XCTAssertEqual(SpeechLocale.options(supported: supported), ["en-IN", "en-US", "hi-IN", "te-IN", "de-DE", "fr-FR"])
+        XCTAssertEqual(SpeechLocale.options(supported: ["fr_FR", "en_US", "fr-FR"]), ["en-US", "fr-FR"])
+        XCTAssertEqual(SpeechLocale.options(supported: []), [])
+    }
+}
+
+final class VoiceFlowTests: XCTestCase {
+    func testAHoldListensThenFinishesAndSavesWhatWasSaid() {
+        var step = VoiceFlow.reduce(.idle, .pressed(nowMs: 1_000))
+        XCTAssertEqual(step.phase, .listening(startedMs: 1_000))
+        XCTAssertEqual(step.action, .startListening)
+        step = VoiceFlow.reduce(step.phase, .released(nowMs: 3_500))
+        XCTAssertEqual(step.phase, .finishing)
+        XCTAssertEqual(step.action, .stopAndFinish)
+        step = VoiceFlow.reduce(step.phase, .result("  call the bank  "))
+        XCTAssertEqual(step.phase, .idle)
+        XCTAssertEqual(step.action, .save("call the bank"))
+    }
+
+    func testATapUnderThreeTenthsOfASecondIsThrownAway() {
+        let listening = VoiceFlow.reduce(.idle, .pressed(nowMs: 0)).phase
+        let step = VoiceFlow.reduce(listening, .released(nowMs: 250))
+        XCTAssertEqual(step.phase, .idle)
+        XCTAssertEqual(step.action, .cancel)
+        XCTAssertEqual(VoiceFlow.reduce(listening, .released(nowMs: 300)).action, .stopAndFinish)
+    }
+
+    func testAHoldStopsByItselfAtSixtySeconds() {
+        let listening = VoicePhase.listening(startedMs: 10_000)
+        XCTAssertEqual(VoiceFlow.reduce(listening, .tick(nowMs: 69_999)).action, .none)
+        let stop = VoiceFlow.reduce(listening, .tick(nowMs: 70_000))
+        XCTAssertEqual(stop.phase, .finishing)
+        XCTAssertEqual(stop.action, .stopAndFinish)
+    }
+
+    func testNothingSaidIsSaidOutLoudAndNothingIsSaved() {
+        XCTAssertEqual(VoiceFlow.reduce(.finishing, .result(nil)).action, .nothingHeard)
+        XCTAssertEqual(VoiceFlow.reduce(.finishing, .result("   \n ")).action, .nothingHeard)
+        XCTAssertEqual(VoiceFlow.reduce(.finishing, .result("")).phase, .idle)
+    }
+
+    func testWordsAreKeptToAThoughtsLength() {
+        let long = String(repeating: "a", count: maxThought + 500)
+        guard case .save(let words) = VoiceFlow.reduce(.finishing, .result(long)).action else { return XCTFail("expected a save") }
+        XCTAssertEqual(words.count, maxThought)
+    }
+
+    func testEventsOutOfOrderChangeNothing() {
+        XCTAssertEqual(VoiceFlow.reduce(.idle, .released(nowMs: 5)).action, .none)
+        XCTAssertEqual(VoiceFlow.reduce(.idle, .result("hi")).action, .none)
+        let listening = VoicePhase.listening(startedMs: 0)
+        XCTAssertEqual(VoiceFlow.reduce(listening, .pressed(nowMs: 10)), VoiceStep(phase: listening, action: .none))
+        XCTAssertEqual(VoiceFlow.reduce(listening, .result("early")).action, .none)
+        XCTAssertEqual(VoiceFlow.reduce(.finishing, .pressed(nowMs: 10)).action, .none)
+    }
+
+    func testSpokenToastNamesTheFirstWords() {
+        XCTAssertEqual(Outcomes.spoken("call the bank"), "Saved: call the bank")
+        XCTAssertEqual(Outcomes.spoken("   "), "Saved")
+        XCTAssertTrue(Outcomes.spoken(String(repeating: "word ", count: 40)).hasSuffix("…"))
+    }
+}

@@ -265,6 +265,10 @@ body {
   background-repeat: repeat-x;
   background-position: 0 0;
 }
+/* Zoomed far out the pattern would be a grey wash: hide it (the paper colour stays). */
+.canvas-surface.canvas-page[data-far] {
+  background-image: none;
+}
 /* The whole page is the canvas: sheets inside it let it show through instead of painting their own. */
 .canvas-page .canvas-surface {
   background: none;
