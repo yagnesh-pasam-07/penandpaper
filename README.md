@@ -26,7 +26,8 @@ Two modules share one app, one sign-in and one database. The public homepage (`/
 - **Library**: `/drop/library` shows every paper as a small card (a miniature of its canvas, name, date made, thought count), newest first, with an **Archived** toggle. Every paper stays fully editable. Rename, archive (put away, hidden from the switcher) and delete live on each card.
 - **Delete**: a deleted paper disappears at once, with an Undo; the nightly cron removes it for good after 7 days, like crumpled thoughts.
 - **Search**: the magnifier in the header, or Ctrl/⌘ K, searches the words of every thought on every paper (any case, newest first, up to 50). A result opens its paper and the note pulses.
-- **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails what you dropped today ("Here's what you dropped today"), grouped by paper (its name, or the date it was made), struck ones with their line. "Open my paper" goes to the paper you wrote on last. No email if nothing was dropped that day.
+- **9 PM email**: Vercel Cron at 15:30 UTC (21:00 IST) emails what you dropped today (subject "Tonight's paper · 9 thoughts"), grouped by paper (its name, or the date it was made), struck ones with their line. A big **Review tonight's paper** button above the list opens [Tonight's paper](#tonights-paper) (signing in first if needed); "Or open my paper" goes to the paper you wrote on last. No email if nothing was dropped that day.
+- **Tonight's paper** (`/tonight`): the evening review, below.
 - **Arrange**: new drops land in a row right under the input; arranged thoughts keep their shape below. Drag a thought anywhere on the page. It snaps like a magnet to a neighbour's centre or edges (a red guide line shows it), otherwise to the dots. The spot is saved and carries over with the thought; new drops land in the free space. **Tidy up** puts everything back into rows.
 - **Pan and zoom**: Ctrl/⌘ + scroll (or a trackpad pinch) zooms around the pointer, 10–300%; drag empty canvas or use the middle mouse button to pan; the − / percent / + control at the bottom right resets the view. Each paper remembers its own view on this device. The pattern and the notes move together.
 - **No edges**: a note can be dropped anywhere on the canvas at any zoom, left of or above where the paper starts, as far as ±200 column-widths sideways and ±200,000 px up or down (the API's sanity limits). Drag near the window's edge and the view drifts so a note can be carried past one screen; **Fit all** (bottom right) zooms and pans to show every note, down to 10%. Spots are still saved as a share of the 1,056 px reading column (x) and pixels (y), so older papers look exactly as they did; only the allowed range is wider.
@@ -38,6 +39,21 @@ Two modules share one app, one sign-in and one database. The public homepage (`/
 - Sign-in required: signed-out visits go to `/signup?next=/drop`.
 
 Shared canvas pieces (bubble looks, the dotted sheet, the interactive thought bubble) live in `src/components/canvas` so the team module can use them too.
+
+## Tonight's paper
+
+An evening ritual that is not a to-do list: one calm pass over what you dropped **today** (on your own clock), across all your papers, deciding nothing more than "did this matter".
+
+- **The cards:** `/tonight` shows one thought at a time, big, in the handwriting look, with its paper's name and the time it was dropped. Progress reads "3 of 9". Oldest first. Pictures and YouTube thumbnails show as on the paper.
+- **Three choices:** **Strike** (S, or swipe right) draws the red pen line; the thought stays on its paper, struck. **Keep** (K, or click or tap the card) leaves it as it is. **Crumple** (X, or swipe left) crumples it, with a 6-second Undo and the usual 7-day cleanup. On a phone the same three are big buttons at the bottom.
+- **Back** (← or Backspace, or "← Change the last one" after the end) puts the previous card back exactly as it was and lets you decide again. **Esc** leaves; nothing is lost, because every choice is saved on the thought as you make it, so reopening resumes at the first undecided card.
+- **Closed:** when the last card is done a red-ink **PAPER CLOSED ✓** stamp comes down with "4 struck · 3 kept · 2 crumpled" and a **Good night** button. Opening `/tonight` again after finishing shows the stamp and summary, not cards. Dropping a new thought afterwards reopens the day for just that thought.
+- **What is included:** thoughts dropped today on any paper that isn't deleted (archived ones count). Thoughts you already struck or crumpled today are skipped. A thought is "reviewed" once the ritual has decided it, and is never shown again that day.
+- **Where to start it:** the 9 PM email's button, or a small **Tonight** link in the header that appears only from 18:00 on your clock and only while thoughts are waiting (it looks again when you return to the tab).
+- **Time zone:** the browser tells the server its zone in a `pp-tz` cookie (the first visit may use `DROP_TIMEZONE`, default Asia/Kolkata, and refreshes once). The email has no browser, so it uses `DROP_TIMEZONE`. A day runs midnight to midnight local time, including the 23- and 25-hour days when clocks change.
+- **Data:** `drop_thoughts.reviewed_at` marks a decided thought; `drop_daily_reviews` keeps one row per person per day (struck, kept, crumpled, `completed_at`). The counts are worked out again from the thoughts after every choice, so Back and Undo can't leave them wrong. Reviewing doesn't "touch" a paper, so it doesn't change which paper a new capture lands on.
+- **API:** `GET /api/drop/tonight` returns `{ date, total, reviewed, remaining, completed, summary: { struck, kept, crumpled }, next }` (add `?lite=1` to leave out `next`). `POST /api/drop/tonight` with `{ thoughtId, action }`, action `strike`, `keep`, `crumple` or `undo`, is same-site only and idempotent. Code: `src/modules/drop/tonight*.ts(x)`, `src/app/tonight`, `src/app/api/drop/tonight`.
+- **Limits:** up to 300 cards per load (oldest first). A review that runs past midnight keeps counting each thought on the day it was dropped, but `/tonight` only lists the new day's thoughts after midnight.
 
 ## Capture from anywhere
 

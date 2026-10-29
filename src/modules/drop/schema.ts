@@ -1,4 +1,4 @@
-import { index, integer, pgTable, real, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { date, index, integer, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
 /** A canvas a person made: as many as they like, each with its own thoughts. */
@@ -59,6 +59,8 @@ export const dropThoughts = pgTable(
     crumpledAt: timestamp("crumpled_at", { withTimezone: true, mode: "string" }),
     /** A pasted or dropped picture, as a small data URL; `text` is then its caption (may be empty). */
     image: text("image"),
+    /** When Tonight's paper last decided something about it (struck, kept or crumpled); null while it is unreviewed. */
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "string" }),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );
@@ -83,4 +85,30 @@ export const dropApiTokens = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (t) => [index("drop_api_tokens_user_idx").on(t.userId)],
+);
+
+/**
+ * One evening review per person per day (the local day in their time zone):
+ * how many thoughts were struck, kept and crumpled, and when it was closed.
+ * The counts are worked out from the thoughts after every choice, so Back and
+ * Undo can never leave them wrong.
+ */
+export const dropDailyReviews = pgTable(
+  "drop_daily_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The local day reviewed, YYYY-MM-DD. */
+    date: date("date", { mode: "string" }).notNull(),
+    struck: integer("struck").notNull().default(0),
+    kept: integer("kept").notNull().default(0),
+    crumpled: integer("crumpled").notNull().default(0),
+    /** When the last unreviewed thought was decided; null while some remain. */
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("drop_daily_reviews_user_date_uq").on(t.userId, t.date)],
 );

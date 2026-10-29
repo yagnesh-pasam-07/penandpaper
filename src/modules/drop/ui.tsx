@@ -13,6 +13,7 @@ import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from
 import { paperTitle, type DropPaper, type PaperMeta, type Thought } from "./logic";
 import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { PaperBar, SearchButton, UNDO_PAPER_KEY } from "./papers-ui";
+import { TonightButton } from "./tonight-button";
 import { importTryPaper } from "./try-import";
 import { useCanvasView, ViewControls } from "./use-view";
 import { PenButton, Writer } from "./writer";
@@ -481,6 +482,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
         title={<PaperBar paper={{ id: paperId, name: initial.name, createdAt: initial.createdAt, archivedAt: initial.archivedAt }} papers={papers} />}
         right={
           <>
+            <TonightButton />
             <SearchButton />
             <Link href="/drop/library" className="rounded-lg px-2.5 py-2 text-sm font-medium text-mute hover:bg-soft hover:text-ink">
               Library
