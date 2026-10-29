@@ -4,10 +4,11 @@ import { AppearanceSync } from "@/components/appearance";
 import { applyAppearance, saveAppearance, useCanvas, useThemeMode } from "@/lib/appearance";
 import { CANVASES, THEME_MODES, type CanvasId, type ThemeMode } from "@/lib/canvases";
 import { COLUMN, DropHeader, type Me } from "./chrome";
+import { DesktopTokens } from "./desktop-tokens";
 
 const MODE_LABEL: Record<ThemeMode, string> = { light: "Light", dark: "Dark", system: "System" };
 
-/** Settings: for now, how the sheet looks. */
+/** Settings: how the sheet looks, and the keys desktop apps save with. */
 export function SettingsView({ me, appearance }: { me: Me; appearance: { canvas: string | null; theme: string | null } }) {
   const canvas = useCanvas();
   const mode = useThemeMode();
@@ -85,6 +86,8 @@ export function SettingsView({ me, appearance }: { me: Me; appearance: { canvas:
             Add Pen &amp; Paper to your home screen, then use Share on a link, text or picture in any app and choose Pen &amp; Paper: it lands on your latest paper. Android (Chrome) has Share and a &ldquo;New thought&rdquo; shortcut; on iPhone, Add to Home Screen opens the app, and you can start typing as soon as it opens.
           </p>
         </section>
+
+        <DesktopTokens />
       </main>
     </div>
   );

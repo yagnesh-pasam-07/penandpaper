@@ -62,3 +62,25 @@ export const dropThoughts = pgTable(
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );
+
+/** Keys for apps that save to a paper without a browser sign-in (the Mac menu-bar app). Only the hash of the secret is kept. */
+export const dropApiTokens = pgTable(
+  "drop_api_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** What the person called it, e.g. "Mac app". */
+    name: text("name").notNull(),
+    /** SHA-256 (hex) of the secret. */
+    tokenHash: text("token_hash").notNull().unique("drop_api_tokens_hash_uq"),
+    /** The first characters of the secret, to tell tokens apart in a list. */
+    prefix: text("prefix").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    /** Revoked tokens stop working at once and stay listed. */
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("drop_api_tokens_user_idx").on(t.userId)],
+);

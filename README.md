@@ -66,6 +66,16 @@ Without Resend configured, development prints every email (sign-in links include
 
 Other scripts: `npm test` (unit tests), `npm run lint`, `npm run build`, `npm run db:generate` (after changing a schema), `npm run db:studio`.
 
+## Personal access tokens
+
+Apps that save to your paper without a browser sign-in (the coming Mac menu-bar app) use a personal access token. Make one in **Settings → Desktop app**.
+
+- **Format:** `pp_` followed by 32 random bytes, URL-safe. It is shown **once**, when you make it; only its SHA-256 is stored, so a lost token can't be recovered, only revoked and replaced.
+- **Use:** send it as `Authorization: Bearer pp_…`. It is never read from a URL or query string, and a token can't manage tokens (that needs a browser sign-in on this site).
+- **Save:** `POST /api/drop/capture` with `{ "id": "<lowercase letters, digits, hyphens, 6-40 long>", "text": "…" }` replies `{ "id", "paperId", "paperName" }`. Sending the same `id` again is one note. `GET /api/drop/capture` replies `{ "paperId", "paperName" }`: where a save would land (your most recently touched paper).
+- **Limits:** up to 5 active tokens each; 60 saves per token per minute (429 with `Retry-After: 60` beyond that). Revoked or unknown tokens get 401.
+- **Revoke:** Settings → Desktop app → Revoke. It stops working at once and stays in the list.
+
 ## Environment variables
 
 See `.env.example` for the full annotated list.
