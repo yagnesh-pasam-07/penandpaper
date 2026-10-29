@@ -468,6 +468,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
     <ThoughtBubble
       {...bubbleProps(t, tz, fresh.has(t.id))}
       image={t.image}
+      previews
       leaving={leaving.get(t.id) ?? null}
       returning={returning.has(t.id)}
       {...extra}

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { CheckIcon, CloseIcon } from "@/components/icons";
 import { firstLink, isOnlyYoutube, linkify, youtubeId } from "@/lib/linkify";
+import { useLinkPreview } from "@/modules/drop/use-link-preview";
 import { bubbleStyle, rand } from "./bubble";
 
 type Props = {
@@ -28,6 +29,8 @@ type Props = {
   returning?: boolean;
   /** A pasted or dropped picture: the note becomes a taped photo, the text its caption. */
   image?: string | null;
+  /** Ask the server for a rich card (title, picture) for a blog or article link. Only where the visitor is signed in. */
+  previews?: boolean;
   onEdit?: (text: string) => void;
   onToggle?: () => void;
   /** Crumple it (with undo, by whoever owns it). */
@@ -37,8 +40,13 @@ type Props = {
 const SWIPE = 64;
 
 /** A link in a note shows a preview under it: a YouTube video its thumbnail, any other link its site and path. */
-function LinkPreview({ text }: { text: string }) {
+function LinkPreview({ text, rich }: { text: string; rich: boolean }) {
   const link = firstLink(text);
+  const isVideo = !!link && youtubeId(link.href) !== null;
+  // Hooks run before any early return; a video never asks.
+  const details = useLinkPreview(link && !isVideo ? link.href : null, rich);
+  const [brokenImage, setBrokenImage] = useState<string | null>(null);
+  const [brokenIcon, setBrokenIcon] = useState<string | null>(null);
   if (!link) return null;
   // A press on the preview can still drag the note (data-drag); the browser's own link/image drag is off.
   const stop = { "data-drag": "", draggable: false, onClick: (e: ReactMouseEvent) => e.stopPropagation(), onDoubleClick: (e: ReactMouseEvent) => e.stopPropagation() };
@@ -64,7 +72,40 @@ function LinkPreview({ text }: { text: string }) {
       </a>
     );
   }
-  // Any other link: the site, and where on it, as plain text (nothing is fetched).
+  // A page that told us about itself: a rich card, with its picture if it has one that loads.
+  if (details && (details.title || details.image)) {
+    const picture = details.image && details.image !== brokenImage ? details.image : null;
+    const icon = details.favicon && details.favicon !== brokenIcon ? details.favicon : null;
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open ${details.title ?? link.host}`}
+        {...stop}
+        className="group/card flex w-[280px] max-w-full flex-col overflow-hidden rounded-xl border border-line bg-sheet/80 text-left shadow-[0_10px_24px_-20px_var(--shadow)] hover:bg-sheet"
+      >
+        {picture && (
+          <span className="block aspect-[1.91/1] w-full overflow-hidden bg-soft">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a page's own picture from its own host; nothing for next/image to optimise */}
+            <img src={picture} alt="" loading="lazy" draggable={false} referrerPolicy="no-referrer" onError={() => setBrokenImage(picture)} className="size-full object-cover transition-opacity group-hover/card:opacity-90" />
+          </span>
+        )}
+        <span className="flex flex-col gap-1 px-3 py-2.5">
+          <span className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.08em] text-mute uppercase">
+            {icon && (
+              // eslint-disable-next-line @next/next/no-img-element -- a site's own icon
+              <img src={icon} alt="" width={14} height={14} loading="lazy" draggable={false} referrerPolicy="no-referrer" onError={() => setBrokenIcon(icon)} className="size-3.5 shrink-0 rounded-[3px]" />
+            )}
+            <span className="truncate">{details.siteName ?? link.host}</span>
+          </span>
+          {details.title && <span className="line-clamp-2 font-note text-[17px] leading-snug text-ink">{details.title}</span>}
+          {details.description && <span className="line-clamp-2 text-[12px] leading-snug text-mute">{details.description}</span>}
+        </span>
+      </a>
+    );
+  }
+  // Until then, or when there's nothing more to show: the site, and where on it, as plain text.
   const path = link.path.length > 48 ? `${link.path.slice(0, 47)}…` : link.path;
   return (
     <a
@@ -166,6 +207,7 @@ export function ThoughtBubble({
   leaving,
   returning,
   image,
+  previews,
   onEdit,
   onToggle,
   onDelete,
@@ -385,7 +427,7 @@ export function ThoughtBubble({
         ) : (
           image && !readOnly && <span className="px-1 font-note text-[18px] text-mute">add a caption…</span>
         )}
-        {!image && <LinkPreview text={text} />}
+        {!image && <LinkPreview text={text} rich={!!previews && !readOnly} />}
         {stream && meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
       </div>
       {!stream && meta && (
