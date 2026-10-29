@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { ReactNode } from "react";
 
-/** Where the screenshots live. Drop web, mac and chrome images in here (see public/shots/README.md). */
+/** Where the homepage screenshot lives (see public/shots/README.md). */
 const SHOTS_DIR = path.join(process.cwd(), "public", "shots");
 const EXTENSIONS = ["png", "webp", "jpg", "jpeg"];
 
@@ -17,9 +16,9 @@ function shotFor(name: string): string | null {
 /** Real keycaps, so a shortcut reads as keys. */
 function Keys({ keys }: { keys: string[] }) {
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-1 align-middle">
       {keys.map((k) => (
-        <kbd key={k} className="inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-line border-b-2 bg-bg px-1.5 text-[15px] leading-none text-ink">
+        <kbd key={k} className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-line border-b-2 bg-sheet px-1.5 text-[13px] leading-none text-ink">
           {k}
         </kbd>
       ))}
@@ -58,126 +57,59 @@ function Glyph({ kind }: { kind: "web" | "mac" | "chrome" }) {
   );
 }
 
-type Panel = {
-  key: "web" | "mac" | "chrome";
-  title: string;
-  line: string;
-  status: "Live" | "Early access";
-  hints: { keys: string[]; label: string }[];
-  alt: string;
-};
-
-const PANELS: Panel[] = [
-  {
-    key: "web",
-    title: "On the web",
-    line: "Open it in any browser. Drag notes anywhere and zoom out to see it all.",
-    status: "Live",
-    hints: [{ keys: ["Space"], label: "write" }],
-    alt: "Pen & Paper open in a browser, notes spread across a paper",
-  },
-  {
-    key: "mac",
-    title: "On your Mac",
-    line: "It sits in your menu bar. Type a thought, or hold a key and speak.",
-    status: "Early access",
-    hints: [
-      { keys: ["⌥", "⇧", "N"], label: "type" },
-      { keys: ["⌥", "Space"], label: "hold to speak" },
-    ],
-    alt: "The Pen & Paper box floating over another app on a Mac",
-  },
-  {
-    key: "chrome",
-    title: "In Chrome",
-    line: "Save a page, a selection or a quick thought from any site.",
-    status: "Early access",
-    hints: [
-      { keys: ["⌥", "⇧", "P"], label: "save page" },
-      { keys: ["⌥", "⇧", "N"], label: "quick thought" },
-    ],
-    alt: "The Pen & Paper pop-up over a web page in Chrome",
-  },
-];
-
-/** A 16:10 frame: the real screenshot once the file exists, a quiet placeholder until then. */
-function Shot({ name, alt }: { name: string; alt: string }) {
-  const src = shotFor(name);
+/** One 16:10 screenshot under the headline: the real file once it exists, a quiet placeholder until then. */
+export function HeroShot() {
+  const src = shotFor("web");
   if (src) {
     return (
       // A local file of unknown size: the frame fixes the shape, so nothing shifts while it loads.
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt={alt} width={1600} height={1000} loading="lazy" className="aspect-[16/10] w-full rounded-xl border border-line object-cover shadow-[0_18px_40px_-26px_var(--shadow)]" />
+      <img src={src} alt="Pen & Paper open in a browser, notes spread across a paper" width={1600} height={1000} className="aspect-[16/10] w-full rounded-2xl border border-line object-cover shadow-[0_30px_60px_-36px_var(--shadow)]" />
     );
   }
   return (
-    <div role="img" aria-label={`Screenshot placeholder: ${alt}`} className="flex aspect-[16/10] w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-line bg-soft/50 text-center">
-      <span className="font-hand text-[24px] leading-none text-mute">your screenshot goes here</span>
-      <span className="font-mono text-[11px] text-mute/80">public/shots/{name}.png</span>
+    <div role="img" aria-label="Screenshot placeholder: Pen & Paper open in a browser" className="flex aspect-[16/10] w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line bg-soft/40 text-center">
+      <span className="font-hand text-[28px] leading-none text-mute">your screenshot goes here</span>
+      <span className="font-mono text-[11px] text-mute/80">public/shots/web.png</span>
     </div>
   );
 }
 
-function Panel({ p }: { p: Panel }): ReactNode {
-  return (
-    <li className="flex flex-col gap-4 rounded-[22px] border border-line bg-sheet p-5">
-      <Shot name={p.key} alt={p.alt} />
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Glyph kind={p.key} />
-          <h3 className="text-[19px] font-semibold tracking-[-0.01em]">{p.title}</h3>
-        </div>
-        <span
-          className={`mt-1 shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
-            p.status === "Live" ? "bg-red-soft text-red-text" : "border border-dashed border-line text-mute"
-          }`}
-        >
-          {p.status}
-        </span>
-      </div>
-      <p className="text-[15px] text-mute">{p.line}</p>
-      <div className="mt-auto flex flex-col gap-2">
-        {p.hints.map((h) => (
-          <span key={h.label} className="flex items-center gap-2 text-[13px] text-mute">
-            <Keys keys={h.keys} />
-            {h.label}
-          </span>
-        ))}
-      </div>
-    </li>
-  );
-}
+const PLACES: { kind: "web" | "mac" | "chrome"; label: string; note?: string }[] = [
+  { kind: "web", label: "Web" },
+  { kind: "mac", label: "Mac", note: "Early access" },
+  { kind: "chrome", label: "Chrome", note: "Early access" },
+];
 
-/** Wherever you are: the web, the Mac menu bar, Chrome, and your voice. */
+/** Wherever you are, in three small symbols and one line about your voice. */
 export function Everywhere() {
   return (
-    <section aria-labelledby="everywhere-title" className="mx-auto flex w-full max-w-[1120px] scroll-mt-20 flex-col gap-10 px-4 pb-24 sm:px-8">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h2 id="everywhere-title" className="font-hand text-[44px] leading-tight font-bold sm:text-[56px]">
-          Wherever the thought finds you.
-        </h2>
-        <p className="text-[17px] text-mute">One paper, three ways in.</p>
-      </div>
-
-      <ul className="grid gap-4 md:grid-cols-3">
-        {PANELS.map((p) => (
-          <Panel key={p.key} p={p} />
+    <section aria-labelledby="everywhere-title" className="mx-auto flex w-full max-w-[720px] flex-col items-center gap-10 px-4 py-24 text-center sm:px-8 sm:py-32">
+      <h2 id="everywhere-title" className="sr-only">
+        Where you can use it
+      </h2>
+      <ul className="flex w-full items-start justify-center gap-10 sm:gap-20">
+        {PLACES.map((p) => (
+          <li key={p.kind} className="flex flex-col items-center gap-2">
+            <Glyph kind={p.kind} />
+            <span className="text-[16px] font-medium">{p.label}</span>
+            <span className="h-4 text-[12px] text-mute">{p.note}</span>
+          </li>
         ))}
       </ul>
-
-      <div className="flex flex-col items-center gap-5 rounded-[22px] border border-line bg-sheet px-6 py-6 text-center sm:flex-row sm:gap-8 sm:px-10 sm:text-left">
-        <span aria-hidden="true" className="voice-bars flex h-12 shrink-0 items-center gap-[5px] text-red-text">
-          {Array.from({ length: 9 }, (_, i) => (
-            <span key={i} style={{ animationDelay: `${-i * 0.17}s` }} className="voice-bar w-[3px] rounded-full bg-current" />
-          ))}
-        </span>
-        <div className="flex flex-1 flex-col gap-2">
-          <p className="voice-write font-hand text-[30px] leading-tight font-bold sm:text-[38px]">Hold a key. Say it. It lands on your paper.</p>
-          <p className="text-[13px] text-mute">Speak in English, हिन्दी or తెలుగు.</p>
-        </div>
-        <span className="flex shrink-0 items-center gap-2 text-[13px] text-mute">
-          <Keys keys={["⌥", "Space"]} />
-        </span>
+      <div className="flex flex-col items-center gap-4">
+        <p className="text-[20px] sm:text-[22px]">Say it instead of typing it.</p>
+        <ul className="flex flex-col items-center gap-2 text-[13px] text-mute">
+          <li className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
+            <span>On the web (Chrome, Edge, Safari): tap the mic, or press</span>
+            <Keys keys={["⌘/Ctrl", "⇧", "M"]} />
+          </li>
+          <li className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
+            <span>In the Mac app: hold</span>
+            <Keys keys={["⌥", "Space"]} />
+          </li>
+        </ul>
+        <p className="text-[12px] text-mute/80">English, हिन्दी and తెలుగు. Telugu is the least accurate.</p>
       </div>
     </section>
   );
