@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { PenIcon } from "@/components/icons";
 import { btn } from "@/components/btn";
 import { Logo, ThemeToggle } from "@/components/ui";
 import { CrumpleDemo, DropDemo, EmailDemo, StrikeDemo } from "./demos";
+import { Everywhere } from "./everywhere";
 import { TryIt } from "./try-it";
 
 /**
@@ -135,44 +135,7 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
           </ol>
         </section>
 
-        {/* Everywhere */}
-        <section className="mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-4 pb-24 sm:px-8">
-          <SectionTitle>Works everywhere you think</SectionTitle>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="flex flex-col gap-4 rounded-[22px] border border-line bg-sheet p-5">
-              <div aria-hidden="true" className="dot-grid flex h-36 flex-wrap content-center items-center justify-center gap-2 rounded-2xl bg-bg p-3">
-                <ThoughtBubble text="call amma" done={false} shape={0} seed="tile-a" readOnly />
-                <ThoughtBubble text="book tickets" done shape={2} seed="tile-b" readOnly />
-              </div>
-              <span className="font-semibold">In the browser</span>
-              <span className="text-[15px] text-mute">Press Space and write. Every action has a key.</span>
-            </div>
-            <div className="flex flex-col gap-4 rounded-[22px] border border-line bg-sheet p-5">
-              <div aria-hidden="true" className="flex h-36 items-center justify-center rounded-2xl bg-bg">
-                <div className="flex h-32 w-20 flex-col gap-1.5 rounded-[14px] border-2 border-ink/70 bg-sheet p-1.5">
-                  <span className="h-4 rounded-md bg-t1" />
-                  <span className="h-4 rounded-md bg-t3" />
-                  <span className="h-4 rounded-md bg-t2" />
-                  <span className="mx-auto mt-auto h-3 w-8 rounded-full border border-line" />
-                </div>
-              </div>
-              <span className="font-semibold">On your phone</span>
-              <span className="text-[15px] text-mute">A calm vertical stream. Add it to your home screen like an app.</span>
-            </div>
-            <div className="flex flex-col gap-4 rounded-[22px] border border-line bg-sheet p-5">
-              <div aria-hidden="true" className="flex h-36 overflow-hidden rounded-2xl">
-                <div data-theme="light" className="flex flex-1 items-center justify-center bg-bg text-ink">
-                  <ThoughtBubble text="light" done={false} shape={1} seed="tile-l" readOnly />
-                </div>
-                <div data-theme="dark" className="flex flex-1 items-center justify-center bg-bg text-ink">
-                  <ThoughtBubble text="dark" done={false} shape={3} seed="tile-d" readOnly />
-                </div>
-              </div>
-              <span className="font-semibold">Light and dark paper</span>
-              <span className="text-[15px] text-mute">Follows your device, or pick one.</span>
-            </div>
-          </div>
-        </section>
+        <Everywhere />
 
         {/* Pricing */}
         <section id="pricing" className="mx-auto flex w-full max-w-[1120px] scroll-mt-20 flex-col items-center gap-8 px-4 pb-24 sm:px-8">

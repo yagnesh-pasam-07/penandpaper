@@ -7,10 +7,10 @@ import { currentUser } from "@/server/session";
 
 export const metadata: Metadata = {
   title: "Pen & Paper: empty your head onto paper",
-  description: "Drop every thought in two seconds. Fold it for later, and clear your desk every night. Free while in early access.",
+  description: "Drop every thought in two seconds, on the web, from your Mac menu bar or in Chrome, by typing or by voice. Free while in early access.",
   openGraph: {
     title: "Pen & Paper: empty your head onto paper",
-    description: "Drop every thought in two seconds. Fold it for later, and clear your desk every night.",
+    description: "Drop every thought in two seconds, by typing or by voice, and put it anywhere on the page.",
     type: "website",
   },
 };

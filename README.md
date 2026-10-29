@@ -67,6 +67,10 @@ Pen & Paper installs as an app, and other apps can share to it.
 - **Quick thought** (`/capture`): one box to type a thought into. **Enter** saves it to the paper you touched last, **Shift+Enter** is a new line, **Esc** closes. It's the installed app's third shortcut (**Quick thought**) and what the browser extension's **Alt+Shift+N** opens. It saves with a same-origin request only (`/api/drop/capture`), so another website can't send it.
 - **Browser extension** (`extension/`, Chrome and Edge): **Alt+Shift+N** (Option+Shift+N on a Mac) pops a small "Quick thought" box up **on the page you're on**; Enter saves it to your latest paper and it closes. The toolbar button and **Alt+Shift+P** save the page (title, link, any selected words) and show a small "Saved" note on the page. Right-click items (**Save page / selection / link / image to Pen & Paper**) use a small window on `/share?…&from=ext`. On pages a browser keeps extensions out of (`chrome://`, the new tab page, extension stores, PDFs) it falls back to the small window. It uses your signed-in session, so there is no token; `POST /api/drop/capture` accepts only this site's own page or a browser extension, and only when you are signed in. After updating its files, reload it at `chrome://extensions`. It is not on the Chrome Web Store: load it unpacked (see [`extension/README.md`](extension/README.md)).
 
+## Homepage screenshots
+
+The public homepage shows Pen & Paper on the web, as a Mac menu-bar app and as a Chrome extension, each with a screenshot frame. Until a file exists the frame shows a dashed "your screenshot goes here" placeholder. Drop `web.png`, `mac.png` and `chrome.png` (or `.webp`, `.jpg`) into `public/shots/` and the page picks them up with no code change; redeploy (or reload the dev server) after adding them. Sizes and tips are in `public/shots/README.md`.
+
 ## Run it locally
 
 ```bash

@@ -377,3 +377,20 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .trace { animation: none; background: none; color: inherit; }
 }
+
+/* Homepage voice strip: a few thin bars that breathe, and a sentence that writes itself once. */
+@keyframes voice-bar {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+.voice-bar { height: 100%; transform-origin: center; animation: voice-bar 1.4s ease-in-out infinite; }
+@keyframes voice-write {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.voice-write { animation: voice-write 2.4s steps(40, end) 0.3s both; }
+@media (prefers-reduced-motion: reduce) {
+  .voice-bar { animation: none; transform: scaleY(0.6); }
+  .voice-bar:nth-child(odd) { transform: scaleY(0.35); }
+  .voice-write { animation: none; clip-path: none; }
+}
