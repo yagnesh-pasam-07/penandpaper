@@ -4,6 +4,8 @@ import { forwardRef, useEffect, useRef, useState, type KeyboardEvent as ReactKey
 import { PenIcon } from "@/components/icons";
 import { imageFiles, shrinkImage, type Picture } from "./image";
 import { MAX_THOUGHT } from "./logic";
+import { useVoice } from "./use-voice";
+import { formatElapsed, insertAtCursor } from "./voice";
 
 /** The floating pen at the bottom of the page: opens the writer. */
 export const PenButton = forwardRef<HTMLButtonElement, { onOpen: () => void; hidden: boolean }>(function PenButton({ onOpen, hidden }, ref) {
@@ -70,6 +72,25 @@ export function Writer({
   const inset = useKeyboardInset(true);
   const picker = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState("");
+  // The latest text, so words that arrive after a recording land in what's there now.
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  /** Spoken words go in at the cursor (or over the selection); they are not dropped until you say so. */
+  const insertSpoken = (words: string) => {
+    const el = area.current;
+    const at = insertAtCursor(draftRef.current, words, el?.selectionStart ?? draftRef.current.length, el?.selectionEnd ?? draftRef.current.length);
+    onDraft(at.text);
+    requestAnimationFrame(() => {
+      area.current?.focus();
+      area.current?.setSelectionRange(at.cursor, at.cursor);
+    });
+  };
+  const voice = useVoice(insertSpoken);
+  const listening = voice.state.kind === "recording";
+  const working = voice.state.kind === "transcribing";
 
   /** Pastes or picks a picture onto this thought (the first, if there are several). */
   const attach = async (files: File[]) => {
@@ -92,6 +113,7 @@ export function Writer({
   }, []);
 
   const send = () => {
+    if (listening || working) return;
     const value = draft.trim().slice(0, MAX_THOUGHT);
     if (!value && !image) return;
     const r = area.current?.getBoundingClientRect();
@@ -101,6 +123,12 @@ export function Writer({
 
   // Keeps Tab inside the writer while it's open.
   const trap = (e: ReactKeyboardEvent) => {
+    // ⌘/Ctrl+Shift+M starts or stops recording from anywhere in the writer.
+    if (voice.supported && (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "m") {
+      e.preventDefault();
+      voice.toggle();
+      return;
+    }
     if (e.key !== "Tab" || !card.current) return;
     const stops = [...card.current.querySelectorAll<HTMLElement>("textarea, button:not([disabled])")];
     if (!stops.length) return;
@@ -156,7 +184,9 @@ export function Writer({
                 send();
               } else if (e.key === "Escape") {
                 e.preventDefault();
-                onClose();
+                // Esc while recording only throws the recording away.
+                if (listening || working) voice.cancel();
+                else onClose();
               }
             }}
             className={`ruled-line hand min-h-[72px] flex-1 resize-none bg-transparent font-note text-[22px] leading-[36px] caret-ink outline-none placeholder:font-sans placeholder:text-lg placeholder:text-mute focus-visible:outline-none text-ink`}
@@ -190,8 +220,33 @@ export function Writer({
           </p>
         )}
         <div className="flex items-center justify-between gap-3 pl-12 text-[13px] text-mute">
-          <span className="max-sm:hidden">{image ? "Enter drops it with the picture" : "Enter to drop · ⌘V a picture"} · Esc to close</span>
-          <span className="sm:hidden">Enter to drop</span>
+          {listening || working || voice.state.kind === "failed" ? (
+            <span role="status" aria-live="polite" className="flex min-w-0 items-center gap-2">
+              {listening && (
+                <>
+                  <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-red motion-safe:animate-pulse" />
+                  <span className="font-mono tabular-nums text-ink">{formatElapsed(voice.elapsed)}</span>
+                  <span className="truncate">Listening · click the mic to stop · Esc cancels</span>
+                </>
+              )}
+              {working && <span>Turning it into words…</span>}
+              {voice.state.kind === "failed" && (
+                <>
+                  <span className="truncate text-red-text">{voice.state.message}</span>
+                  {voice.canRetry && (
+                    <button type="button" onClick={voice.retry} className="shrink-0 font-semibold text-ink underline underline-offset-2">
+                      Retry
+                    </button>
+                  )}
+                </>
+              )}
+            </span>
+          ) : (
+            <>
+              <span className="max-sm:hidden">{image ? "Enter drops it with the picture" : "Enter to drop · ⌘V a picture"} · Esc to close</span>
+              <span className="sm:hidden">Enter to drop</span>
+            </>
+          )}
           <span className="flex items-center gap-1">
             <input
               ref={picker}
@@ -205,6 +260,19 @@ export function Writer({
                 e.target.value = "";
               }}
             />
+            {voice.supported && (
+              <button
+                type="button"
+                onClick={voice.toggle}
+                disabled={working}
+                aria-pressed={listening}
+                aria-label={listening ? "Stop recording" : "Speak a thought"}
+                title={listening ? "Stop recording" : "Speak a thought (⌘⇧M)"}
+                className={`flex size-9 items-center justify-center rounded-lg disabled:opacity-40 ${listening ? "bg-red text-on-red" : "hover:bg-soft hover:text-ink"}`}
+              >
+                {listening ? <StopIcon /> : <MicIcon />}
+              </button>
+            )}
             <button type="button" onClick={() => picker.current?.click()} aria-label="Add a picture" title="Add a picture" className="flex size-9 items-center justify-center rounded-lg hover:bg-soft hover:text-ink">
               <CameraIcon />
             </button>
@@ -218,6 +286,25 @@ export function Writer({
         </div>
       </div>
     </div>
+  );
+}
+
+/** A small microphone, for "speak a thought". */
+function MicIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" />
+    </svg>
+  );
+}
+
+/** A small square, for "stop recording". */
+function StopIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="2.5" />
+    </svg>
   );
 }
 

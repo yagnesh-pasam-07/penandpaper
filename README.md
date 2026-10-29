@@ -76,6 +76,17 @@ Apps that save to your paper without a browser sign-in (the coming Mac menu-bar 
 - **Limits:** up to 5 active tokens each; 60 saves per token per minute (429 with `Retry-After: 60` beyond that). Revoked or unknown tokens get 401.
 - **Revoke:** Settings → Desktop app → Revoke. It stops working at once and stays in the list.
 
+## Voice transcription
+
+Speak a thought and it becomes text. In the writer, the **mic** button (or **⌘/Ctrl + Shift + M**) starts and stops a recording; the words are inserted at the cursor and are not dropped until you press Enter. Esc while recording throws the recording away; it stops by itself after a minute. The button is hidden in a browser that can't record.
+
+- **Endpoint:** `POST /api/drop/transcribe`, multipart form with `audio` (webm, ogg, mp3, mp4, m4a, wav or aac; up to 8 MB). Replies `{ "text" }`. Errors: 400 empty or no `audio`, 401 not signed in or bad token, 403 not from this site, 413 too big, 415 not an audio type, 422 "Didn't catch anything.", 429 more than 30 in 10 minutes (`Retry-After: 600`), 502/504 the transcriber failed or was slow, 503 voice isn't set up on this server.
+- **Save in one step (for apps):** add `save=1` and an `id` (6-40 of a-z, 0-9, hyphen) and the words are also saved as a thought on your most recent paper, replying `{ "text", "id", "paperId", "paperName" }`. The same `id` again is one note. The Mac menu-bar app uses this with `Authorization: Bearer pp_…` (see Personal access tokens); the browser uses the session cookie.
+- **Setup:** set `OPENAI_API_KEY` (Vercel production, and `.env.local` to try it locally). Without it the endpoint answers 503 and the mic button shows "Voice isn't set up on this server yet." It uses `gpt-4o-mini-transcribe`, falling back to `whisper-1` when that model isn't available to the key.
+- **Languages:** no language is forced, so English, Telugu, Hindi and others are detected from the audio.
+- **Cost and privacy:** each recording is sent to OpenAI to be transcribed and costs a small amount per minute of audio. Nothing is kept by this app: only the words you choose to keep become a note.
+- **Limits:** the site's `Permissions-Policy` allows the microphone for this site only (`microphone=(self)`). Vercel functions accept request bodies up to about 4.5 MB, which is far more than a minute of speech.
+
 ## Environment variables
 
 See `.env.example` for the full annotated list.
@@ -90,6 +101,7 @@ See `.env.example` for the full annotated list.
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | optional | "Continue with Google". Redirect URI: `{BETTER_AUTH_URL}/api/auth/callback/google`. |
 | `CRON_SECRET` | production | Vercel Cron sends it to `/api/cron/drop-digest`. `openssl rand -hex 24`. |
 | `DROP_TIMEZONE` | optional | The day the evening email covers, and how dates read (default `Asia/Kolkata`). The cron time in `vercel.json` is fixed to 9 PM IST; change both together. |
+| `OPENAI_API_KEY` | for voice | Speech-to-text for the mic button and the Mac app (see Voice transcription). Without it the mic answers "Voice isn't set up". |
 | `SUPPORT_EMAIL` | optional | Contact address on `/privacy`. |
 
 ## Databases
