@@ -54,7 +54,7 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
             </Link>
           </div>
         </section>
-        <div className="mx-auto w-full max-w-[980px] px-4 pb-8 sm:px-8">
+        <div className="mx-auto w-full max-w-[1320px] pb-8">
           <HeroGallery />
         </div>
 

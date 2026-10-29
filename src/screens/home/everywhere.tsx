@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { ShotTabs, type Shot } from "./shot-tabs";
+import { ShotCarousel, type Shot } from "./shot-carousel";
 
 /** Where the homepage screenshot lives (see public/shots/README.md). */
 const SHOTS_DIR = path.join(process.cwd(), "public", "shots");
@@ -91,32 +91,46 @@ export function HeroShot() {
   );
 }
 
-/** The screens the hero can show, in tab order. A tab appears only when its light file exists in public/shots/; a `-dark` twin is optional. */
-const SCREENS: { id: string; label: string; alt: string }[] = [
-  { id: "web", label: "Canvas", alt: "Pen & Paper open in a browser, notes and videos spread across a paper" },
-  { id: "writer", label: "Writer", alt: "The writer open over the canvas, with a microphone button and a language menu" },
-  { id: "library", label: "Library", alt: "The Library: every paper as a small preview card" },
-  { id: "search", label: "Search", alt: "Searching every paper for a word" },
-  { id: "tonight", label: "Tonight", alt: "Tonight's paper: one thought at a time to strike, keep or crumple" },
-  { id: "grid", label: "Grid", alt: "The same paper on the Grid canvas" },
-  { id: "ruled", label: "Ruled", alt: "The same paper on the Ruled canvas" },
+/** The screens the hero can show, in order. A slide appears only when its light file exists in public/shots/; a `-dark` twin is optional. */
+const SCREENS: { id: string; label: string; alt: string; blurb: string }[] = [
+  { id: "web", label: "Canvas", alt: "Pen & Paper open in a browser, notes and videos spread across a paper", blurb: "One calm canvas for everything you drop." },
+  { id: "writer", label: "Writer", alt: "The writer open over the canvas, with a microphone button and a language menu", blurb: "Type it, paste it, or say it." },
+  { id: "library", label: "Library", alt: "The Library: every paper as a small preview card", blurb: "Every paper, as a small preview." },
+  { id: "search", label: "Search", alt: "Searching every paper for a word", blurb: "Find that video from two weeks ago." },
+  { id: "tonight", label: "Tonight", alt: "Tonight's paper: one thought at a time to strike, keep or crumple", blurb: "Close the day in a minute." },
+  { id: "grid", label: "Grid", alt: "The same paper on the Grid canvas", blurb: "Dots, grid or ruled. Pick the paper you like." },
+  { id: "ruled", label: "Ruled", alt: "The same paper on the Ruled canvas", blurb: "Notebook lines, if you prefer." },
 ];
 
-/** The hero: the canvas screenshot, with small tabs for the other screens when their files exist. */
+/** The hero: the canvas screenshot, as a carousel of the other screens when their files exist. */
 export function HeroGallery() {
   const shots: Shot[] = [];
   for (const s of SCREENS) {
     const light = shotFor(s.id);
-    if (light) shots.push({ id: s.id, label: s.label, alt: s.alt, light, dark: shotFor(`${s.id}-dark`) });
+    if (light) shots.push({ id: s.id, label: s.label, alt: s.alt, blurb: s.blurb, light, dark: shotFor(`${s.id}-dark`) });
   }
-  // Light and dark halves of one screen, cut on a slant, as a last tab.
+  // Light and dark halves of one screen, cut on a slant, as the last slide.
   const themeLight = shotFor("grid");
   const themeDark = shotFor("grid-dark");
   if (themeLight && themeDark) {
-    shots.push({ id: "themes", label: "Light & dark", alt: "The same paper in the light and the dark theme, split down the middle", light: themeLight, dark: themeDark, split: true });
+    shots.push({
+      id: "themes",
+      label: "Light & dark",
+      alt: "The same paper in the light and the dark theme, split down the middle",
+      blurb: "Light or dark, your call.",
+      light: themeLight,
+      dark: themeDark,
+      split: true,
+    });
   }
-  if (shots.length < 2) return <HeroShot />;
-  return <ShotTabs shots={shots} />;
+  if (shots.length < 2) {
+    return (
+      <div className="mx-auto w-full max-w-[980px] px-4 sm:px-8">
+        <HeroShot />
+      </div>
+    );
+  }
+  return <ShotCarousel shots={shots} />;
 }
 
 const PLACES: { kind: "web" | "mac" | "chrome"; label: string; note?: string }[] = [

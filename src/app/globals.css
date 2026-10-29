@@ -402,6 +402,50 @@ body {
 [data-theme="dark"] .shot-light { display: none; }
 [data-theme="dark"] .shot-dark { display: block; }
 
+/*
+ * The hero carousel: the front slide is sharp, its neighbours sit beside it,
+ * smaller and blurred, and the rest wait out of sight. Everything moves with
+ * transform, opacity and filter only. With no script, slide one is in front.
+ */
+.shot-carousel { --shot-w: min(860px, 72vw); }
+@media (max-width: 640px) {
+  .shot-carousel { --shot-w: 84vw; }
+}
+/* The stage fades out at both ends so cut-off neighbours don't end in a hard edge; thinner on phones, where the slivers are small. */
+.shot-stage { -webkit-mask-image: linear-gradient(to right, transparent, #000 9%, #000 91%, transparent); mask-image: linear-gradient(to right, transparent, #000 9%, #000 91%, transparent); }
+@media (max-width: 640px) {
+  .shot-stage { -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent); mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent); }
+}
+.shot-slide {
+  width: var(--shot-w);
+  transform: translateX(-50%) scale(0.8);
+  opacity: 0;
+  filter: blur(8px);
+  pointer-events: none;
+  will-change: transform, opacity, filter;
+  transition: transform 600ms cubic-bezier(0.22, 0.8, 0.24, 1), opacity 600ms ease, filter 600ms ease;
+}
+.shot-slide[data-pos="0"] {
+  transform: translateX(-50%) scale(1);
+  opacity: 1;
+  filter: none;
+  z-index: 3;
+  pointer-events: auto;
+}
+.shot-slide[data-pos="1"],
+.shot-slide[data-pos="-1"] {
+  opacity: 0.55;
+  filter: blur(6px) brightness(0.82);
+  z-index: 2;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.shot-slide[data-pos="1"] { transform: translateX(calc(-50% + var(--shot-w) * 0.78)) scale(0.86); }
+.shot-slide[data-pos="-1"] { transform: translateX(calc(-50% - var(--shot-w) * 0.78)) scale(0.86); }
+@media (prefers-reduced-motion: reduce) {
+  .shot-slide { transition: none; }
+}
+
 /* The hero screenshots swap with a short fade. */
 @keyframes shot-fade {
   from { opacity: 0; }
