@@ -86,12 +86,14 @@ export function insertAtCursor(text: string, insert: string, start: number, end:
 }
 
 /** What the transcriber's answer means for the caller, without ever passing the provider's own message on. */
-export type VoiceFailure = "not_configured" | "bad_audio" | "upstream" | "timeout";
+export type VoiceFailure = "not_configured" | "key_refused" | "bad_audio" | "upstream" | "timeout";
 
 export function failureResponse(reason: VoiceFailure): { status: number; error: string } {
   switch (reason) {
     case "not_configured":
       return { status: 503, error: "Voice isn't set up on this server yet." };
+    case "key_refused":
+      return { status: 503, error: "Voice is set up, but the server's OpenAI key was refused. Check the key." };
     case "bad_audio":
       return { status: 422, error: "Couldn't read that recording. Try again." };
     case "timeout":

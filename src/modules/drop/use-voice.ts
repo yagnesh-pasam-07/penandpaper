@@ -63,7 +63,7 @@ export function useVoice(onText: (text: string) => void) {
         return;
       }
       if (res.status === 401) setState({ kind: "failed", message: "Sign in again to use your voice.", canRetry: false });
-      else if (res.status === 503) setState({ kind: "failed", message: "Voice isn't set up on this server yet.", canRetry: false });
+      else if (res.status === 503) setState({ kind: "failed", message: body.error ?? "Voice isn't set up on this server yet.", canRetry: false });
       else setState({ kind: "failed", message: body.error ?? "Couldn't turn that into words.", canRetry: (res.status >= 500 || res.status === 429) && !retried.current });
     } catch {
       // The recording stays so one retry doesn't mean speaking it all again.

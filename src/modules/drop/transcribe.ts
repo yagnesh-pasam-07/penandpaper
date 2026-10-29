@@ -50,7 +50,7 @@ export async function transcribeAudio(
     if (res.status === 400 || res.status === 415 || res.status === 413) return { ok: false, reason: "bad_audio" };
     if (res.status === 401 || res.status === 403) {
       console.error("transcribe: the OpenAI key was refused");
-      return { ok: false, reason: "not_configured" };
+      return { ok: false, reason: "key_refused" };
     }
     console.error("transcribe: provider status", res.status);
     return { ok: false, reason: "upstream" };

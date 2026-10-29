@@ -57,6 +57,7 @@ describe("recorder type", () => {
 describe("failure responses", () => {
   it("never carries the provider's own words", () => {
     expect(failureResponse("not_configured")).toEqual({ status: 503, error: "Voice isn't set up on this server yet." });
+    expect(failureResponse("key_refused")).toEqual({ status: 503, error: "Voice is set up, but the server's OpenAI key was refused. Check the key." });
     expect(failureResponse("bad_audio").status).toBe(422);
     expect(failureResponse("timeout").status).toBe(504);
     expect(failureResponse("upstream").status).toBe(502);
@@ -101,7 +102,7 @@ describe("transcribeAudio", () => {
   });
   it("maps a refused key, a provider error and a network failure without leaking anything", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(await transcribeAudio(audio, "webm", "k", vi.fn().mockResolvedValue(reply(401, { error: "bad key sk-secret" })))).toEqual({ ok: false, reason: "not_configured" });
+    expect(await transcribeAudio(audio, "webm", "k", vi.fn().mockResolvedValue(reply(401, { error: "bad key sk-secret" })))).toEqual({ ok: false, reason: "key_refused" });
     expect(await transcribeAudio(audio, "webm", "k", vi.fn().mockResolvedValue(reply(500, "boom sk-secret")))).toEqual({ ok: false, reason: "upstream" });
     expect(await transcribeAudio(audio, "webm", "k", vi.fn().mockRejectedValue(new TypeError("fetch failed")))).toEqual({ ok: false, reason: "upstream" });
     const timeout = Object.assign(new Error("t"), { name: "TimeoutError" });
