@@ -138,3 +138,7 @@ src/lib/                 auth, env, time zones, estimates, shared helpers
 src/server/              API handling, session, email
 scripts/seed.ts          seed data for Drop
 ```
+
+## Mac menu-bar app
+
+`mac/` is a native macOS app (Swift, no dependencies) that captures a thought from any app: **⌥⇧N** opens a floating quick-thought box, and holding **⌥Space** records your voice, which `/api/drop/transcribe` turns into a note. It signs in with a personal access token (Settings → Desktop app), keeps everything in an on-disk outbox until the site has it, and is ad-hoc signed (not notarized). Build it with `./mac/build-app.sh`; see [mac/README.md](mac/README.md) for permissions, limits and manual test steps.

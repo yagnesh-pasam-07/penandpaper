@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAX_THOUGHT } from "@/modules/drop/logic";
-import { noStore, requireUser } from "@/modules/drop/http";
+import { noStore, requireUser, userFromRequest } from "@/modules/drop/http";
 import { crumpleThought, updateThought } from "@/modules/drop/server";
 
 const patch = z
@@ -20,10 +20,12 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/thoug
   return thought ? Response.json(thought, noStore) : gone();
 }
 
-/** Crumples it: hidden at once, swept up for good a week later. The paper goes in the query: `?paper=<id>`. */
+/** Crumples it: hidden at once, swept up for good a week later. The paper goes in the query: `?paper=<id>`. A session or a Bearer token. */
 export async function DELETE(request: Request, ctx: RouteContext<"/api/drop/thoughts/[id]">) {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
+  // The Mac app undoes a save with its token; the web app uses the signed-in session.
+  const who = await userFromRequest(request);
+  if (who instanceof Response) return who;
+  const { user } = who;
   const paper = z.uuid().safeParse(new URL(request.url).searchParams.get("paper"));
   if (!paper.success) return Response.json({ error: "Which paper?" }, { status: 400 });
   const { id } = await ctx.params;
