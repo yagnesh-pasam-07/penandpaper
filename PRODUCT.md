@@ -45,7 +45,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - Pushing to `main` deploys to production. Migrations must only add (columns with defaults, new tables) so old and new code both run while a deploy rolls out.
 
 ### Security
-- Roles: `user` (everyone) and `admin` (one person: `yagnesh@tilicho.in`). Set by a migration or `npm run set-role`, never by the app, and always by exact email, never by name.
+- Roles: `user` (everyone) and `admin` (one person: the maintainer). Set by a migration or `npm run set-role`, never by the app, and always by exact email, never by name.
 - Studio (`/studio`) needs both the admin role and `STUDIO_PASSCODE`. No secret lives in the code.
 - New accounts must use an address that can receive mail: typos (with a "Did you mean …?" fix), throwaway inboxes and domains with no mail server are refused on the server. With an email service set (`RESEND_API_KEY` + `EMAIL_FROM`), a password sign-up must also click a confirmation link before it can sign in.
 - The server fetches pictures and link previews only from public addresses, never with the visitor's cookies.
@@ -58,6 +58,10 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 ---
 
 ## Decision log
+
+### 2026-10-30 09:55 IST · growth · Open source under MIT; only the maintainer merges to main
+Why: anyone can read, fork and contribute; quality stays in one pair of hands. `main` is protected: every change is a pull request that passes CI and gets the maintainer's approval (CODEOWNERS). Contributor guide, security policy, code of conduct and templates are in the repo. The admin's email was taken out of the files before going public.
+Replaces: nothing
 
 ### 2026-10-30 09:40 IST · product · Studio rebuilt like YouTube Studio: growth, realtime, insights
 Why: the first version showed totals, not decisions. Now: a Studio brand bar; four headline numbers (writers, thoughts, new people, thoughts per writer), each with ▲/▼ change against the previous 28 days; a tabbed daily chart; Realtime (online now, from a once-a-minute ping while a paper is visible: `users.last_seen_at`); Insights in plain words with what to do; the journey (activation, week-1 retention, slipping, never wrote); sources; when people think (day and hour); monthly; people with online status and verification.
@@ -72,7 +76,7 @@ Replaces: nothing
 Why: the two features that most set it apart were invisible to visitors. "Read something good? Highlight it." shows a highlighted line becoming a note; "Think loose. Read it clear." shows one thought in both fonts.
 Replaces: a single line about the extension above the download button
 
-### 2026-10-30 08:35 IST · security · The admin is one exact email: yagnesh@tilicho.in
+### 2026-10-30 08:35 IST · security · The admin is one exact email, the maintainer's
 Why: a name can be chosen by anyone who signs up; an email can't. Applied to production by migration `0013_yagnesh_admin.sql`; studio still needs the passcode.
 Replaces: promoting every account whose name or email contains "yagnesh" (tried locally, never shipped)
 

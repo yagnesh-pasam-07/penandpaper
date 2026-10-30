@@ -1,5 +1,4 @@
--- One time: the owner's account becomes admin (opens Studio, which still needs
--- STUDIO_PASSCODE). An exact email, so no one can get it by choosing a name.
--- If the account doesn't exist yet, this changes nothing; sign up, then run
--- `npm run set-role -- yagnesh@tilicho.in admin`.
-UPDATE "users" SET "role" = 'admin' WHERE lower("email") = 'yagnesh@tilicho.in';
+-- Kept so the migration history stays in order. On the live site this once
+-- made the maintainer's account admin; on any other database it changes
+-- nothing. To make someone admin: `npm run set-role -- you@example.com admin`.
+SELECT 1;

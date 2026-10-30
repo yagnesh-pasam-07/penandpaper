@@ -178,3 +178,7 @@ scripts/seed.ts          seed data for Drop
 ## Mac menu-bar app
 
 `mac/` is a native macOS app (Swift, no dependencies) that captures a thought from any app: **⌥⇧N** opens a floating quick-thought box, and holding **⌥Space** listens to your voice, which Apple's recogniser turns into a note (on your Mac where the language allows it, with no server key). Undo is on every save. It signs in with a personal access token (Settings → Desktop app), keeps everything in an on-disk outbox until the site has it, and is ad-hoc signed (not notarized). Build it with `./mac/build-app.sh`; see [mac/README.md](mac/README.md) for permissions, limits and manual test steps.
+
+## Contributing
+
+Pen & Paper is open source under the [MIT License](LICENSE). Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md), open an issue for anything big, then send a pull request. Security reports go through [SECURITY.md](SECURITY.md).
