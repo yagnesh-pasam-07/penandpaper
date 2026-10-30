@@ -47,6 +47,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 ### Security
 - Roles: `user` (everyone) and `admin` (one person: `yagnesh@tilicho.in`). Set by a migration or `npm run set-role`, never by the app, and always by exact email, never by name.
 - Studio (`/studio`) needs both the admin role and `STUDIO_PASSCODE`. No secret lives in the code.
+- New accounts must use an address that can receive mail: typos (with a "Did you mean …?" fix), throwaway inboxes and domains with no mail server are refused on the server. With an email service set (`RESEND_API_KEY` + `EMAIL_FROM`), a password sign-up must also click a confirmation link before it can sign in.
 - The server fetches pictures and link previews only from public addresses, never with the visitor's cookies.
 
 ### Open questions
@@ -57,6 +58,15 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 ---
 
 ## Decision log
+
+### 2026-10-30 09:40 IST · product · Studio rebuilt like YouTube Studio: growth, realtime, insights
+Why: the first version showed totals, not decisions. Now: a Studio brand bar; four headline numbers (writers, thoughts, new people, thoughts per writer), each with ▲/▼ change against the previous 28 days; a tabbed daily chart; Realtime (online now, from a once-a-minute ping while a paper is visible: `users.last_seen_at`); Insights in plain words with what to do; the journey (activation, week-1 retention, slipping, never wrote); sources; when people think (day and hour); monthly; people with online status and verification.
+Design: numbers in Inter with tabular figures (no handwriting in Studio); one validated blue for data; green/red only for growth, always with an arrow.
+Replaces: 2026-10-30 07:45 · Studio's first layout
+
+### 2026-10-30 09:20 IST · security · Refuse sign-ups from addresses that can't receive mail; verify when email is on
+Why: broken and fake emails (typos, throwaway inboxes) can't get sign-in links and pollute the numbers. Checked in the browser for a quick fix and enforced on the server for every new account. Verification links need an email service, which production doesn't have yet, so they switch on by themselves once `RESEND_API_KEY` and `EMAIL_FROM` are set; turning them on without one would lock everyone out.
+Replaces: nothing
 
 ### 2026-10-30 08:55 IST · growth · The homepage shows highlight-to-save and the two fonts
 Why: the two features that most set it apart were invisible to visitors. "Read something good? Highlight it." shows a highlighted line becoming a note; "Think loose. Read it clear." shows one thought in both fonts.

@@ -6,7 +6,10 @@ import { magicLink } from "better-auth/plugins";
 import { httpDb } from "@/db";
 import * as schema from "@/db/schema";
 import { appleClientSecret } from "@/lib/apple-secret";
-import { appleEnabled, env, googleEnabled, microsoftEnabled } from "@/lib/env";
+import { APIError } from "better-auth/api";
+import { checkEmail } from "@/lib/email-check";
+import { mailServers } from "@/lib/email-dns";
+import { appleEnabled, emailEnabled, env, googleEnabled, microsoftEnabled } from "@/lib/env";
 import { nameFromEmail } from "@/lib/mutations";
 import { sendMail } from "@/server/email";
 
@@ -26,7 +29,25 @@ export const auth = betterAuth({
   database: drizzleAdapter(httpDb, { provider: "pg", usePlural: true, schema }),
   // Email + password works with no email service. Nothing checks the address
   // yet, so a password account counts as unverified (see accountLinking).
-  emailAndPassword: { enabled: true, minPasswordLength: 8, maxPasswordLength: 128, autoSignIn: true },
+  // With an email service, a new password account must click a link before it
+  // can sign in. Without one, no link could arrive, so that waits until
+  // RESEND_API_KEY and EMAIL_FROM are set; the address checks below always run.
+  emailAndPassword: { enabled: true, minPasswordLength: 8, maxPasswordLength: 128, autoSignIn: !emailEnabled, requireEmailVerification: emailEnabled },
+  emailVerification: {
+    sendOnSignUp: emailEnabled,
+    sendOnSignIn: emailEnabled,
+    autoSignInAfterVerification: true,
+    expiresIn: 60 * 60 * 24,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendMail({
+        to: user.email,
+        subject: "Confirm your email for Pen & Paper",
+        heading: "One tap to confirm it's you",
+        lines: ["Confirm this address and your paper is ready. The link works for 24 hours.", "If you didn't sign up, ignore this email."],
+        cta: { label: "Confirm my email", url },
+      });
+    },
+  },
   // Google, Apple or Microsoft may join an existing account with the same
   // address only when that address was verified (an email link). Never a
   // password account whose email nobody checked: it could belong to whoever
@@ -44,8 +65,14 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        // Every new account, however it signs up: refuse addresses that can't
+        // receive mail (typos, throwaway inboxes, domains with no mail server).
         // Email-link sign-ups arrive without a name.
-        before: async (user) => ({ data: { ...user, name: user.name?.trim() || nameFromEmail(user.email) } }),
+        before: async (user) => {
+          const problem = await checkEmail(user.email, mailServers);
+          if (problem) throw new APIError("BAD_REQUEST", { message: problem.message, code: "EMAIL_UNDELIVERABLE" });
+          return { data: { ...user, name: user.name?.trim() || nameFromEmail(user.email) } };
+        },
       },
     },
   },

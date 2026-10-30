@@ -159,6 +159,20 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
     return () => clearTimeout(timer);
   }, [router]);
 
+  // "I'm here" each minute while this paper is on screen, for Studio's "online now".
+  useEffect(() => {
+    const ping = () => {
+      if (document.visibilityState === "visible") void fetch("/api/drop/presence", { method: "POST", keepalive: true }).catch(() => {});
+    };
+    ping();
+    const timer = setInterval(ping, 60_000);
+    document.addEventListener("visibilitychange", ping);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", ping);
+    };
+  }, []);
+
   // Back to the tab: pick up changes from other devices.
   useEffect(() => {
     const sync = async () => {

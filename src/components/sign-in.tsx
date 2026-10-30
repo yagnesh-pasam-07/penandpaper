@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { emailProblem } from "@/lib/email-check";
 import { useStore } from "@/lib/store";
 import { btn } from "./ui";
 
@@ -96,6 +97,8 @@ function explain(err: AuthError, mode: "signup" | "login"): Problem {
       return { text: "Use at least 8 characters for your password." };
     case "PASSWORD_TOO_LONG":
       return { text: "That password is too long (128 characters at most)." };
+    case "EMAIL_UNDELIVERABLE":
+      return { text: err.message ?? "That address can't receive email. Use your real one." };
     case "INVALID_EMAIL":
       return { text: "That doesn't look like an email address." };
     case "INVALID_ORIGIN":
@@ -125,14 +128,20 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
   const [problem, setProblem] = useState<Problem | null>(null);
   const [checked, setChecked] = useState(false);
   const [linkSentTo, setLinkSentTo] = useState<string | null>(null);
+  /** "link": an email-link sign-in was sent; "verify": a new account must confirm its address. */
+  const [sentKind, setSentKind] = useState<"link" | "verify">("link");
   const signup = mode === "signup";
   const cleanEmail = email.trim().toLowerCase();
   const fieldErrors = {
     name: signup && !name.trim() ? "Add your name." : "",
-    email: !cleanEmail ? "Enter your email." : !EMAIL.test(cleanEmail) ? "That doesn't look like an email address." : "",
+    // Signing up checks the address can receive mail (typos, throwaway inboxes); logging in only its shape.
+    email: !cleanEmail ? "Enter your email." : !EMAIL.test(cleanEmail) ? "That doesn't look like an email address." : signup ? (emailProblem(cleanEmail)?.message ?? "") : "",
     password: !password ? "Enter your password." : signup && password.length < 8 ? `Use at least 8 characters (${password.length} so far).` : "",
   };
   const shown = (field: keyof typeof fieldErrors) => (checked ? fieldErrors[field] : "");
+  // A misspelt big provider is offered as a one-tap fix as soon as it's typed, before submitting.
+  const typo = signup && EMAIL.test(cleanEmail) ? emailProblem(cleanEmail) : null;
+  const suggestion = typo?.reason === "typo" ? typo.suggestion : undefined;
   const setError = (text: string) => setProblem(text ? { text } : null);
 
   const switchTo = (target: "signup" | "login") => {
@@ -156,7 +165,15 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
       <div role="status" className="flex flex-col items-center gap-3 rounded-[18px] border border-line bg-sheet p-6 text-center">
         <span className="font-hand text-[32px] leading-none font-bold">Check your inbox.</span>
         <span className="text-[15px] text-mute">
-          We sent a sign-in link to <span className="font-medium text-ink">{linkSentTo}</span>. It works once and expires in 15 minutes.
+          {sentKind === "verify" ? (
+            <>
+              We sent a link to <span className="font-medium text-ink">{linkSentTo}</span>. Tap it to confirm your email and open your paper. It works for 24 hours.
+            </>
+          ) : (
+            <>
+              We sent a sign-in link to <span className="font-medium text-ink">{linkSentTo}</span>. It works once and expires in 15 minutes.
+            </>
+          )}
         </span>
         <button type="button" onClick={() => setLinkSentTo(null)} className="py-2 text-sm font-semibold">
           Back
@@ -220,12 +237,27 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
           } catch {
             err = {};
           }
+          // An unconfirmed address: the site has just emailed a confirmation link.
+          if (err?.code === "EMAIL_NOT_VERIFIED") {
+            setBusy(null);
+            setSentKind("verify");
+            setLinkSentTo(cleanEmail);
+            return;
+          }
           if (err) {
             setBusy(null);
             setProblem(explain(err, mode));
             return;
           }
           rememberEmail("");
+          // With verification on, signing up makes no session: the confirmation link does.
+          const session = await authClient.getSession().catch(() => null);
+          if (signup && !session?.data) {
+            setBusy(null);
+            setSentKind("verify");
+            setLinkSentTo(cleanEmail);
+            return;
+          }
           await done();
         }}
       >
@@ -260,6 +292,15 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
             className={`${FIELD} ${shown("email") ? FIELD_BAD : ""}`}
           />
           <FieldError id="email-error" text={shown("email")} />
+          {suggestion && !shown("email") && (
+            <span className="text-[13px] font-normal text-mute">
+              Did you mean{" "}
+              <button type="button" onClick={() => setEmail(suggestion)} className="font-semibold text-ink underline underline-offset-2">
+                {suggestion}
+              </button>
+              ?
+            </span>
+          )}
         </label>
         <label className="flex flex-col gap-2 text-sm font-medium">
           Password
@@ -302,7 +343,10 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
             const { error: err } = await authClient.signIn.magicLink({ email: cleanEmail, callbackURL: next });
             setBusy(null);
             if (err) setError(err.message ?? "Couldn't send the link. Try again.");
-            else setLinkSentTo(cleanEmail);
+            else {
+              setSentKind("link");
+              setLinkSentTo(cleanEmail);
+            }
           }}
           className="text-sm font-medium text-mute hover:text-ink disabled:opacity-50"
         >

@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   image: text("image"),
   /** "user" for everyone; "admin" opens Studio (with its passcode). Set only by `npm run set-role`, never by the app. */
   role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
+  /** When a page of theirs was last open and visible (a ping each minute); Studio's "online now". */
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
