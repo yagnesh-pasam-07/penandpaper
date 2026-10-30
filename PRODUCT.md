@@ -24,7 +24,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 
 ### Product
 - **What it is:** one calm paper for the thoughts you don't have time to write. Personal, not a team planner (the team planner is parked; its routes redirect to `/drop`).
-- **The core loop:** drop a thought in a second (type, paste, speak, share, highlight) → see it on one canvas → close the day with Tonight's paper → a 9 PM email of what you dropped.
+- **The core loop:** drop a thought in a second (type, paste, speak, share, highlight) → see it on one canvas → close the day with Tonight's paper → a 9 PM email of what you dropped → **the thought comes back**: one each morning (1, 7, 30 days later: do it, keep, let go) and the whole week in Sunday's rewind (`/rewind`). Quiet by design: no streaks or badges, and it can be switched off in Settings.
 - **Papers:** you make as many as you like; captures land on the paper you touched last. Library and search across all of them.
 - **Capture surfaces:** the web canvas, the quick box (`/capture`), phone share (`/share`), the Chrome & Edge extension, the Mac menu-bar app. Each tags its thoughts by id prefix (`ext-`, `mac-`, `cap-`, `share-`), which Studio counts.
 - **Extension:** highlight on any site and click the icon (or ⌥⇧P / Alt+Shift+P): the words, the first picture in the highlight and the page address go straight to the paper. No window.
@@ -40,6 +40,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 ### Tech
 - Next.js 16 on Vercel (`sin1`), Neon Postgres, Drizzle, Better Auth.
 - Sign in: email + password, email link, and Google, Apple, Microsoft (each appears only when its keys are set).
+- Email: Brevo (free, no domain needed) or Resend, whichever key is set, with `EMAIL_FROM`. Nothing sends until one is set.
 - Pictures are small WebP data URLs in the database (to be moved to object storage, see open questions).
 - Every schema change is a Drizzle migration in `drizzle/`. Production applies them automatically at the start of each deploy (`scripts/migrate-on-deploy.mjs`); locally, run `npm run db:migrate`.
 - Pushing to `main` deploys to production. Migrations must only add (columns with defaults, new tables) so old and new code both run while a deploy rolls out.
@@ -58,6 +59,14 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 ---
 
 ## Decision log
+
+### 2026-10-30 11:30 IST · tech · Email through Brevo or Resend, whichever is set
+Why: Resend's free plan only emails anyone after you verify a domain you own, and the site is on vercel.app. Brevo's free plan (300 a day) sends to anyone after confirming one sender address. One HTTPS call, no new package.
+Replaces: Resend only
+
+### 2026-10-30 11:30 IST · product · Thoughts come back: the morning resurface and the Sunday rewind
+Why: capture was strong but nothing came back, so there was no reason to return (13% came back after their first week). Each morning one open thought from 1, 7 or 30 days ago returns to the top of the paper: Do it (struck), Keep (later in the rhythm), Let go (stays, never returns), or Not now (tomorrow). `/rewind` shows the week grouped by paper, linked from Sunday's 9 PM email. Measured by Studio's week-1 retention. No streaks, badges or guilt; a switch in Settings turns it off.
+Replaces: nothing
 
 ### 2026-10-30 10:45 IST · tech · The star count refreshes every two minutes, and again in the browser
 Why: an hour-long cache showed 0 stars after the repo had 1, the first time anyone looked. Stars now have their own two-minute server cache (about 30 GitHub calls an hour, inside the 60 allowed without a token), and the button asks `/api/github/stars` once after the page loads, so a new star shows within minutes. Avatars and forks stay hourly.

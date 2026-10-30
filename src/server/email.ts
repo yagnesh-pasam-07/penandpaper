@@ -1,6 +1,6 @@
 import "server-only";
 import { Resend } from "resend";
-import { emailEnabled, env } from "@/lib/env";
+import { emailProvider, env } from "@/lib/env";
 
 type Mail = {
   to: string;
@@ -55,20 +55,51 @@ ${secondaryRow}
   return { html, text };
 }
 
+/** "Pen & Paper <hello@x.com>" → { name, email }; a bare address works too. */
+export function parseFrom(from: string): { name?: string; email: string } {
+  const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(from);
+  return m ? { ...(m[1] ? { name: m[1].replace(/^"|"$/g, "") } : {}), email: m[2].trim() } : { email: from.trim() };
+}
+
+/** Brevo's transactional API: one HTTPS call, no extra package. */
+async function sendWithBrevo(mail: Mail, html: string, text: string): Promise<boolean> {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": env.BREVO_API_KEY!, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      sender: parseFrom(env.EMAIL_FROM!),
+      to: [{ email: mail.to }],
+      subject: mail.subject,
+      htmlContent: html,
+      textContent: text,
+      ...(mail.scheduledAt ? { scheduledAt: mail.scheduledAt } : {}),
+    }),
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.error("Brevo refused an email:", mail.subject, res ? `${res.status} ${await res.text().catch(() => "")}` : "no answer");
+    return false;
+  }
+  return true;
+}
+
 /**
- * Sends (or schedules) one email. Without Resend set up, development prints
- * the email to the server log instead; production reports that it can't send.
+ * Sends (or schedules) one email, through Brevo or Resend, whichever is set
+ * up (see .env.example). With neither, development prints the email to the
+ * server log instead; production reports that it can't send.
  */
 export async function sendMail(mail: Mail): Promise<boolean> {
   const { html, text } = render(mail);
-  if (!emailEnabled || !resend) {
+  if (!emailProvider) {
     if (process.env.NODE_ENV !== "production") {
       console.info(`\n[email to ${mail.to}${mail.scheduledAt ? ` at ${mail.scheduledAt}` : ""}]\n${text}\n`);
       return true;
     }
-    console.error("Email is not set up (RESEND_API_KEY, EMAIL_FROM); not sent:", mail.subject);
+    console.error("Email is not set up (BREVO_API_KEY or RESEND_API_KEY, and EMAIL_FROM); not sent:", mail.subject);
     return false;
   }
+  if (emailProvider === "brevo") return sendWithBrevo(mail, html, text);
+  if (!resend) return false;
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM!,
     to: mail.to,

@@ -1,6 +1,7 @@
 import { appUrl } from "@/lib/env";
 import { longDate, todayIn } from "@/lib/time";
 import { digestItems } from "@/modules/drop/digest";
+import { isSunday } from "@/modules/drop/resurface";
 import { emailSubject } from "@/modules/drop/tonight";
 import { digestsFor, dropZone, sweepCrumpled } from "@/modules/drop/server";
 import { sendMail } from "@/server/email";
@@ -19,6 +20,8 @@ export async function GET(request: Request) {
   const zone = dropZone();
   const date = todayIn(zone);
   const digests = await digestsFor(date);
+  // On Sundays the email also points to the week's rewind.
+  const sunday = isSunday(date);
   let sent = 0;
   for (const { email, groups, latestPaperId } of digests) {
     const total = groups.reduce((n, g) => n + g.thoughts.length, 0);
@@ -27,7 +30,10 @@ export async function GET(request: Request) {
       to: email,
       subject: emailSubject(total),
       heading: `Here's what you dropped on ${longDate(date)}`,
-      lines: [`${total} ${total === 1 ? "thought" : "thoughts"} on ${groups.length} ${groups.length === 1 ? "paper" : "papers"}${struck ? `, ${struck} struck out` : ""}.`],
+      lines: [
+        `${total} ${total === 1 ? "thought" : "thoughts"} on ${groups.length} ${groups.length === 1 ? "paper" : "papers"}${struck ? `, ${struck} struck out` : ""}.`,
+        ...(sunday ? [`It's Sunday: rewind your week and decide what each thought becomes. ${appUrl}/rewind`] : []),
+      ],
       items: digestItems(groups),
       ctaFirst: true,
       cta: { label: "Review tonight's paper", url: `${appUrl}/tonight` },

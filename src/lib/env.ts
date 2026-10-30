@@ -19,6 +19,8 @@ const schema = z.object({
   MICROSOFT_CLIENT_ID: optional,
   MICROSOFT_CLIENT_SECRET: optional,
   RESEND_API_KEY: optional,
+  /** Brevo (free: 300 emails a day, sends to anyone after you confirm one sender address; no domain needed). */
+  BREVO_API_KEY: optional,
   /** e.g. "Pen & Paper <hello@yourdomain.com>"; the domain must be verified in Resend. */
   EMAIL_FROM: optional,
   /** The second lock on /studio (the first is the admin role). Unset, Studio is switched off. */
@@ -38,7 +40,9 @@ export const appUrl =
   (env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined) ??
   (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "http://localhost:3000");
 
-export const emailEnabled = Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
+/** Which service sends email: Brevo when its key is set, else Resend, else none. EMAIL_FROM is the sender either way. */
+export const emailProvider: "brevo" | "resend" | null = env.EMAIL_FROM ? (env.BREVO_API_KEY ? "brevo" : env.RESEND_API_KEY ? "resend" : null) : null;
+export const emailEnabled = emailProvider !== null;
 export const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 export const appleEnabled = Boolean(env.APPLE_CLIENT_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY);
 export const microsoftEnabled = Boolean(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET);

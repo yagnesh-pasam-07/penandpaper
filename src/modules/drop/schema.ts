@@ -1,4 +1,4 @@
-import { date, index, integer, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
 /** A canvas a person made: as many as they like, each with its own thoughts. */
@@ -34,6 +34,8 @@ export const dropPrefs = pgTable("drop_prefs", {
   theme: text("theme"),
   /** How thoughts are written (an id from NOTE_FONTS in src/lib/canvases.ts); null means handwritten. */
   noteFont: text("note_font"),
+  /** Old thoughts come back each morning and the Sunday rewind is emailed; on unless switched off. */
+  resurface: boolean("resurface").notNull().default(true),
 });
 
 export const dropThoughts = pgTable(
@@ -63,6 +65,12 @@ export const dropThoughts = pgTable(
     image: text("image"),
     /** When Tonight's paper last decided something about it (struck, kept or crumpled); null while it is unreviewed. */
     reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "string" }),
+    /** How many times it has come back in the morning and been kept (see resurface.ts). */
+    resurfaceStep: integer("resurface_step").notNull().default(0),
+    /** When it next comes back in the morning; null = on its first rhythm (a day after it was written), or retired once `resurfaceDone`. */
+    resurfaceAt: timestamp("resurface_at", { withTimezone: true, mode: "string" }),
+    /** Acted on, let go, or through the whole rhythm: never comes back on its own. */
+    resurfaceDone: boolean("resurface_done").notNull().default(false),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

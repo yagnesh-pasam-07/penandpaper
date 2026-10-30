@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { AppearanceSync } from "@/components/appearance";
 import { applyAppearance, applyNoteFont, saveAppearance, useCanvas, useNoteFont, useThemeMode } from "@/lib/appearance";
 import { CANVASES, NOTE_FONTS, THEME_MODES, type CanvasId, type NoteFont, type ThemeMode } from "@/lib/canvases";
@@ -10,10 +11,16 @@ import { DesktopTokens } from "./desktop-tokens";
 const MODE_LABEL: Record<ThemeMode, string> = { light: "Light", dark: "Dark", system: "System" };
 
 /** Settings: how the sheet looks, and the keys desktop apps save with. */
-export function SettingsView({ me, appearance }: { me: Me; appearance: { canvas: string | null; theme: string | null; noteFont: string | null } }) {
+export function SettingsView({ me, appearance, resurface }: { me: Me; appearance: { canvas: string | null; theme: string | null; noteFont: string | null }; resurface: boolean }) {
   const canvas = useCanvas();
   const mode = useThemeMode();
   const noteFont = useNoteFont();
+  const [comesBack, setComesBack] = useState(resurface);
+  const toggleComesBack = async () => {
+    const next = !comesBack;
+    setComesBack(next);
+    await fetch("/api/drop/resurface", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next }) }).catch(() => setComesBack(!next));
+  };
 
   const pickCanvas = (id: CanvasId) => {
     applyAppearance({ canvas: id });
@@ -110,6 +117,31 @@ export function SettingsView({ me, appearance }: { me: Me; appearance: { canvas:
               ))}
             </div>
           </div>
+        </section>
+
+        <section aria-labelledby="comeback" className="flex flex-col gap-3">
+          <h2 id="comeback" className="font-hand text-[30px] leading-none font-bold">
+            Thoughts that come back
+          </h2>
+          <p className="max-w-[60ch] text-[15px] text-mute">
+            Each morning, one thought you wrote a day, a week or a month ago comes back to the top of your paper: do it, keep it, or let it go. On Sundays the evening email links to your week&apos;s{" "}
+            <Link href="/rewind" className="font-medium text-ink underline underline-offset-2">
+              rewind
+            </Link>
+            . No streaks, no nagging.
+          </p>
+          <label className="flex w-fit cursor-pointer items-center gap-3 text-[15px]">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={comesBack}
+              onClick={() => void toggleComesBack()}
+              className={`relative h-6 w-11 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text ${comesBack ? "bg-red" : "bg-line"}`}
+            >
+              <span className={`absolute top-0.5 size-5 rounded-full bg-sheet shadow transition-transform motion-reduce:transition-none ${comesBack ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+            </button>
+            {comesBack ? "On" : "Off"}
+          </label>
         </section>
 
         <section aria-labelledby="capture" className="flex flex-col gap-2">
