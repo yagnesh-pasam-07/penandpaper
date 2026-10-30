@@ -59,6 +59,10 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 
 ## Decision log
 
+### 2026-10-30 10:20 IST · growth · Live GitHub stars and contributors on the homepage
+Why: an open-source project grows by showing it is alive. A GitHub button with the live star count sits in the nav; "Built in the open." shows contributors' avatars, stars, forks and a way to contribute. Fetched on the server and cached for an hour, so visitors never call GitHub and its rate limit is never hit; if GitHub is down, the numbers simply don't show. Bots are left out.
+Replaces: nothing
+
 ### 2026-10-30 09:55 IST · growth · Open source under MIT; only the maintainer merges to main
 Why: anyone can read, fork and contribute; quality stays in one pair of hands. `main` is protected: every change is a pull request that passes CI and gets the maintainer's approval (CODEOWNERS). Contributor guide, security policy, code of conduct and templates are in the repo. The admin's email was taken out of the files before going public.
 Replaces: nothing

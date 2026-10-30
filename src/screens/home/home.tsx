@@ -2,6 +2,7 @@ import Link from "next/link";
 import { btn } from "@/components/btn";
 import { Logo, ThemeToggle } from "@/components/ui";
 import { Everywhere, Fonts, HeroGallery, Highlight } from "./everywhere";
+import { GitHubButton, OpenSource } from "./github";
 import { PainPoints } from "./pain-points";
 import { TryIt } from "./try-it";
 
@@ -29,6 +30,7 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
           <Logo size="sm" />
         </Link>
         <span className="ml-auto flex items-center gap-1.5">
+          <GitHubButton />
           <ThemeToggle />
           <Link href="/download" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
             Download
@@ -76,6 +78,8 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
         <Fonts />
 
         <Everywhere />
+
+        <OpenSource />
 
         {/* Close */}
         <section className="mx-auto flex w-full max-w-[1040px] flex-col items-center gap-8 px-4 pt-8 pb-28 text-center sm:px-8 sm:pb-36">
