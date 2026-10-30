@@ -36,12 +36,13 @@ export const DEFAULT_CANVAS: CanvasId = "dotted";
 
 /**
  * How the thoughts are written. Only the notes change; headings stay handwritten.
- * "clean": Noto Sans, a calm neutral sans that covers Latin, Devanagari and
- * Telugu, so a mixed-language thought reads in one hand.
+ * "hand": Kalam, for loose thinking. "clean" (shown as "Clear"): Inter at
+ * medium weight, so a thought reads like a decision you'll remember. The id
+ * stays "clean" so earlier choices still apply.
  */
 export const NOTE_FONTS = [
-  { id: "hand", label: "Handwritten", hint: "Like a pen on paper" },
-  { id: "clean", label: "Clean", hint: "Neutral and easy to read" },
+  { id: "hand", label: "Handwritten", hint: "Loose, like thinking on paper" },
+  { id: "clean", label: "Clear", hint: "Sharp and easy to remember" },
 ] as const;
 
 export type NoteFont = (typeof NOTE_FONTS)[number]["id"];

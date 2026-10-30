@@ -32,7 +32,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **Windows:** no native app yet; the installable web app and the extension stand in.
 
 ### Design
-- Paper, ink and one red. Handwritten headings; notes in Kalam (handwritten) by default, or **Clean** (Noto Sans), chosen per user in Settings.
+- Paper, ink and one red. Handwritten headings. Notes in one of two fonts, chosen per user in Settings: **Handwritten** (Kalam, the default, for loose thinking) or **Clear** (Inter, medium weight, so a thought reads like a decision you'll remember).
 - Minimal and calm: one idea per screen, quiet controls, no clutter. Menus are short and grouped.
 - The paper header sits above the canvas; notes slide under it, never over it.
 - Keys are shown in the visitor's own system (⌥ on Mac, Alt on Windows).
@@ -45,7 +45,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - Pushing to `main` deploys to production. Migrations must only add (columns with defaults, new tables) so old and new code both run while a deploy rolls out.
 
 ### Security
-- Roles: `user` (everyone) and `admin` (one person). Set only by `npm run set-role`, never by the app.
+- Roles: `user` (everyone) and `admin` (one person: `yagnesh@tilicho.in`). Set by a migration or `npm run set-role`, never by the app, and always by exact email, never by name.
 - Studio (`/studio`) needs both the admin role and `STUDIO_PASSCODE`. No secret lives in the code.
 - The server fetches pictures and link previews only from public addresses, never with the visitor's cookies.
 
@@ -57,6 +57,14 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 ---
 
 ## Decision log
+
+### 2026-10-30 08:35 IST · security · The admin is one exact email: yagnesh@tilicho.in
+Why: a name can be chosen by anyone who signs up; an email can't. Applied to production by migration `0013_yagnesh_admin.sql`; studio still needs the passcode.
+Replaces: promoting every account whose name or email contains "yagnesh" (tried locally, never shipped)
+
+### 2026-10-30 08:30 IST · design · The second note font is "Clear" (Inter), for remembering
+Why: people who rely on their notes (founders, startup ideas) need each thought to stand out and stick on a quick reread. Inter at medium weight with tight spacing reads like a decision. Handwritten stays the default for loose thinking. The stored id stays `clean`, so earlier choices still apply.
+Replaces: 2026-10-30 07:15 · "Clean" (Noto Sans)
 
 ### 2026-10-30 08:15 IST · infra · Production deploys migrate the database first
 Why: pushing to main auto-deploys, and the new code went live before the production database had `users.role`, so every signed-in page failed. Now `npm run build` runs `scripts/migrate-on-deploy.mjs` first on Vercel production; if a migration fails, the build fails and the old version stays live.

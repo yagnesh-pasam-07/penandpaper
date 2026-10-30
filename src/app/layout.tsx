@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, Gurajada, Instrument_Sans, JetBrains_Mono, Kalam, Noto_Sans, Noto_Sans_Devanagari, Noto_Sans_Telugu } from "next/font/google";
+import { Caveat, Gurajada, Instrument_Sans, Inter, JetBrains_Mono, Kalam } from "next/font/google";
 import { AppearanceBoot } from "@/components/appearance";
 import { StoreBoot } from "@/components/hydration";
 import "./globals.css";
@@ -32,11 +32,9 @@ const gurajada = Gurajada({
   preload: false,
 });
 
-// The "Clean" note font (Settings): one neutral hand for Latin, Devanagari and
-// Telugu. Not preloaded: only people who pick it download it.
-const noto = Noto_Sans({ variable: "--font-noto", subsets: ["latin", "latin-ext"], weight: ["400", "500"], preload: false });
-const notoDeva = Noto_Sans_Devanagari({ variable: "--font-noto-deva", subsets: ["devanagari"], weight: ["400", "500"], preload: false });
-const notoTelugu = Noto_Sans_Telugu({ variable: "--font-noto-telugu", subsets: ["telugu"], weight: ["400", "500"], preload: false });
+// The "Clear" note font (Settings): Inter, drawn for reading on screens. Not
+// preloaded: only people who pick it download it.
+const inter = Inter({ variable: "--font-inter", subsets: ["latin", "latin-ext"], weight: ["500", "600"], preload: false });
 
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
@@ -76,7 +74,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-canvas="dotted"
       data-note-font="hand"
       suppressHydrationWarning
-      className={`${instrument.variable} ${caveat.variable} ${kalam.variable} ${gurajada.variable} ${noto.variable} ${notoDeva.variable} ${notoTelugu.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${instrument.variable} ${caveat.variable} ${kalam.variable} ${gurajada.variable} ${inter.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

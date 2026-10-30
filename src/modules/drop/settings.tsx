@@ -81,7 +81,7 @@ export function SettingsView({ me, appearance }: { me: Me; appearance: { canvas:
                     className={`flex flex-col gap-2 rounded-2xl border p-3 text-left ${on ? "border-red-text bg-red-soft/40" : "border-line bg-sheet hover:bg-soft"}`}
                   >
                     <span aria-hidden="true" data-note-font={f.id} className="note-sample font-note text-[20px] leading-snug text-ink">
-                      Call mom about Sunday
+                      Pitch the pilot to 3 clinics
                     </span>
                     <span className="flex flex-col">
                       <span className="text-sm font-semibold">{f.label}</span>

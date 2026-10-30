@@ -110,19 +110,27 @@ body {
   font-family: var(--font-sans);
 }
 
-/* The "Clean" note font (Settings → How thoughts are written). It swaps the
-   note font itself, so every .font-note (the notes, the writer, captions) follows
-   and nothing else changes. A sample card can show either, whatever is picked. */
+/* How thoughts are written (Settings). "Handwritten" is Kalam, for loose thinking.
+   "Clear" is Inter at medium weight with tight spacing: each thought reads like
+   a decision you'll remember, not a scribble. Only the notes change. A sample
+   card can show either, whatever is picked. */
 :root,
 .note-sample[data-note-font="hand"] {
   --note-family: var(--font-kalam), var(--font-gurajada), cursive;
 }
 [data-note-font="clean"],
 .note-sample[data-note-font="clean"] {
-  --note-family: var(--font-noto), var(--font-noto-deva), var(--font-noto-telugu), system-ui, sans-serif;
+  --note-family: var(--font-inter), system-ui, sans-serif;
 }
-[data-note-font="clean"] .font-note {
-  letter-spacing: -0.005em;
+[data-note-font="clean"] .font-note,
+.note-sample[data-note-font="clean"] {
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+[data-note-font="clean"] .font-note[class*="text-[19px]"],
+[data-note-font="clean"] .font-note[class*="text-[20px]"] {
+  font-size: 17px;
 }
 [data-note-font="clean"] .hand {
   text-shadow: none;
