@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Pen & Paper",
-  "version": "0.2.0",
-  "description": "Save the page you're on, a selection, a link or an image to your latest Pen & Paper paper.",
+  "version": "0.3.0",
+  "description": "Highlight a post, its words and picture, and save it with the page's address to your latest Pen & Paper paper.",
   "permissions": [
     "activeTab",
     "contextMenus",
@@ -10,7 +10,7 @@
     "storage"
   ],
   "action": {
-    "default_title": "Save to Pen & Paper (Alt+Shift+P)"
+    "default_title": "Save the highlight (or this page) to Pen & Paper (Alt+Shift+P)"
   },
   "background": {
     "service_worker": "background.js",
@@ -25,7 +25,7 @@
       "suggested_key": {
         "default": "Alt+Shift+P"
       },
-      "description": "Save this page to Pen & Paper"
+      "description": "Save what is highlighted (or this page) to Pen & Paper"
     },
     "quick-thought": {
       "suggested_key": {

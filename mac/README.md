@@ -54,7 +54,7 @@ Every note (and every recording) is written to `~/Library/Application Support/Pe
 ## Limits
 
 - **Undo** crumples the note on the site (kept for a week there). It can't recall a note already in the evening email.
-- macOS 13+, Apple silicon build by default (change `--arch` in `build-app.sh` for Intel).
+- macOS 13+, Apple silicon build by default. `UNIVERSAL=1 ./mac/build-app.sh` builds one app for Apple silicon and Intel (not yet tested on an Intel Mac).
 - Not notarized and not on the App Store. Notarizing needs an Apple developer account.
 - Rebuilding the app changes its ad-hoc signature, so macOS may ask for the microphone and speech recognition again.
 - The icon is scaled up from the 128 px extension icon.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { CANVAS_KEY, DEFAULT_CANVAS, DEFAULT_THEME_MODE, THEME_KEY, parseCanvas, parseThemeMode, resolveTheme, type CanvasId, type ThemeMode } from "./canvases";
+import { CANVAS_KEY, DEFAULT_CANVAS, DEFAULT_NOTE_FONT, DEFAULT_THEME_MODE, NOTE_FONT_KEY, THEME_KEY, parseCanvas, parseNoteFont, parseThemeMode, resolveTheme, type CanvasId, type NoteFont, type ThemeMode } from "./canvases";
 
 const EVENT = "pp-appearance";
 
@@ -17,6 +17,23 @@ function paint(canvas: CanvasId, mode: ThemeMode) {
   root().setAttribute("data-theme-mode", mode);
   root().setAttribute("data-theme", resolveTheme(mode, dark().matches));
   window.dispatchEvent(new Event(EVENT));
+}
+
+export function readNoteFont(): NoteFont {
+  return parseNoteFont(root().getAttribute("data-note-font"));
+}
+
+/** Applies and remembers how thoughts are written, on this device. */
+export function applyNoteFont(font: NoteFont) {
+  try {
+    localStorage.setItem(NOTE_FONT_KEY, font);
+  } catch {}
+  root().setAttribute("data-note-font", font);
+  window.dispatchEvent(new Event(EVENT));
+}
+
+export function useNoteFont(): NoteFont {
+  return useSyncExternalStore(subscribe, readNoteFont, () => DEFAULT_NOTE_FONT);
 }
 
 export function readCanvas(): CanvasId {
@@ -39,7 +56,7 @@ export function applyAppearance(next: { canvas?: CanvasId; mode?: ThemeMode }) {
 }
 
 /** Saves the choice on the account; a signed-out visit just keeps its device copy. */
-export async function saveAppearance(next: { canvas?: CanvasId; theme?: ThemeMode }): Promise<void> {
+export async function saveAppearance(next: { canvas?: CanvasId; theme?: ThemeMode; noteFont?: NoteFont }): Promise<void> {
   try {
     await fetch("/api/drop/prefs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
   } catch {}

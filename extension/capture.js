@@ -71,6 +71,16 @@ export function withPage(text, page = {}) {
   return (head ? `${head}\n${tailText}` : tailText).slice(0, MAX_THOUGHT).trim();
 }
 
+/**
+ * The picture to keep with a save: a web address (http or https) of at most
+ * 4000 characters, or "". An inline picture (data:, blob:) has no address the
+ * site can fetch, so it is left out and the words still go.
+ */
+export function pictureUrl(src) {
+  const url = httpUrl(src);
+  return url.length <= 4000 ? url : "";
+}
+
 /** What to tell someone whose thought is safe on this device but not on the site yet. */
 export function queuedMessage(status) {
   return status === 401 ? "Saved on this device. Sign in to sync." : "Saved on this device, will sync.";
@@ -110,7 +120,10 @@ export function chooseSurface({ mode, url, chromeFocused = true }) {
 
 /** What happened to a save, as the box should say it. `status` 0 means the request never got an answer. */
 export function saveOutcome(status, body = {}) {
-  if (status >= 200 && status < 300) return { kind: "saved", message: `Saved to ${String(body?.paperName ?? "").trim() || "your paper"}` };
+  if (status >= 200 && status < 300) {
+    const where = `Saved to ${String(body?.paperName ?? "").trim() || "your paper"}`;
+    return { kind: "saved", message: body?.imageSkipped ? `${where}, without the picture` : where };
+  }
   if (status === 401) return { kind: "signin", message: "Sign in, then try again." };
   if (status === 403) return { kind: "error", message: "The site didn't accept that. Reload the extension and try again." };
   if (status === 400) return { kind: "error", message: String(body?.error ?? "") || "Write something first." };

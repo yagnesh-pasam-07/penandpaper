@@ -1,13 +1,17 @@
 import { z } from "zod";
 import { allowTokenSave } from "@/modules/drop/api-tokens";
 import { noStore, userFromRequest } from "@/modules/drop/http";
-import { canCapture, captureText } from "@/modules/drop/share";
+import { pictureFromUrl } from "@/modules/drop/picture";
+import { allowWithin } from "@/modules/drop/rate";
+import { canCapture, captureText, cleanUrl } from "@/modules/drop/share";
 import { captureTarget, captureThought } from "@/modules/drop/server";
 
 const body = z.object({
   // Made by the sender for each try, so sending it twice (a retry) is one note.
   id: z.string().regex(/^[a-z0-9-]{6,40}$/),
   text: z.string().max(20_000),
+  /** A picture on the web to tape onto the note (a highlighted image): fetched and shrunk here. */
+  imageUrl: z.string().max(4000).optional(),
 });
 
 /**
@@ -16,7 +20,10 @@ const body = z.object({
  *   with the session cookie (a web page can't send either `Origin`);
  * - an app holding a personal access token, `Authorization: Bearer pp_…`
  *   (rate-limited per token). The token is only read from that header.
- * Replies `{ id, paperId, paperName }`.
+ * With `imageUrl` the server fetches that picture (public addresses only, see
+ * `modules/drop/preview.ts`) and keeps it on the note; if it can't, the words
+ * are still saved and `imageSkipped` says so.
+ * Replies `{ id, paperId, paperName, imageSkipped? }`.
  */
 export async function POST(request: Request) {
   const viaToken = request.headers.has("authorization");
@@ -28,10 +35,14 @@ export async function POST(request: Request) {
   }
   const parsed = body.safeParse(await request.json().catch(() => null));
   const text = parsed.success ? captureText(parsed.data.text) : null;
-  if (!parsed.success || !text) return Response.json({ error: "Write something first." }, { status: 400 });
+  const imageUrl = parsed.success ? cleanUrl(parsed.data.imageUrl) : null;
+  if (!parsed.success || (!text && !imageUrl)) return Response.json({ error: "Write something first." }, { status: 400 });
+  // Fetching a picture costs the server a request, so it is counted like a preview.
+  const image = imageUrl && (await allowWithin(`pp-picture:${who.user.id}`, 60, 60_000)) ? await pictureFromUrl(imageUrl) : null;
+  if (!text && !image) return Response.json({ error: "Couldn't get that picture." }, { status: 400 });
   try {
-    const done = await captureThought(who.user.id, { id: parsed.data.id, text });
-    return Response.json({ id: done.thought.id, paperId: done.paperId, paperName: done.paperName?.trim() || null }, noStore);
+    const done = await captureThought(who.user.id, { id: parsed.data.id, text: text ?? "", image });
+    return Response.json({ id: done.thought.id, paperId: done.paperId, paperName: done.paperName?.trim() || null, ...(imageUrl && !image ? { imageSkipped: true } : {}) }, noStore);
   } catch {
     return Response.json({ error: "Couldn't save that thought." }, { status: 409 });
   }

@@ -305,21 +305,21 @@ export async function searchThoughts(userId: string, term: string): Promise<Sear
 
 /* ---------- Appearance ---------- */
 
-export type Appearance = { canvas: string | null; theme: string | null };
+export type Appearance = { canvas: string | null; theme: string | null; noteFont: string | null };
 
 /** The saved choice; nothing saved (the device's own choice stands) if the columns aren't there yet, i.e. before `npm run db:migrate`. */
 export async function getAppearance(userId: string): Promise<Appearance> {
   try {
-    const [row] = await db.select({ canvas: dropPrefs.canvas, theme: dropPrefs.theme }).from(dropPrefs).where(eq(dropPrefs.userId, userId));
-    return { canvas: row?.canvas ?? null, theme: row?.theme ?? null };
+    const [row] = await db.select({ canvas: dropPrefs.canvas, theme: dropPrefs.theme, noteFont: dropPrefs.noteFont }).from(dropPrefs).where(eq(dropPrefs.userId, userId));
+    return { canvas: row?.canvas ?? null, theme: row?.theme ?? null, noteFont: row?.noteFont ?? null };
   } catch (e) {
     console.error("getAppearance: run db:migrate to add the canvas and theme columns", e);
-    return { canvas: null, theme: null };
+    return { canvas: null, theme: null, noteFont: null };
   }
 }
 
 /** Saves the canvas and/or theme choice (values are checked against the registry by the route). */
-export async function saveAppearance(userId: string, patch: { canvas?: string; theme?: string }): Promise<void> {
+export async function saveAppearance(userId: string, patch: { canvas?: string; theme?: string; noteFont?: string }): Promise<void> {
   try {
     await db
       .insert(dropPrefs)

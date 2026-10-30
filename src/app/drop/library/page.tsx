@@ -19,8 +19,8 @@ async function Library({ searchParams }: { searchParams: Promise<{ archived?: st
   const [papers, appearance] = await Promise.all([listPaperCards(user.id, { archived: showArchived }), getAppearance(user.id)]);
   return (
     <>
-      <AppearanceSync canvas={appearance.canvas} theme={appearance.theme} />
-      <LibraryView key={showArchived ? "archived" : "all"} me={{ name: user.name, email: user.email }} papers={papers} archived={showArchived} />
+      <AppearanceSync canvas={appearance.canvas} theme={appearance.theme} noteFont={appearance.noteFont} />
+      <LibraryView key={showArchived ? "archived" : "all"} me={{ name: user.name, email: user.email, admin: user.role === "admin" }} papers={papers} archived={showArchived} />
     </>
   );
 }

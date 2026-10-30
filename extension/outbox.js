@@ -16,10 +16,10 @@ export function backoffMs(attempts) {
   return Math.min(FIRST_RETRY_MS * 2 ** (n - 1), LONGEST_WAIT_MS);
 }
 
-/** Adds a thought (once: the same id is not added twice), ready to send now. */
+/** Adds a thought (once: the same id is not added twice), with the picture to keep if any, ready to send now. */
 export function enqueue(list, item, now = Date.now()) {
   if (list.some((x) => x.id === item.id)) return list;
-  const next = [...list, { id: item.id, text: item.text, createdAt: now, attempts: 0, nextAt: 0 }];
+  const next = [...list, { id: item.id, text: item.text, ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}), createdAt: now, attempts: 0, nextAt: 0 }];
   return next.length > MAX_OUTBOX ? next.slice(next.length - MAX_OUTBOX) : next;
 }
 

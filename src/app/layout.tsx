@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, Gurajada, Instrument_Sans, JetBrains_Mono, Kalam } from "next/font/google";
+import { Caveat, Gurajada, Instrument_Sans, JetBrains_Mono, Kalam, Noto_Sans, Noto_Sans_Devanagari, Noto_Sans_Telugu } from "next/font/google";
 import { AppearanceBoot } from "@/components/appearance";
 import { StoreBoot } from "@/components/hydration";
 import "./globals.css";
@@ -32,6 +32,12 @@ const gurajada = Gurajada({
   preload: false,
 });
 
+// The "Clean" note font (Settings): one neutral hand for Latin, Devanagari and
+// Telugu. Not preloaded: only people who pick it download it.
+const noto = Noto_Sans({ variable: "--font-noto", subsets: ["latin", "latin-ext"], weight: ["400", "500"], preload: false });
+const notoDeva = Noto_Sans_Devanagari({ variable: "--font-noto-deva", subsets: ["devanagari"], weight: ["400", "500"], preload: false });
+const notoTelugu = Noto_Sans_Telugu({ variable: "--font-noto-telugu", subsets: ["telugu"], weight: ["400", "500"], preload: false });
+
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin"],
@@ -56,7 +62,7 @@ export const viewport: Viewport = {
 
 // Runs before first paint, so nothing flashes: the saved theme mode (light, dark or
 // system, which follows the OS) and the saved canvas. Keys match src/lib/canvases.ts.
-const themeScript = `(function(){try{var d=document.documentElement,m=localStorage.getItem("pp-theme"),c=localStorage.getItem("pp-canvas");if(m!=="light"&&m!=="dark")m="system";var t=m==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.setAttribute("data-theme",t);d.setAttribute("data-theme-mode",m);d.setAttribute("data-canvas",c==="ruled"||c==="grid"?c:"dotted")}catch(e){}})()`;
+const themeScript = `(function(){try{var d=document.documentElement,m=localStorage.getItem("pp-theme"),c=localStorage.getItem("pp-canvas");if(m!=="light"&&m!=="dark")m="system";var t=m==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.setAttribute("data-theme",t);d.setAttribute("data-theme-mode",m);d.setAttribute("data-canvas",c==="ruled"||c==="grid"?c:"dotted");d.setAttribute("data-note-font",localStorage.getItem("pp-note-font")==="clean"?"clean":"hand")}catch(e){}})()`;
 
 // Holds Chrome's install offer until the account menu asks for it (keys match src/lib/install.ts).
 const installScript = `window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__ppInstall=e;window.dispatchEvent(new Event("pp-install"))})`;
@@ -68,8 +74,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-theme="light"
       data-theme-mode="system"
       data-canvas="dotted"
+      data-note-font="hand"
       suppressHydrationWarning
-      className={`${instrument.variable} ${caveat.variable} ${kalam.variable} ${gurajada.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${instrument.variable} ${caveat.variable} ${kalam.variable} ${gurajada.variable} ${noto.variable} ${notoDeva.variable} ${notoTelugu.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

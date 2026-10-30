@@ -1,9 +1,9 @@
-import { buildCaptureText, captureEndpoint, chooseSurface, loginUrl, newThoughtId, queuedMessage, saveOutcome, withPage } from "./capture.js";
+import { buildCaptureText, captureEndpoint, chooseSurface, loginUrl, newThoughtId, pictureUrl, queuedMessage, saveOutcome, withPage } from "./capture.js";
 import { dueItems, enqueue, failed, OUTBOX_KEY, remove, retryable } from "./outbox.js";
 import { buildCaptureUrl, buildShareUrl, DEFAULT_SERVER, pickShare } from "./share-url.js";
 
-// The small separate window: the fallback for pages that can't hold the box,
-// the right-click items, and anyone who picked "a separate window" in Options.
+// The small separate window: the fallback for pages that can't hold the box or
+// the note, and anyone who picked "a separate window" in Options.
 const WINDOW = { type: "popup", width: 420, height: 340, focused: true };
 const QUICK_WINDOW = { type: "popup", width: 520, height: 300, focused: true };
 
@@ -32,14 +32,36 @@ async function openQuickWindow() {
   await chrome.windows.create({ ...QUICK_WINDOW, url: buildCaptureUrl((await settings()).server) });
 }
 
-/** The words selected on the page, if the browser lets the extension read them. */
+/**
+ * What is highlighted on the page, if the browser lets the extension read it:
+ * the words, and the address of the first picture inside the highlight (a post
+ * with its photo, say).
+ */
 async function selectionOf(tab) {
-  if (!tab?.id) return "";
+  if (!tab?.id) return { text: "", image: "" };
   try {
-    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => String(getSelection() ?? "") });
-    return result?.result ?? "";
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const sel = getSelection();
+        const text = String(sel ?? "");
+        let image = "";
+        if (sel && sel.rangeCount && !sel.isCollapsed) {
+          const range = sel.getRangeAt(0);
+          for (const img of document.images) {
+            // Big enough to be the picture, not an icon or an avatar.
+            if (range.intersectsNode(img) && img.naturalWidth >= 64 && img.naturalHeight >= 64) {
+              image = img.currentSrc || img.src;
+              break;
+            }
+          }
+        }
+        return { text, image };
+      },
+    });
+    return { text: String(result?.result?.text ?? ""), image: String(result?.result?.image ?? "") };
   } catch {
-    return "";
+    return { text: "", image: "" };
   }
 }
 
@@ -74,7 +96,7 @@ async function send(item) {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: item.id, text: item.text }),
+      body: JSON.stringify({ id: item.id, text: item.text, ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}) }),
     });
     return { status: res.status, body: await res.json().catch(() => ({})) };
   } catch {
@@ -116,9 +138,9 @@ function flush(force = null) {
   });
 }
 
-/** A thought from the box or the toolbar: kept on this device first, then sent. */
-async function capture({ id, text }) {
-  await exclusively(async () => writeOutbox(enqueue(await readOutbox(), { id, text }, Date.now())));
+/** A thought from the box or the toolbar: kept on this device first, then sent. `imageUrl` is a picture for the site to fetch and keep with it. */
+async function capture({ id, text, imageUrl = "" }) {
+  await exclusively(async () => writeOutbox(enqueue(await readOutbox(), { id, text, imageUrl }, Date.now())));
   const out = (await flush(id)) ?? { kind: "queued", message: queuedMessage(0) };
   if (out.status === 401) await chrome.tabs.create({ url: loginUrl((await settings()).server) });
   return out;
@@ -180,28 +202,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-// Toolbar button, or the Alt+Shift+P shortcut: saves the page, and says so with a note on the page.
-chrome.action.onClicked.addListener(async (tab) => {
-  void flush();
+/**
+ * Saves straight to the paper and says so with a note on the page (no window):
+ * the words (title, highlight, address) and, when there is one, a picture the
+ * site fetches and keeps. Falls back to the small window where the page won't
+ * take the note; the window can't carry a picture, so then only the words go.
+ */
+async function saveFromPage(tab, share, picture = "", fallback = share) {
   const { mode } = await settings();
-  const selection = await selectionOf(tab);
-  const share = pickShare("page", tab, {}, selection);
-  if (chooseSurface({ mode, url: tab.url }) === "overlay") {
-    const text = buildCaptureText(share);
-    if (text) {
-      try {
-        const id = newThoughtId();
-        const out = await capture({ id, text });
-        const undo = out.kind === "saved" ? { id, paperId: out.paperId } : null;
-        await onPage(tab, (message, tone, u) => window.__ppQuick.toast(message, tone, u), [out.message, out.kind === "saved" || out.kind === "queued" ? "ok" : "error", undo]);
-        return;
-      } catch {
-        // The page wouldn't take the note. The thought is already safe in the outbox.
-        return;
-      }
+  const imageUrl = pictureUrl(picture);
+  const text = buildCaptureText(share);
+  if ((text || imageUrl) && chooseSurface({ mode, url: tab?.url }) === "overlay") {
+    const toast = (message, tone, u = null) => onPage(tab, (m, t, x) => window.__ppQuick.toast(m, t, x), [message, tone, u]);
+    try {
+      // Fetching a picture takes a moment, so say something now.
+      if (imageUrl) await toast("Saving…", "ok");
+      const id = newThoughtId();
+      const out = await capture({ id, text, imageUrl });
+      const undo = out.kind === "saved" ? { id, paperId: out.paperId } : null;
+      await toast(out.message, out.kind === "saved" || out.kind === "queued" ? "ok" : "error", undo);
+      return;
+    } catch {
+      // The page wouldn't take the note. Anything already saved is safe in the outbox.
+      if (imageUrl) return;
     }
   }
-  await openShareWindow(share);
+  await openShareWindow(fallback);
+}
+
+// Toolbar button, or the Alt+Shift+P shortcut: saves what is highlighted (the
+// words, the first picture in it, and the page's address), or the page itself
+// when nothing is.
+chrome.action.onClicked.addListener(async (tab) => {
+  void flush();
+  const selection = await selectionOf(tab);
+  await saveFromPage(tab, pickShare("page", tab, {}, selection.text), selection.image);
 });
 
 // Alt+Shift+N: a box on the page to type a thought into. With the shortcut set to
@@ -224,6 +259,14 @@ chrome.commands.onCommand.addListener(async (command) => {
   await openQuickWindow();
 });
 
+// Right-click: the same straight save. A picture keeps the page it was on as its caption.
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  await openShareWindow(pickShare(String(info.menuItemId), tab, info));
+  void flush();
+  const kind = String(info.menuItemId);
+  if (kind === "image") {
+    await saveFromPage(tab, pickShare("page", tab), info.srcUrl, pickShare("image", tab, info));
+    return;
+  }
+  const selection = kind === "selection" ? await selectionOf(tab) : { text: "", image: "" };
+  await saveFromPage(tab, pickShare(kind, tab, info, selection.text), selection.image);
 });

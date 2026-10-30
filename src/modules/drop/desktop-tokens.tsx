@@ -84,8 +84,11 @@ export function DesktopTokens() {
         Desktop app
       </h2>
       <p className="max-w-[60ch] text-[15px] text-mute">
-        A Mac menu-bar app is coming: press a key in any app and your words land on your latest paper. It signs in with a token, not your password. Make one here and paste it into the app when it asks.
+        The Mac menu-bar app: press a key in any app and your words land on your latest paper. It signs in with a token, not your password. Make one here and paste it into the app when it asks.
       </p>
+      <a href="/downloads/PenAndPaper-mac.zip" download className="inline-flex h-11 items-center self-start rounded-xl border border-line bg-sheet px-4 text-sm font-semibold hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
+        Download for Mac
+      </a>
 
       {fresh && (
         <div role="status" className="flex max-w-[560px] flex-col gap-2 rounded-2xl border border-red-text/50 bg-red-soft/40 p-4">

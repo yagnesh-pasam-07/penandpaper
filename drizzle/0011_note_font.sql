@@ -1,0 +1,1 @@
+ALTER TABLE "drop_prefs" ADD COLUMN "note_font" text;

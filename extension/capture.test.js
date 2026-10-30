@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCaptureText, canInject, captureEndpoint, chooseSurface, loginUrl, MAX_THOUGHT, newThoughtId, queuedMessage, saveOutcome, withPage } from "./capture.js";
+import { buildCaptureText, canInject, captureEndpoint, chooseSurface, loginUrl, MAX_THOUGHT, newThoughtId, pictureUrl, queuedMessage, saveOutcome, withPage } from "./capture.js";
 
 describe("newThoughtId", () => {
   it("is one the site accepts, and different each time", () => {
@@ -113,5 +113,21 @@ describe("queuedMessage", () => {
     expect(queuedMessage(401)).toMatch(/Sign in/);
     expect(queuedMessage(0)).toMatch(/will sync/);
     expect(queuedMessage(503)).toMatch(/will sync/);
+  });
+});
+
+describe("pictureUrl", () => {
+  it("keeps a web address", () => {
+    expect(pictureUrl("https://img.example.com/a.jpg?w=800")).toBe("https://img.example.com/a.jpg?w=800");
+  });
+  it("leaves out inline pictures and junk", () => {
+    for (const v of ["data:image/png;base64,AA", "blob:https://x.com/1", "javascript:alert(1)", "", undefined, `https://a.co/${"x".repeat(4000)}`]) expect(pictureUrl(v)).toBe("");
+  });
+});
+
+describe("saveOutcome with a picture", () => {
+  it("says when the picture couldn't come along", () => {
+    expect(saveOutcome(200, { paperName: "Ideas", imageSkipped: true }).message).toBe("Saved to Ideas, without the picture");
+    expect(saveOutcome(200, { paperName: "Ideas" }).message).toBe("Saved to Ideas");
   });
 });

@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { defaultSpeechLang, mergeSpeech, parseSpeechLang, resultsFrom, speechCtor, speechErrorMessage, speechTag, spokenSoFar } from "./speech";
 
 describe("speech language", () => {
-  it("starts from the browser's own language when it is Hindi or Telugu, else English", () => {
-    expect(defaultSpeechLang("hi-IN")).toBe("hi");
-    expect(defaultSpeechLang("te")).toBe("te");
+  it("starts in English, whatever the browser's language (English only for now)", () => {
+    expect(defaultSpeechLang("hi-IN")).toBe("en");
+    expect(defaultSpeechLang("te")).toBe("en");
     expect(defaultSpeechLang("en-US")).toBe("en");
     expect(defaultSpeechLang("fr-FR")).toBe("en");
     expect(defaultSpeechLang(undefined)).toBe("en");
@@ -12,7 +12,8 @@ describe("speech language", () => {
   });
 
   it("only accepts a language it offers", () => {
-    expect(parseSpeechLang("hi")).toBe("hi");
+    expect(parseSpeechLang("en")).toBe("en");
+    expect(parseSpeechLang("hi")).toBeNull();
     expect(parseSpeechLang("xx")).toBeNull();
     expect(parseSpeechLang(null)).toBeNull();
   });
@@ -24,8 +25,6 @@ describe("speech language", () => {
     expect(speechTag("en", "fr-FR")).toBe("en-IN");
     expect(speechTag("en", "en")).toBe("en-IN");
     expect(speechTag("en", undefined)).toBe("en-IN");
-    expect(speechTag("hi", "en-US")).toBe("hi-IN");
-    expect(speechTag("te", "en-US")).toBe("te-IN");
   });
 });
 

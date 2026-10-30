@@ -98,7 +98,8 @@
   /* Handwriting in every script: Caveat for Latin, Kalam for Devanagari, Gurajada for Telugu (each loads only for its letters). */
   --font-hand: var(--font-caveat), var(--font-kalam), var(--font-gurajada), cursive;
   /* Notes and the writer: Kalam reads best at 18–24px (and covers Devanagari); Gurajada for Telugu. */
-  --font-note: var(--font-kalam), var(--font-gurajada), cursive;
+  /* Reads a runtime variable, so Settings → "How thoughts are written" can switch it (see --note-family below). */
+  --font-note: var(--note-family);
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
@@ -107,6 +108,24 @@ body {
   background-image: var(--grain);
   color: var(--ink);
   font-family: var(--font-sans);
+}
+
+/* The "Clean" note font (Settings → How thoughts are written). It swaps the
+   note font itself, so every .font-note (the notes, the writer, captions) follows
+   and nothing else changes. A sample card can show either, whatever is picked. */
+:root,
+.note-sample[data-note-font="hand"] {
+  --note-family: var(--font-kalam), var(--font-gurajada), cursive;
+}
+[data-note-font="clean"],
+.note-sample[data-note-font="clean"] {
+  --note-family: var(--font-noto), var(--font-noto-deva), var(--font-noto-telugu), system-ui, sans-serif;
+}
+[data-note-font="clean"] .font-note {
+  letter-spacing: -0.005em;
+}
+[data-note-font="clean"] .hand {
+  text-shadow: none;
 }
 
 /* Handwriting: contextual alternates so repeated letters vary, and a hair of ink bleed. */

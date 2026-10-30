@@ -32,6 +32,8 @@ export const dropPrefs = pgTable("drop_prefs", {
   canvas: text("canvas"),
   /** Light, dark or system; null means system. */
   theme: text("theme"),
+  /** How thoughts are written (an id from NOTE_FONTS in src/lib/canvases.ts); null means handwritten. */
+  noteFont: text("note_font"),
 });
 
 export const dropThoughts = pgTable(

@@ -10,9 +10,19 @@ const schema = z.object({
   BETTER_AUTH_URL: z.url().optional().catch(undefined),
   GOOGLE_CLIENT_ID: optional,
   GOOGLE_CLIENT_SECRET: optional,
+  /** Sign in with Apple: the Services ID, and the .p8 key with its ids (the client secret is made from them). */
+  APPLE_CLIENT_ID: optional,
+  APPLE_TEAM_ID: optional,
+  APPLE_KEY_ID: optional,
+  APPLE_PRIVATE_KEY: optional,
+  /** Sign in with Microsoft (personal, work and school accounts). */
+  MICROSOFT_CLIENT_ID: optional,
+  MICROSOFT_CLIENT_SECRET: optional,
   RESEND_API_KEY: optional,
   /** e.g. "Pen & Paper <hello@yourdomain.com>"; the domain must be verified in Resend. */
   EMAIL_FROM: optional,
+  /** The second lock on /studio (the first is the admin role). Unset, Studio is switched off. */
+  STUDIO_PASSCODE: optional,
   /** Shown on the privacy page when set. */
   SUPPORT_EMAIL: optional,
   VERCEL_URL: optional,
@@ -30,3 +40,5 @@ export const appUrl =
 
 export const emailEnabled = Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
 export const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+export const appleEnabled = Boolean(env.APPLE_CLIENT_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY);
+export const microsoftEnabled = Boolean(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET);

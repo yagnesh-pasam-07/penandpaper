@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { PenIcon } from "@/components/icons";
+import { shortcutText, usePlatform } from "@/lib/platform";
 import { imageFiles, shrinkImage, type Picture } from "./image";
 import { MAX_THOUGHT } from "./logic";
 import { SPEECH_LANGS, parseSpeechLang } from "./speech";
@@ -73,6 +74,7 @@ export function Writer({
   const inset = useKeyboardInset(true);
   const picker = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState("");
+  const platform = usePlatform();
   // The latest text, so words that arrive after a recording land in what's there now.
   const draftRef = useRef(draft);
   useEffect(() => {
@@ -271,7 +273,7 @@ export function Writer({
             </span>
           ) : (
             <>
-              <span className="max-sm:hidden">{image ? "Enter drops it with the picture" : "Enter to drop · ⌘V a picture"} · Esc to close</span>
+              <span className="max-sm:hidden">{image ? "Enter drops it with the picture" : `Enter to drop · ${shortcutText(["⌘", "V"], platform)} a picture`} · Esc to close</span>
               <span className="sm:hidden">Enter to drop</span>
             </>
           )}
@@ -288,7 +290,7 @@ export function Writer({
                 e.target.value = "";
               }}
             />
-            {voice.supported && voice.engine === "speech" && !listening && !working && (
+            {voice.supported && voice.engine === "speech" && SPEECH_LANGS.length > 1 && !listening && !working && (
               <select
                 value={voice.lang}
                 onChange={(e) => {
@@ -317,8 +319,8 @@ export function Writer({
                   listening
                     ? "Stop recording"
                     : voice.engine === "speech"
-                      ? "Speak a thought (⌘⇧M). Chrome's built-in recogniser sends your voice to Google; Safari uses Apple."
-                      : "Speak a thought (⌘⇧M)"
+                      ? `Speak a thought (${shortcutText(["⌘", "⇧", "M"], platform)}). Chrome's built-in recogniser sends your voice to Google; Safari uses Apple.`
+                      : `Speak a thought (${shortcutText(["⌘", "⇧", "M"], platform)})`
                 }
                 className={`flex size-9 items-center justify-center rounded-lg disabled:opacity-40 ${listening ? "bg-red text-on-red" : "hover:bg-soft hover:text-ink"}`}
               >

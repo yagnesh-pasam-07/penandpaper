@@ -9,7 +9,7 @@ import { useStore } from "@/lib/store";
 import { browserTz, clock } from "@/lib/time";
 import type { Thought } from "./logic";
 
-export type Me = { name: string; email: string };
+export type Me = { name: string; email: string; admin?: boolean };
 
 /** The reading column for headings and the sheet. */
 export const COLUMN = "mx-auto w-full max-w-[1056px]";
@@ -39,7 +39,9 @@ export function DropHeader({ me, title, right }: { me: Me; title?: ReactNode; ri
   const router = useRouter();
   const signOut = useStore((s) => s.signOut);
   return (
-    <header className="mx-auto flex w-full max-w-[1120px] items-center gap-3 px-4 pt-4 pb-1 sm:px-8">
+    // Its own layer above the canvas: notes panned or dragged up slide under it (frosted), never over the logo or the menu.
+    <div className="sticky top-0 z-40 w-full bg-bg/80 backdrop-blur-md">
+      <header className="mx-auto flex w-full max-w-[1120px] items-center gap-3 px-4 pt-4 pb-3 sm:px-8">
       <Link href="/drop" aria-label="Latest paper" className="shrink-0">
         <span className="max-sm:hidden">
           <Logo size="sm" />
@@ -56,17 +58,23 @@ export function DropHeader({ me, title, right }: { me: Me; title?: ReactNode; ri
       )}
       <span className="ml-auto flex shrink-0 items-center gap-1.5">
         {right}
+        {/* The extension and the Mac app; only on screens wide enough to use them. */}
+        <Link href="/download" className="flex h-9 items-center rounded-lg px-2.5 text-[14px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text max-md:hidden">
+          Download
+        </Link>
         <ThemeToggle persist />
         <AccountMenu
           name={me.name}
           email={me.email}
+          admin={me.admin}
           onSignOut={async () => {
             await signOut();
             router.push("/");
           }}
         />
       </span>
-    </header>
+      </header>
+    </div>
   );
 }
 

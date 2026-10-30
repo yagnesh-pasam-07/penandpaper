@@ -78,6 +78,20 @@
       "when": 1793244862744,
       "tag": "0010_tonights_paper",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793325847788,
+      "tag": "0011_note_font",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793326470989,
+      "tag": "0012_user_role",
+      "breakpoints": true
     }
   ]
 }

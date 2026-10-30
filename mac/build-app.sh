@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds PenAndPaper.app next to this script: release build, icon, Info.plist, ad-hoc signature.
-# Usage: ./mac/build-app.sh        (from anywhere)
+# Usage: ./mac/build-app.sh                 (from anywhere; Apple silicon only)
+#        UNIVERSAL=1 ./mac/build-app.sh     (one app for Apple silicon and Intel Macs)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,8 +11,14 @@ VERSION="0.1.0"
 
 cd "$HERE"
 echo "→ swift build (release)"
-swift build -c release --arch arm64 >/dev/null
-BIN="$(swift build -c release --arch arm64 --show-bin-path)/PenAndPaperCapture"
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+  # Both architectures in one binary. Not yet tried on an Intel Mac.
+  ARCHS=(--arch arm64 --arch x86_64)
+else
+  ARCHS=(--arch arm64)
+fi
+swift build -c release "${ARCHS[@]}" >/dev/null
+BIN="$(swift build -c release "${ARCHS[@]}" --show-bin-path)/PenAndPaperCapture"
 
 echo "→ assembling PenAndPaper.app"
 rm -rf "$APP"

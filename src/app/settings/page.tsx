@@ -14,7 +14,7 @@ async function Settings() {
   const user = await currentUser();
   if (!user) redirect("/login?next=/settings");
   const appearance = await getAppearance(user.id);
-  return <SettingsView me={{ name: user.name, email: user.email }} appearance={appearance} />;
+  return <SettingsView me={{ name: user.name, email: user.email, admin: user.role === "admin" }} appearance={appearance} />;
 }
 
 export default function SettingsPage() {

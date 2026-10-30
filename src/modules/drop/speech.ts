@@ -7,12 +7,8 @@
 /** What Chrome, Edge and Safari hand over: a list of results, each with its best guess and whether it is settled. */
 export type SpeechResultLike = { transcript: string; isFinal: boolean };
 
-/** The few languages offered next to the mic. */
-export const SPEECH_LANGS = [
-  { id: "en", label: "English" },
-  { id: "hi", label: "हिन्दी" },
-  { id: "te", label: "తెలుగు" },
-] as const;
+/** The languages offered next to the mic: English only for now (with one, no picker shows). */
+export const SPEECH_LANGS = [{ id: "en", label: "English" }] as const;
 export type SpeechLang = (typeof SPEECH_LANGS)[number]["id"];
 
 export const DEFAULT_SPEECH_LANG: SpeechLang = "en";
@@ -24,7 +20,7 @@ export function parseSpeechLang(value: unknown): SpeechLang | null {
   return SPEECH_LANGS.find((l) => l.id === value)?.id ?? null;
 }
 
-/** The language to start with: the browser's own when it is Hindi or Telugu, else English. */
+/** The language to start with: the browser's own when it is offered, else English. */
 export function defaultSpeechLang(navigatorLanguage: string | undefined | null): SpeechLang {
   const base = String(navigatorLanguage ?? "").toLowerCase().split("-")[0];
   return parseSpeechLang(base) ?? DEFAULT_SPEECH_LANG;
@@ -32,12 +28,9 @@ export function defaultSpeechLang(navigatorLanguage: string | undefined | null):
 
 /**
  * The BCP-47 tag handed to the recogniser. English follows the browser's own
- * English (en-US, en-GB…) and is Indian English otherwise; Hindi and Telugu
- * are the Indian variants.
+ * English (en-US, en-GB…) and is Indian English otherwise.
  */
-export function speechTag(lang: SpeechLang, navigatorLanguage: string | undefined | null): string {
-  if (lang === "hi") return "hi-IN";
-  if (lang === "te") return "te-IN";
+export function speechTag(_lang: SpeechLang, navigatorLanguage: string | undefined | null): string {
   const nav = String(navigatorLanguage ?? "");
   return /^en-[A-Za-z]{2}$/.test(nav) ? nav : "en-IN";
 }

@@ -24,6 +24,33 @@ function GoogleMark() {
   );
 }
 
+function AppleMark() {
+  return (
+    <svg width="17" height="20" viewBox="0 0 17 20" aria-hidden="true" fill="currentColor">
+      <path d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.5 1.3 0 1.7-.8 3.3-.8 1.5 0 1.9.8 3.3.8 1.4 0 2.2-1.2 3-2.4 1-1.4 1.3-2.7 1.4-2.8-.1 0-2.4-.9-2.4-4.2zM11.6 3c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z" />
+    </svg>
+  );
+}
+
+function MicrosoftMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+      <path fill="#F25022" d="M1 1h9v9H1z" />
+      <path fill="#7FBA00" d="M11 1h9v9h-9z" />
+      <path fill="#00A4EF" d="M1 11h9v9H1z" />
+      <path fill="#FFB900" d="M11 11h9v9h-9z" />
+    </svg>
+  );
+}
+
+type Provider = "google" | "apple" | "microsoft";
+
+const PROVIDERS: { id: Provider; name: string; Mark: () => React.JSX.Element }[] = [
+  { id: "google", name: "Google", Mark: GoogleMark },
+  { id: "apple", name: "Apple", Mark: AppleMark },
+  { id: "microsoft", name: "Microsoft", Mark: MicrosoftMark },
+];
+
 function FieldError({ id, text }: { id: string; text: string }) {
   if (!text) return null;
   return (
@@ -82,7 +109,7 @@ function explain(err: AuthError, mode: "signup" | "login"): Problem {
 }
 
 /**
- * Sign up or log in with email and password; Google and the email link show
+ * Sign up or log in with email and password; Google, Apple, Microsoft and the email link show
  * above it when they're set up. All of them come back to `next`.
  */
 export function SignInPanel({ next, mode: startMode, switchInline = false }: { next: string; mode: "signup" | "login"; switchInline?: boolean }) {
@@ -94,7 +121,7 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
   const [email, setEmail] = useState(recalledEmail);
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState<"google" | "password" | "link" | null>(null);
+  const [busy, setBusy] = useState<Provider | "password" | "link" | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [checked, setChecked] = useState(false);
   const [linkSentTo, setLinkSentTo] = useState<string | null>(null);
@@ -140,28 +167,36 @@ export function SignInPanel({ next, mode: startMode, switchInline = false }: { n
 
   return (
     <div className="flex flex-col gap-3.5">
-      {methods.google && (
+      {PROVIDERS.some((p) => methods[p.id]) && (
         <>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={async () => {
-              setBusy("google");
-              setError("");
-              const { error: err } = await authClient.signIn.social({ provider: "google", callbackURL: next });
-              if (err) {
-                setBusy(null);
-                setError(err.message ?? "Google sign-in didn't work. Use your email and password.");
-              }
-            }}
-            className="flex h-[52px] items-center justify-center gap-2.5 rounded-[14px] border border-line bg-sheet text-base font-medium hover:bg-soft disabled:opacity-60"
-          >
-            <GoogleMark />
-            {busy === "google" ? "Opening Google…" : signup ? "Sign up with Google" : "Log in with Google"}
-          </button>
+          {/* One button per account people already have, each in its maker's own look. */}
+          <div className="flex flex-col gap-2.5">
+            {PROVIDERS.filter((p) => methods[p.id]).map(({ id, name, Mark }) => (
+              <button
+                key={id}
+                type="button"
+                disabled={busy !== null}
+                onClick={async () => {
+                  setBusy(id);
+                  setError("");
+                  const { error: err } = await authClient.signIn.social({ provider: id, callbackURL: next });
+                  if (err) {
+                    setBusy(null);
+                    setError(err.message ?? `${name} sign-in didn't work. Use your email and password.`);
+                  }
+                }}
+                className={`flex h-[52px] items-center justify-center gap-2.5 rounded-[14px] text-base font-medium disabled:opacity-60 ${
+                  id === "apple" ? "bg-ink text-bg hover:opacity-90" : "border border-line bg-sheet hover:bg-soft"
+                }`}
+              >
+                <Mark />
+                {busy === id ? `Opening ${name}…` : `Continue with ${name}`}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-3 text-[13px] text-mute">
             <span className="h-px flex-1 bg-line" />
-            or
+            or with email
             <span className="h-px flex-1 bg-line" />
           </div>
         </>

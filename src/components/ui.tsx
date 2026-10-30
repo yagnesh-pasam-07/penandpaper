@@ -88,7 +88,10 @@ export function Avatar({
 }
 
 /** The signed-in person's avatar; opens a small menu with their email and Sign out. */
-export function AccountMenu({ name, email, tint, onSignOut }: { name: string; email: string; tint?: Tint; onSignOut: () => void }) {
+/** One row of the account menu. */
+const item = "rounded-xl px-3 py-2 text-sm hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-text";
+
+export function AccountMenu({ name, email, tint, admin = false, onSignOut }: { name: string; email: string; tint?: Tint; admin?: boolean; onSignOut: () => void }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const canInstall = useCanInstall();
   useEffect(() => {
@@ -103,26 +106,39 @@ export function AccountMenu({ name, email, tint, onSignOut }: { name: string; em
       <summary aria-label="Account" className="flex cursor-pointer list-none rounded-full [&::-webkit-details-marker]:hidden">
         <Avatar name={name} tint={tint} size={36} />
       </summary>
-      <div className="absolute right-0 z-40 mt-2 flex w-60 flex-col gap-1 rounded-2xl border border-line bg-sheet p-2 shadow-[0_18px_40px_-20px_var(--shadow)]">
-        <span className="flex flex-col px-3 py-2">
-          <span className="text-sm font-semibold">{name}</span>
+      <div className="absolute right-0 z-40 mt-2 flex w-56 flex-col gap-0.5 rounded-2xl border border-line bg-sheet p-1.5 shadow-[0_18px_40px_-20px_var(--shadow)]">
+        <span className="flex flex-col px-3 pt-2 pb-1">
+          <span className="truncate text-sm font-semibold">{name}</span>
           <span className="truncate text-[13px] text-mute">{email}</span>
         </span>
-        <Link href="/drop" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+        <span aria-hidden="true" className="mx-3 my-1 h-px bg-line" />
+        <Link href="/drop" className={item}>
           My paper
         </Link>
-        <Link href="/drop/library" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+        <Link href="/drop/library" className={item}>
           Library
         </Link>
-        <Link href="/settings" className="rounded-xl px-3 py-2.5 text-sm hover:bg-soft">
+        <Link href="/settings" className={item}>
           Settings
         </Link>
+        {/* Only the admin account sees it; Studio still asks for its passcode. */}
+        {admin && (
+          <Link href="/studio" className={item}>
+            Studio
+          </Link>
+        )}
+        <span aria-hidden="true" className="mx-3 my-1 h-px bg-line" />
+        {/* One short line each: the desktop apps live on /download; installing this site as an app is its own thing. */}
+        <Link href="/download" className={item}>
+          Get the apps
+        </Link>
         {canInstall && (
-          <button type="button" onClick={() => void promptInstall()} className="rounded-xl px-3 py-2.5 text-left text-sm hover:bg-soft">
-            Install app
+          <button type="button" onClick={() => void promptInstall()} className={`${item} text-left`}>
+            Install this app
           </button>
         )}
-        <button type="button" onClick={onSignOut} className="rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-text hover:bg-red-soft">
+        <span aria-hidden="true" className="mx-3 my-1 h-px bg-line" />
+        <button type="button" onClick={onSignOut} className={`${item} text-left text-red-text hover:bg-red-soft`}>
           Sign out
         </button>
       </div>

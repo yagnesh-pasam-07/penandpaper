@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { noStore, requireUser } from "@/modules/drop/http";
-import { CANVAS_IDS, THEME_MODES } from "@/lib/canvases";
+import { CANVAS_IDS, NOTE_FONT_IDS, THEME_MODES } from "@/lib/canvases";
 import { saveAppearance } from "@/modules/drop/server";
 
 const body = z
-  .object({ canvas: z.enum(CANVAS_IDS).optional(), theme: z.enum(THEME_MODES).optional() })
-  .refine((p) => p.canvas !== undefined || p.theme !== undefined);
+  .object({ canvas: z.enum(CANVAS_IDS).optional(), theme: z.enum(THEME_MODES).optional(), noteFont: z.enum(NOTE_FONT_IDS).optional() })
+  .refine((p) => p.canvas !== undefined || p.theme !== undefined || p.noteFont !== undefined);
 
-/** The canvas and theme choice. */
+/** The canvas, theme and note-font choice. */
 export async function POST(request: Request) {
   const user = await requireUser();
   if (user instanceof Response) return user;

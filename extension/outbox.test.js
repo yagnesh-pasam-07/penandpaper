@@ -65,3 +65,10 @@ describe("keptDraft", () => {
     expect(keptDraft(undefined)).toBe("");
   });
 });
+
+describe("enqueue with a picture", () => {
+  it("keeps the picture address with the thought, and nothing when there is none", () => {
+    expect(enqueue([], { id: "ext-1", text: "post", imageUrl: "https://a.co/p.jpg" }, 1)[0].imageUrl).toBe("https://a.co/p.jpg");
+    expect("imageUrl" in enqueue([], { id: "ext-2", text: "x" }, 1)[0]).toBe(false);
+  });
+});

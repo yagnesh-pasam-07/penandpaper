@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique("users_email_uq"),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  /** "user" for everyone; "admin" opens Studio (with its passcode). Set only by `npm run set-role`, never by the app. */
+  role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

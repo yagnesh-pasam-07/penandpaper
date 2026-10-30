@@ -262,13 +262,13 @@ function decode(body: Uint8Array, contentType: string | undefined): string {
 }
 
 /**
- * Fetches a page to read its details: validates the link, resolves the host
+ * One GET of a public address, safely: validates the link, resolves the host
  * and refuses it if ANY address is non-public, then talks to the address it
  * just validated (so a name that changes its answer between check and use gets
  * no second chance), follows redirects by hand up to PREVIEW_MAX_REDIRECTS and
  * re-checks every hop the same way, all inside one PREVIEW_TIMEOUT_MS budget.
  */
-export async function loadPage(rawUrl: string, deps: PreviewDeps): Promise<{ ok: true; finalUrl: string; html: string } | { ok: false; reason: PreviewFailure }> {
+async function fetchPublic(rawUrl: string, deps: PreviewDeps, maxBytes: number): Promise<{ ok: true; finalUrl: string; type: string; headers: Record<string, string | undefined>; body: Uint8Array } | { ok: false; reason: PreviewFailure }> {
   const now = deps.now ?? Date.now;
   const deadline = now() + PREVIEW_TIMEOUT_MS;
   const first = checkUrl(rawUrl);
@@ -292,7 +292,7 @@ export async function loadPage(rawUrl: string, deps: PreviewDeps): Promise<{ ok:
     if (left <= 0) return { ok: false, reason: "timeout" };
     let res: Awaited<ReturnType<PreviewDeps["get"]>>;
     try {
-      res = await deps.get({ url, ip: addresses[0], timeoutMs: left, maxBytes: PREVIEW_MAX_BYTES });
+      res = await deps.get({ url, ip: addresses[0], timeoutMs: left, maxBytes });
     } catch (e) {
       return { ok: false, reason: e instanceof Error && e.name === "TimeoutError" ? "timeout" : "failed" };
     }
@@ -310,11 +310,36 @@ export async function loadPage(rawUrl: string, deps: PreviewDeps): Promise<{ ok:
       continue;
     }
     if (res.status < 200 || res.status >= 300) return { ok: false, reason: "failed" };
-    const type = (res.headers["content-type"] ?? "").toLowerCase();
-    if (!type.startsWith("text/html") && !type.startsWith("application/xhtml+xml")) return { ok: false, reason: "unsupported" };
-    return { ok: true, finalUrl: url.href, html: decode(res.body, res.headers["content-type"]) };
+    return { ok: true, finalUrl: url.href, type: (res.headers["content-type"] ?? "").toLowerCase(), headers: res.headers, body: res.body };
   }
   return { ok: false, reason: "failed" };
+}
+
+/** Fetches a page to read its details (see `fetchPublic` for how it stays safe). */
+export async function loadPage(rawUrl: string, deps: PreviewDeps): Promise<{ ok: true; finalUrl: string; html: string } | { ok: false; reason: PreviewFailure }> {
+  const res = await fetchPublic(rawUrl, deps, PREVIEW_MAX_BYTES);
+  if (!res.ok) return res;
+  if (!res.type.startsWith("text/html") && !res.type.startsWith("application/xhtml+xml")) return { ok: false, reason: "unsupported" };
+  return { ok: true, finalUrl: res.finalUrl, html: decode(res.body, res.headers["content-type"]) };
+}
+
+/** The picture types a thought keeps. */
+const PICTURE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+/** A picture is read up to this size; bigger than this, it is shrunk only if it arrived whole. */
+export const PICTURE_MAX_BYTES = 8_000_000;
+
+/**
+ * Fetches a picture from a public address, the same safe way as a page. Only
+ * PNG, JPEG, WebP and GIF; a body cut off at the size limit is refused, since a
+ * half picture won't decode.
+ */
+export async function loadPicture(rawUrl: string, deps: PreviewDeps): Promise<{ ok: true; type: string; bytes: Uint8Array } | { ok: false; reason: PreviewFailure }> {
+  const res = await fetchPublic(rawUrl, deps, PICTURE_MAX_BYTES);
+  if (!res.ok) return res;
+  const type = res.type.split(";")[0].trim();
+  if (!PICTURE_TYPES.includes(type)) return { ok: false, reason: "unsupported" };
+  if (res.body.length === 0 || res.body.length >= PICTURE_MAX_BYTES) return { ok: false, reason: "unsupported" };
+  return { ok: true, type, bytes: res.body };
 }
 
 /** A page's preview, or why there isn't one. */

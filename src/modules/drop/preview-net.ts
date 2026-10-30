@@ -47,7 +47,7 @@ export const netDeps: PreviewDeps = {
           agent: false,
           headers: {
             "User-Agent": USER_AGENT,
-            Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
+            Accept: "text/html,application/xhtml+xml;q=0.9,image/webp,image/*;q=0.8,*/*;q=0.1",
             "Accept-Language": "en;q=0.9,*;q=0.5",
             "Accept-Encoding": "gzip, deflate, br",
           },

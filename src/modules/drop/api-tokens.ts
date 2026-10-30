@@ -66,7 +66,7 @@ export async function revokeApiToken(userId: string, id: string): Promise<boolea
  */
 export async function userFromToken(secret: string): Promise<{ user: User; tokenId: string } | null> {
   const [row] = await db
-    .select({ tokenId: dropApiTokens.id, id: users.id, email: users.email, name: users.name })
+    .select({ tokenId: dropApiTokens.id, id: users.id, email: users.email, name: users.name, role: users.role })
     .from(dropApiTokens)
     .innerJoin(users, eq(users.id, dropApiTokens.userId))
     .where(and(eq(dropApiTokens.tokenHash, hashToken(secret)), isNull(dropApiTokens.revokedAt)));
@@ -80,7 +80,7 @@ export async function userFromToken(secret: string): Promise<{ user: User; token
         or(isNull(dropApiTokens.lastUsedAt), lt(dropApiTokens.lastUsedAt, sql`now() - make_interval(secs => ${LAST_USED_EVERY_MS / 1000})`)),
       ),
     );
-  return { user: { id: row.id, email: row.email, name: row.name }, tokenId: row.tokenId };
+  return { user: { id: row.id, email: row.email, name: row.name, role: row.role }, tokenId: row.tokenId };
 }
 
 /**

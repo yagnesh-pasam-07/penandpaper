@@ -25,9 +25,9 @@ async function Paper({ params, searchParams }: { params: Promise<{ paperId: stri
   const listed = papers.some((p) => p.id === paper.id) ? papers : [{ id: paper.id, name: paper.name, createdAt: paper.createdAt, updatedAt: paper.createdAt, archivedAt: paper.archivedAt, count: paper.thoughts.length }, ...papers];
   return (
     <>
-      <AppearanceSync canvas={appearance.canvas} theme={appearance.theme} />
+      <AppearanceSync canvas={appearance.canvas} theme={appearance.theme} noteFont={appearance.noteFont} />
       {skipped === "image" && <ShareNotice>That picture was too big to add from a share. Drop it on the paper and it will shrink first.</ShareNotice>}
-      <DropCanvas key={paper.id} initial={paper} papers={listed} me={{ name: user.name, email: user.email }} focus={typeof note === "string" ? note : null} write={write === "1"} />
+      <DropCanvas key={paper.id} initial={paper} papers={listed} me={{ name: user.name, email: user.email, admin: user.role === "admin" }} focus={typeof note === "string" ? note : null} write={write === "1"} />
     </>
   );
 }

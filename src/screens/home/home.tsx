@@ -30,6 +30,9 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
         </Link>
         <span className="ml-auto flex items-center gap-1.5">
           <ThemeToggle />
+          <Link href="/download" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
+            Download
+          </Link>
           <Link href="/login" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
             Sign in
           </Link>

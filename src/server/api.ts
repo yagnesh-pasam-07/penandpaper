@@ -5,7 +5,7 @@ import type { Db } from "@/db";
 import { loadProjects, saveProject, type Q } from "@/db/repo";
 import { members, projects } from "@/db/schema";
 import { demoStory } from "@/lib/demo";
-import { appUrl, emailEnabled, googleEnabled } from "@/lib/env";
+import { appleEnabled, appUrl, emailEnabled, googleEnabled, microsoftEnabled } from "@/lib/env";
 import { formatHours } from "@/lib/estimate";
 import { ActionError, LEAD_ONLY, TINTS, actingMemberId, applyAction, nameFromEmail, paperFor, uid, type ProjectAction } from "@/lib/mutations";
 import { cityFromTz, todayIn, weekday, zonedTime } from "@/lib/time";
@@ -21,11 +21,11 @@ export type AppState = {
   /** projectId -> the member this account is on that project. */
   viewer: Record<string, string>;
   /** Which sign-in methods work in this environment. */
-  signIn: { password: boolean; email: boolean; google: boolean };
+  signIn: { password: boolean; email: boolean; google: boolean; apple: boolean; microsoft: boolean };
 };
 
 export async function stateFor(q: Q, user: User | null): Promise<AppState> {
-  const signIn = { password: true, email: emailEnabled, google: googleEnabled };
+  const signIn = { password: true, email: emailEnabled, google: googleEnabled, apple: appleEnabled, microsoft: microsoftEnabled };
   if (!user) return { lead: null, projects: [], viewer: {}, signIn };
   const [owned, joined] = await Promise.all([
     q.select({ id: projects.id }).from(projects).where(eq(projects.ownerId, user.id)),

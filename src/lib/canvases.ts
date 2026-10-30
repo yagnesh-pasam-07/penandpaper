@@ -34,6 +34,25 @@ export type CanvasId = (typeof CANVASES)[number]["id"];
 export const CANVAS_IDS = CANVASES.map((c) => c.id) as [CanvasId, ...CanvasId[]];
 export const DEFAULT_CANVAS: CanvasId = "dotted";
 
+/**
+ * How the thoughts are written. Only the notes change; headings stay handwritten.
+ * "clean": Noto Sans, a calm neutral sans that covers Latin, Devanagari and
+ * Telugu, so a mixed-language thought reads in one hand.
+ */
+export const NOTE_FONTS = [
+  { id: "hand", label: "Handwritten", hint: "Like a pen on paper" },
+  { id: "clean", label: "Clean", hint: "Neutral and easy to read" },
+] as const;
+
+export type NoteFont = (typeof NOTE_FONTS)[number]["id"];
+export const NOTE_FONT_IDS = NOTE_FONTS.map((f) => f.id) as [NoteFont, ...NoteFont[]];
+export const DEFAULT_NOTE_FONT: NoteFont = "hand";
+export const NOTE_FONT_KEY = "pp-note-font";
+
+export function parseNoteFont(value: unknown): NoteFont {
+  return NOTE_FONT_IDS.find((id) => id === value) ?? DEFAULT_NOTE_FONT;
+}
+
 export const THEME_MODES = ["light", "dark", "system"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 export const DEFAULT_THEME_MODE: ThemeMode = "system";

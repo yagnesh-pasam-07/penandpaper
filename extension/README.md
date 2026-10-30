@@ -2,7 +2,7 @@
 
 Saves what you're looking at onto your latest Pen & Paper paper: the page, some selected words, a link or an image. Chrome and Edge (Manifest V3).
 
-**It is not on the Chrome Web Store.** You load it yourself, as below. Nothing needs building.
+**It is not on the Chrome Web Store.** Download the zip from the site's `/download` page (built by `scripts/build-downloads.sh`) or use this folder, and load it yourself, as below. Nothing needs building.
 
 ## Install
 
@@ -22,8 +22,8 @@ Sign in to Pen & Paper in the same browser first. If you aren't signed in, the e
 - **It opens instantly.** Nothing is fetched when it opens: the paper's name, your last choice and any draft are read from this device.
 - **Nothing is lost.** The box hands the thought to the extension, which keeps it on this device first and then sends it. If you're offline, signed out or the site has a hiccup, the note says **Saved on this device, will sync** (or **Sign in to sync**, and the log-in page opens), and it is sent later: when the browser starts, when the network comes back, and the next time you press a shortcut or save anything.
 - **Keyboard and screen readers:** the box is a labelled dialog, Tab and Shift+Tab stay inside it, focus goes back to where you were when it closes, and it follows your light or dark setting. A character count appears only near the 1,000-character limit.
-- **Toolbar button** or **Alt+Shift+P**: saves the page (its title and address, plus any words you have selected) and shows a small **Saved to _your paper_** note at the bottom of the page.
-- **Right-click** on the page, a selection, a link or an image, then **Save … to Pen & Paper**. These open the small saving window, which closes itself.
+- **Highlight, then click the toolbar button** (or **Alt+Shift+P**): saves what you highlighted — the words, **the first picture inside the highlight** (a post's photo, say) and the page's title and address — straight to your latest paper, with a **Saved to _your paper_** note and **Undo**. Nothing highlighted saves the page itself. No window opens. The site fetches the picture itself (the extension can't read other sites' pictures), shrinks it and tapes it to the note; if it can't (a private address, not a PNG/JPEG/WebP/GIF, too slow), the words still go and the note says **without the picture**.
+- **Right-click** on the page, a selection, a link or an image, then **Save … to Pen & Paper**: the same straight save. A saved image keeps the page it was on as its caption.
 
 To change a shortcut, go to `chrome://extensions/shortcuts`.
 

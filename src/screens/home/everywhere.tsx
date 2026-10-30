@@ -1,5 +1,9 @@
 import fs from "node:fs";
+import Link from "next/link";
 import path from "node:path";
+import { btn } from "@/components/btn";
+import { Keys } from "@/components/keys";
+import { Glyph } from "./glyph";
 import { ShotCarousel, type Shot } from "./shot-carousel";
 
 /** Where the homepage screenshot lives (see public/shots/README.md). */
@@ -12,50 +16,6 @@ function shotFor(name: string): string | null {
     if (fs.existsSync(path.join(SHOTS_DIR, `${name}.${ext}`))) return `/shots/${name}.${ext}`;
   }
   return null;
-}
-
-/** Real keycaps, so a shortcut reads as keys. */
-function Keys({ keys }: { keys: string[] }) {
-  return (
-    <span className="inline-flex items-center gap-1 align-middle">
-      {keys.map((k) => (
-        <kbd key={k} className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-line border-b-2 bg-sheet px-1.5 text-[13px] leading-none text-ink">
-          {k}
-        </kbd>
-      ))}
-    </span>
-  );
-}
-
-const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
-/** Three small line drawings in the ink colour, each with one red mark. */
-function Glyph({ kind }: { kind: "web" | "mac" | "chrome" }) {
-  return (
-    <svg aria-hidden="true" width="64" height="44" viewBox="0 0 64 44" className="text-ink/75">
-      {kind === "web" && (
-        <>
-          <rect x="6" y="6" width="52" height="32" rx="5" {...stroke} />
-          <path d="M6 14h52" {...stroke} />
-          <path d="M18 27c4-6 8-6 12 0s8 6 14-2" className="text-red-text" {...stroke} />
-        </>
-      )}
-      {kind === "mac" && (
-        <>
-          <rect x="4" y="5" width="56" height="9" rx="2" {...stroke} />
-          <path d="M10 9.5h6M22 9.5h6" {...stroke} />
-          <path d="M47 7.8l3 3.4m0-3.4l-3 3.4" className="text-red-text" {...stroke} />
-          <rect x="14" y="22" width="36" height="16" rx="4" {...stroke} />
-        </>
-      )}
-      {kind === "chrome" && (
-        <>
-          <path d="M8 36V12a4 4 0 0 1 4-4h16v6a4 4 0 1 0 8 0V8h16a4 4 0 0 1 4 4v24z" {...stroke} />
-          <path d="M26 28l4 4 8-9" className="text-red-text" {...stroke} />
-        </>
-      )}
-    </svg>
-  );
 }
 
 /** One 16:10 screenshot under the headline: the real file once it exists, a quiet placeholder until then. A `web-dark` twin, when present, shows in the dark theme. */
@@ -133,10 +93,10 @@ export function HeroGallery() {
   return <ShotCarousel shots={shots} />;
 }
 
-const PLACES: { kind: "web" | "mac" | "chrome"; label: string; note?: string }[] = [
+const PLACES: { kind: "web" | "mac" | "chrome"; label: string; note?: string; href?: string }[] = [
   { kind: "web", label: "Web" },
-  { kind: "mac", label: "Mac", note: "Early access" },
-  { kind: "chrome", label: "Chrome", note: "Early access" },
+  { kind: "mac", label: "Mac", note: "Download", href: "/download#mac-title" },
+  { kind: "chrome", label: "Chrome", note: "Download", href: "/download#chrome-title" },
 ];
 
 /** Wherever you are, in three small symbols and one line about your voice. */
@@ -148,26 +108,41 @@ export function Everywhere() {
       </h2>
       <ul className="flex w-full items-start justify-center gap-10 sm:gap-20">
         {PLACES.map((p) => (
-          <li key={p.kind} className="flex flex-col items-center gap-2">
-            <Glyph kind={p.kind} />
-            <span className="text-[16px] font-medium">{p.label}</span>
-            <span className="h-4 text-[12px] text-mute">{p.note}</span>
+          <li key={p.kind}>
+            {p.href ? (
+              <Link href={p.href} className="group flex flex-col items-center gap-2 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-text">
+                <Glyph kind={p.kind} />
+                <span className="text-[16px] font-medium">{p.label}</span>
+                <span className="h-4 text-[12px] text-red-text underline-offset-2 group-hover:underline">{p.note}</span>
+              </Link>
+            ) : (
+              <span className="flex flex-col items-center gap-2">
+                <Glyph kind={p.kind} />
+                <span className="text-[16px] font-medium">{p.label}</span>
+                <span className="h-4 text-[12px] text-mute">{p.note}</span>
+              </span>
+            )}
           </li>
         ))}
       </ul>
+      <div className="flex flex-col items-center gap-3">
+        <p className="text-[16px] text-mute">Highlight a post in Chrome, click once, and it&apos;s on your paper with its picture and link.</p>
+        <Link href="/download" className={`${btn.outline} h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text`}>
+          Download the Mac app &amp; Chrome extension
+        </Link>
+      </div>
       <div className="flex flex-col items-center gap-4">
         <p className="text-[20px] sm:text-[22px]">Say it instead of typing it.</p>
         <ul className="flex flex-col items-center gap-2 text-[13px] text-mute">
           <li className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
             <span>On the web (Chrome, Edge, Safari): tap the mic, or press</span>
-            <Keys keys={["⌘/Ctrl", "⇧", "M"]} />
+            <Keys keys={["⌘", "⇧", "M"]} />
           </li>
           <li className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
             <span>In the Mac app: hold</span>
             <Keys keys={["⌥", "Space"]} />
           </li>
         </ul>
-        <p className="text-[12px] text-mute/80">English, हिन्दी and తెలుగు. Telugu is the least accurate.</p>
       </div>
     </section>
   );
