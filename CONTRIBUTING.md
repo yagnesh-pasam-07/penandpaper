@@ -10,6 +10,7 @@ Thanks for helping. Pen & Paper is a calm paper for the thoughts you don't have 
 4. Check it:
    ```bash
    npm install
+   npx next typegen   # route types; `npm run dev` also makes them
    npx tsc --noEmit
    npm run lint
    npm test
