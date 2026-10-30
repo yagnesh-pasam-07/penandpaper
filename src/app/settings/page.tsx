@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { resurfaceOn } from "@/modules/drop/resurface-server";
 import { getAppearance } from "@/modules/drop/server";
 import { SettingsView } from "@/modules/drop/settings";
 import { currentUser } from "@/server/session";
@@ -13,8 +14,8 @@ async function Settings() {
   await connection();
   const user = await currentUser();
   if (!user) redirect("/login?next=/settings");
-  const appearance = await getAppearance(user.id);
-  return <SettingsView me={{ name: user.name, email: user.email, admin: user.role === "admin" }} appearance={appearance} />;
+  const [appearance, resurface] = await Promise.all([getAppearance(user.id), resurfaceOn(user.id)]);
+  return <SettingsView me={{ name: user.name, email: user.email, admin: user.role === "admin" }} appearance={appearance} resurface={resurface} />;
 }
 
 export default function SettingsPage() {

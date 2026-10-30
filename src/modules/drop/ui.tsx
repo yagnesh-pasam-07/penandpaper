@@ -13,6 +13,7 @@ import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from
 import { paperTitle, type DropPaper, type PaperMeta, type Thought } from "./logic";
 import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { PaperBar, SearchButton, UNDO_PAPER_KEY } from "./papers-ui";
+import { ResurfaceCard } from "./resurface-card";
 import { TonightButton } from "./tonight-button";
 import { importTryPaper } from "./try-import";
 import { useCanvasView, ViewControls } from "./use-view";
@@ -506,6 +507,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
         }
       />
       <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-3 pb-28 sm:px-8">
+        <ResurfaceCard />
         {onSheet.length === 0 ? (
           <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 items-center justify-center sm:min-h-[420px]`}>
             <span className="flex flex-col items-center gap-3 py-16 text-center">
