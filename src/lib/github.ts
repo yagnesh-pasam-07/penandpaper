@@ -43,6 +43,27 @@ export async function repoStats(): Promise<RepoStats | null> {
   }
 }
 
+/**
+ * Just the star count, kept fresh: re-asked from GitHub at most every two
+ * minutes (about 30 calls an hour, inside the 60 GitHub allows without a
+ * token). The homepage's button reads it on the server, then once more from
+ * the browser through /api/github/stars, so a new star shows within minutes.
+ */
+export async function liveStars(): Promise<number | null> {
+  "use cache";
+  cacheLife({ stale: 60, revalidate: 120, expire: 3600 });
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "penandpaper-site" };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}`, { headers, signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const r = (await res.json()) as { stargazers_count?: number };
+    return typeof r.stargazers_count === "number" ? r.stargazers_count : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 1234 → "1.2k", like GitHub shows it. */
 export function compact(n: number): string {
   if (n < 1000) return String(n);

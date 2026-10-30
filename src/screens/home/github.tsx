@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { compact, REPO_URL, repoStats } from "@/lib/github";
+import { liveStars, REPO_URL, repoStats } from "@/lib/github";
+import { StarCount as LiveCount } from "./star-count";
 
 /** GitHub's mark, in the text colour. */
 export function GitHubMark({ size = 16 }: { size?: number }) {
@@ -21,12 +22,11 @@ function Star() {
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text";
 
 async function StarCount() {
-  const stats = await repoStats();
-  if (!stats) return null;
+  const stars = await liveStars();
   return (
-    <span className="flex items-center gap-1 border-l border-line pl-2 tabular-nums">
+    <span className="flex items-center gap-1 border-l border-line pl-2">
       <Star />
-      {compact(stats.stars)}
+      <LiveCount initial={stars} />
     </span>
   );
 }
@@ -51,7 +51,7 @@ export function GitHubButton() {
 }
 
 async function People() {
-  const stats = await repoStats();
+  const [stats, stars] = await Promise.all([repoStats(), liveStars()]);
   if (!stats) return null;
   const shown = stats.contributors.slice(0, 24);
   return (
@@ -67,7 +67,7 @@ async function People() {
         ))}
       </ul>
       <p className="text-[14px] text-mute tabular-nums">
-        <Star /> <span className="font-semibold text-ink">{stats.stars.toLocaleString()}</span> {stats.stars === 1 ? "star" : "stars"}
+        <Star /> <span className="font-semibold text-ink">{(stars ?? stats.stars).toLocaleString()}</span> {(stars ?? stats.stars) === 1 ? "star" : "stars"}
         <span aria-hidden="true"> · </span>
         <span className="font-semibold text-ink">{stats.contributors.length}</span> {stats.contributors.length === 1 ? "contributor" : "contributors"}
         <span aria-hidden="true"> · </span>

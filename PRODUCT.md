@@ -59,6 +59,10 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 
 ## Decision log
 
+### 2026-10-30 10:45 IST · tech · The star count refreshes every two minutes, and again in the browser
+Why: an hour-long cache showed 0 stars after the repo had 1, the first time anyone looked. Stars now have their own two-minute server cache (about 30 GitHub calls an hour, inside the 60 allowed without a token), and the button asks `/api/github/stars` once after the page loads, so a new star shows within minutes. Avatars and forks stay hourly.
+Replaces: 2026-10-30 10:20 · stars cached for an hour with the rest
+
 ### 2026-10-30 10:20 IST · growth · Live GitHub stars and contributors on the homepage
 Why: an open-source project grows by showing it is alive. A GitHub button with the live star count sits in the nav; "Built in the open." shows contributors' avatars, stars, forks and a way to contribute. Fetched on the server and cached for an hour, so visitors never call GitHub and its rate limit is never hit; if GitHub is down, the numbers simply don't show. Bots are left out.
 Replaces: nothing
