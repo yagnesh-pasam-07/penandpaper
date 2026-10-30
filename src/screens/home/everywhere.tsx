@@ -99,6 +99,79 @@ const PLACES: { kind: "web" | "mac" | "chrome"; label: string; note?: string; hr
   { kind: "chrome", label: "Chrome", note: "Download", href: "/download#chrome-title" },
 ];
 
+/** Highlight anything on the web, click once, and it's on your paper. */
+export function Highlight() {
+  return (
+    <section aria-labelledby="highlight-title" className="mx-auto flex w-full max-w-[880px] flex-col items-center gap-8 px-4 py-20 text-center sm:px-8">
+      <span className="flex flex-col items-center gap-3">
+        <h2 id="highlight-title" className="font-hand text-[40px] leading-none font-bold sm:text-[52px]">
+          Read something good? <span className="highlight">Highlight it.</span>
+        </h2>
+        <p className="max-w-[520px] text-[17px] text-mute">
+          Select a line, a post or a picture on any website and click the Pen &amp; Paper icon. The words, the picture and the link land on your paper. No copy, no paste, no new tab.
+        </p>
+      </span>
+      {/* A web page with a line marked in red, then the same line as a note on the paper. */}
+      <div aria-hidden="true" className="grid w-full max-w-[720px] items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="flex flex-col gap-2 rounded-2xl border border-line bg-sheet p-4 text-left">
+          <span className="flex gap-1.5">
+            <span className="size-2 rounded-full bg-line" />
+            <span className="size-2 rounded-full bg-line" />
+            <span className="size-2 rounded-full bg-line" />
+          </span>
+          <span className="h-2 w-3/4 rounded bg-line/70" />
+          <span className="text-[15px] leading-snug">
+            <span className="rounded bg-red-soft px-0.5 text-ink">The best startup ideas come from noticing what&apos;s missing.</span>
+          </span>
+          <span className="h-2 w-2/3 rounded bg-line/70" />
+        </div>
+        <span className="font-hand text-[34px] leading-none text-red-text max-sm:rotate-90">→</span>
+        <div className="canvas-surface flex items-center justify-center rounded-2xl border border-line p-5">
+          <span className="rounded-[18px_14px_20px_12px] bg-t2 px-4 py-3 text-left font-note text-[18px] leading-snug text-ink">
+            The best startup ideas come from noticing what&apos;s missing.
+            <span className="mt-1 block font-sans text-[12px] text-mute">paulgraham.com</span>
+          </span>
+        </div>
+      </div>
+      <p className="text-[14px] text-mute">
+        Click the icon, or press <Keys keys={["⌥", "⇧", "P"]} />. Chrome and Edge, on Mac and Windows.
+      </p>
+    </section>
+  );
+}
+
+/** Two ways to write a thought: loose, or clear enough to remember. */
+export function Fonts() {
+  const sample = "Pitch the pilot to 3 clinics before Friday";
+  return (
+    <section aria-labelledby="fonts-title" className="mx-auto flex w-full max-w-[880px] flex-col items-center gap-8 px-4 py-20 text-center sm:px-8">
+      <span className="flex flex-col items-center gap-3">
+        <h2 id="fonts-title" className="font-hand text-[40px] leading-none font-bold sm:text-[52px]">
+          Think loose. Read it clear.
+        </h2>
+        <p className="max-w-[520px] text-[17px] text-mute">Write in handwriting while the idea is forming. Switch to Clear when you want every thought to stand out on a quick reread.</p>
+      </span>
+      <div className="grid w-full max-w-[720px] gap-4 sm:grid-cols-2">
+        {[
+          { id: "hand", label: "Handwritten", hint: "For loose thinking" },
+          { id: "clean", label: "Clear", hint: "For remembering" },
+        ].map((f) => (
+          <figure key={f.id} className="canvas-surface flex flex-col items-start gap-4 rounded-2xl border border-line p-5 text-left">
+            <span data-note-font={f.id} className="note-sample rounded-[18px_14px_20px_12px] bg-t1 px-4 py-3 font-note text-[20px] leading-snug text-ink">
+              {sample}
+            </span>
+            <figcaption className="flex flex-col">
+              <span className="text-[15px] font-semibold">{f.label}</span>
+              <span className="text-[13px] text-mute">{f.hint}</span>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+      <p className="text-[13px] text-mute">Pick yours any time in Settings. Only your notes change.</p>
+    </section>
+  );
+}
+
 /** Wherever you are, in three small symbols and one line about your voice. */
 export function Everywhere() {
   return (
@@ -125,12 +198,9 @@ export function Everywhere() {
           </li>
         ))}
       </ul>
-      <div className="flex flex-col items-center gap-3">
-        <p className="text-[16px] text-mute">Highlight a post in Chrome, click once, and it&apos;s on your paper with its picture and link.</p>
-        <Link href="/download" className={`${btn.outline} h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text`}>
-          Download the Mac app &amp; Chrome extension
-        </Link>
-      </div>
+      <Link href="/download" className={`${btn.outline} h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text`}>
+        Download the Mac app &amp; Chrome extension
+      </Link>
       <div className="flex flex-col items-center gap-4">
         <p className="text-[20px] sm:text-[22px]">Say it instead of typing it.</p>
         <ul className="flex flex-col items-center gap-2 text-[13px] text-mute">

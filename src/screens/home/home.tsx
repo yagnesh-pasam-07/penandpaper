@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { btn } from "@/components/btn";
 import { Logo, ThemeToggle } from "@/components/ui";
-import { Everywhere, HeroGallery } from "./everywhere";
+import { Everywhere, Fonts, HeroGallery, Highlight } from "./everywhere";
 import { PainPoints } from "./pain-points";
 import { TryIt } from "./try-it";
 
@@ -70,6 +70,10 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
           </h2>
           <TryIt />
         </section>
+
+        <Highlight />
+
+        <Fonts />
 
         <Everywhere />
 

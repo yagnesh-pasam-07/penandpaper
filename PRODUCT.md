@@ -58,6 +58,10 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 
 ## Decision log
 
+### 2026-10-30 08:55 IST · growth · The homepage shows highlight-to-save and the two fonts
+Why: the two features that most set it apart were invisible to visitors. "Read something good? Highlight it." shows a highlighted line becoming a note; "Think loose. Read it clear." shows one thought in both fonts.
+Replaces: a single line about the extension above the download button
+
 ### 2026-10-30 08:35 IST · security · The admin is one exact email: yagnesh@tilicho.in
 Why: a name can be chosen by anyone who signs up; an email can't. Applied to production by migration `0013_yagnesh_admin.sql`; studio still needs the passcode.
 Replaces: promoting every account whose name or email contains "yagnesh" (tried locally, never shipped)
