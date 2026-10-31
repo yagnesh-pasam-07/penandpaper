@@ -108,10 +108,11 @@ export function TodayThought({ force = false, onUsed }: { force?: boolean; onUse
         else if (e.key.toLowerCase() === "u" && !e.metaKey && !e.ctrlKey) void act("use");
         else if (e.key.toLowerCase() === "t" && !e.metaKey && !e.ctrlKey) void act("tomorrow");
       }}
-      className="scrim-bg fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none sm:p-8"
+      className="scrim-bg fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none backdrop-blur-md sm:p-8"
     >
+      {/* Its own solid paper: never the canvas-surface class, which the canvas page clears to see-through. */}
       <article
-        className={`canvas-surface relative flex max-h-[92dvh] w-full max-w-[640px] flex-col gap-6 overflow-auto rounded-[22px] border border-line bg-sheet px-6 pt-8 pb-6 shadow-[0_40px_80px_-40px_var(--shadow)] sm:px-12 sm:pt-12 sm:pb-8 ${
+        className={`relative flex max-h-[92dvh] w-full max-w-[640px] flex-col gap-6 overflow-auto rounded-[22px] border border-line bg-sheet px-6 pt-8 pb-6 shadow-[0_40px_80px_-40px_var(--shadow)] sm:px-12 sm:pt-12 sm:pb-8 ${
           leaving === "use" ? "today-use" : leaving === "tomorrow" ? "today-later" : "today-in"
         }`}
       >

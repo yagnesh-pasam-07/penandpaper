@@ -130,6 +130,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-10-31 18:00 IST · design · Thought of the Day sits on solid paper over a blurred canvas
+
+The card reused the `canvas-surface` class, which the canvas page clears to see-through, so the paper's thoughts showed through the card and it was unreadable. The card now paints its own solid sheet and the canvas behind is blurred, so the one thought is the only thing in view. Replaces the see-through card from 17:00.
+
 ### 2026-10-31 17:00 IST · product · Thought of the Day replaces the morning card: one past thought, full screen, with a signature sound
 Why: people capture everywhere but never recall (the PRD's problem). The morning card was small, had four buttons and left pictures out. Now one past thought greets you full screen at your chosen time, like a letter from your past self, with two choices (Use it, Tomorrow), a once-a-day sound, and a notification on every device you turn on. Decision tree: it is the "it comes back" step of the core loop (step 1); one thought, one sound, two buttons, a time and days in Settings, with no per-thought alarms (step 2: calm by default); "Use it" copies the thought onto today's paper rather than striking it, because a maker uses raw material, it doesn't finish it, and pictures and written text can come back (step 3); one add-only migration: recall settings on `drop_prefs`, `drop_thoughts.recall_shown_at` and a `drop_push_subscriptions` table, reusing the resurface rhythm columns (step 4); the push endpoint must be a known push service over https, and the service worker caches nothing (step 5). Web push is built on Node's crypto (RFC 8291 and 8292, tested against the RFC's own vector) instead of a package. The signature sound is synthesised by `scripts/make-recall-sound.mjs`, so it is ours. Browsers only play a custom sound while the page is open; when it is closed, the device's own notification sound plays.
 Replaces: 2026-10-30 11:30 · the morning resurface card (do it / keep / let go / not now on a 1 → 7 → 30 rhythm)
