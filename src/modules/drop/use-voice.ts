@@ -68,7 +68,11 @@ function readLang(): SpeechLang {
  * recording again (once). It stops by itself after a minute, and the words go
  * to `onText` once, when it stops.
  */
-export function useVoice(onText: (text: string) => void) {
+/**
+ * `hold`: listening runs until stop() is called (push-to-talk, like holding
+ * Space on the canvas), so a pause mid-sentence doesn't end it.
+ */
+export function useVoice(onText: (text: string) => void, { hold = false }: { hold?: boolean } = {}) {
   const engine = useSyncExternalStore<VoiceEngine | null>(noSubscribe, detectEngine, () => null);
   const mime = useSyncExternalStore(noSubscribe, recorderMime, () => null);
   const lang = useSyncExternalStore<SpeechLang>(subscribeLang, readLang, () => "en");
@@ -118,7 +122,7 @@ export function useVoice(onText: (text: string) => void) {
     setInterim("");
     const rec = new Ctor();
     rec.lang = speechTag(lang, navigator.language);
-    rec.continuous = false;
+    rec.continuous = hold;
     rec.interimResults = true;
     rec.onresult = (event) => {
       heard.current = spokenSoFar(resultsFrom(event.results));
@@ -165,7 +169,7 @@ export function useVoice(onText: (text: string) => void) {
       setElapsed(ms);
       if (ms >= MAX_RECORDING_MS) recognizer.current?.stop();
     }, 200);
-  }, [lang, release]);
+  }, [hold, lang, release]);
 
   /* ---------- Engine 2: record and send to the server ---------- */
 
@@ -266,6 +270,13 @@ export function useVoice(onText: (text: string) => void) {
     else if (engine === "recorder") void startRecorder();
   }, [engine, startRecorder, startSpeech, stop]);
 
+  /** Starts listening if it isn't already (for push-to-talk). */
+  const start = useCallback(() => {
+    if (recognizer.current || recorder.current) return;
+    if (engine === "speech") startSpeech();
+    else if (engine === "recorder") void startRecorder();
+  }, [engine, startRecorder, startSpeech]);
+
   const retry = useCallback(() => {
     if (!kept.current || retried.current) return;
     retried.current = true;
@@ -293,6 +304,8 @@ export function useVoice(onText: (text: string) => void) {
     lang,
     setLang,
     toggle,
+    start,
+    stop,
     cancel,
     retry,
     canRetry: state.kind === "failed" && state.canRetry,

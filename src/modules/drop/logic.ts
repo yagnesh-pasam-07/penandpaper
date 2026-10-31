@@ -14,6 +14,19 @@ export type Thought = {
   y: number | null;
   /** A pasted or dropped picture (a small data URL), taped on like a photo; the text is its caption. */
   image?: string | null;
+  /** "note" (a hand-cut note) or "text" (words written straight on the paper with the Text tool). Missing means "note". */
+  kind?: ThoughtKind;
+};
+
+export type ThoughtKind = "note" | "text";
+
+/** A line drawn on a paper. Tied at either end to a thought (a connector), or free. */
+export type Stroke = {
+  id: string;
+  /** Canvas px, in the sheet's own units; for a tied end, the point is where it was when drawn. */
+  points: [number, number][];
+  fromId: string | null;
+  toId: string | null;
 };
 
 /** One paper: a canvas the person made, with the thoughts dropped on it. */
@@ -26,6 +39,8 @@ export type DropPaper = {
   /** Set while it is put away (archived). */
   archivedAt: string | null;
   thoughts: Thought[];
+  /** Lines and connectors drawn on it. */
+  strokes?: Stroke[];
 };
 
 /** A paper in a list (the switcher): no thoughts, just how many. */
@@ -62,6 +77,20 @@ export const MAX_IMAGE = 1_500_000;
 export const CRUMPLE_KEEP_DAYS = 7;
 
 export { firstLink, firstYoutube, isOnlyYoutube, linkify, youtubeId, type TextPart } from "@/lib/linkify";
+
+/**
+ * A drop is kept to look at, not to do: a picture (with or without a caption),
+ * or words written straight on the paper with the Text tool. It can't be
+ * struck, and Tonight's paper and the morning resurface pass it by. Every
+ * other note is a to-do.
+ */
+export function isDrop(t: { image?: string | null; kind?: ThoughtKind | null }): boolean {
+  return Boolean(t.image) || t.kind === "text";
+}
+
+/** Most points a line keeps, and how far (canvas px) a line can reach, for the API's sanity checks. */
+export const MAX_STROKE_POINTS = 2000;
+export const STROKE_LIMIT = 400_000;
 
 /** What a thought reads as in lists: its words, or "Image" for a picture with no caption. */
 export function thoughtLabel(t: Pick<Thought, "text" | "image">): string {

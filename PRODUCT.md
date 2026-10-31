@@ -1,11 +1,14 @@
 # Pen & Paper: product memory
 
-What we decided, and why. Two parts:
+The one place for product knowledge: what Pen & Paper is, what we decided and why, and how to decide the next thing. Five parts:
 
+0. **Vision**: why it exists and where it is going.
 1. **Current truth**: the decisions in force today, short and grouped. Read this first.
-2. **Decision log**: every decision, newest first, with its date and reason. Append only: a change gets a new entry that says what it replaces; old entries are never edited or deleted.
+2. **Decision tree**: the questions to walk through before adding or changing anything.
+3. **Feature tickets**: every feature asked for, with its state and its GitHub issue.
+4. **Decision log**: every decision, newest first, with its date and reason. Append only: a change gets a new entry that says what it replaces; old entries are never edited or deleted.
 
-**Rule for every change (people and coding agents alike):** a new feature, a removed feature, or a product, design, tech or security choice adds one log entry here, *and* updates "Current truth" if it changes what is true now. Same commit as the code.
+**Rule for every change (people and coding agents alike):** a new feature, a removed feature, or a product, design, tech or security choice adds one log entry here, *and* updates "Current truth" if it changes what is true now, *and* adds or moves its row in "Feature tickets". Walk the decision tree first. Same commit as the code.
 
 Entry format:
 
@@ -20,12 +23,27 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 
 ---
 
+## Vision
+
+**First, people put thoughts down on paper. Pen & Paper is pen and paper, digitally.** It keeps paper's freedom (write anywhere, draw an arrow, tape in a picture, no setup) and fixes what paper loses: you can find any word, close the day in a minute, and your thoughts come back when they matter. The aim is a tool better than a pen and a sheet of paper. We value people's thoughts: nothing gets in their way, and nothing is lost.
+
+**Where it sits:** a *personal thinking canvas with a daily rhythm*. Whiteboards (Excalidraw, tldraw, Miro, FigJam, Freeform) have the canvas but no memory; to-do apps (Things, Todoist) have the rhythm but no canvas; card-and-link tools (Heptabase, Obsidian Canvas) are for research, not today. Pen & Paper is the only one with all three: capture in a second, a free canvas, and thoughts that come back.
+
+**Guardrails:** three tools, not thirteen (Select, Text, Draw, plus the eraser). Voice is first-class (hold Space and talk onto the paper). Calm by default: no shapes palette, no templates, no streaks.
+
+**Next bets:** Apple Pencil and touch pen on iPad (literally better than paper); connected thoughts in Tonight's paper ("these three are one idea").
+
+---
+
 ## Current truth
 
 ### Product
 - **What it is:** one calm paper for the thoughts you don't have time to write. Personal, not a team planner (the team planner is parked; its routes redirect to `/drop`).
 - **The core loop:** drop a thought in a second (type, paste, speak, share, highlight) → see it on one canvas → close the day with Tonight's paper → a 9 PM email of what you dropped → **the thought comes back**: one each morning (1, 7, 30 days later: do it, keep, let go) and the whole week in Sunday's rewind (`/rewind`). Quiet by design: no streaks or badges, and it can be switched off in Settings.
 - **Papers:** you make as many as you like; captures land on the paper you touched last. Library and search across all of them.
+- **Two kinds of thought:** a **to-do** (a note with words, links, videos) can be struck with the red pen, is reviewed in Tonight's paper and comes back in the morning. A **drop** (anything with a picture, and text written straight on the paper) is kept just to look at: no tick, no strike, not in Tonight's paper or the morning resurface. It can still be moved, edited, zoomed and crumpled. Which kind is decided by what it is, not chosen (`isDrop` in `src/modules/drop/logic.ts`).
+- **Canvas tools** (desktop, a bar at the top; keys 1–4, Esc back to Select): **Select** (move, edit, arrange; drag bare paper to pan), **Text** (click anywhere and write straight on the paper: no card, Enter is a new line, Esc or a click away puts the pen down; written text is a drop), **Draw** (freehand ink; a line that starts on one thing and ends on another is a **connector** with an arrowhead and follows both when they move; a line that starts and ends on the same thing is a mark on it), **Eraser** (press or rub over a line, with Undo). Letters are left for typing, which still opens the writer. The phone keeps the simple stream.
+- **Voice:** tap Space to open the writer; **hold Space** to speak, and the words land as text where the pointer is (or into the text being written). Uses the browser's own recogniser, no key.
 - **Capture surfaces:** the web canvas, the quick box (`/capture`), phone share (`/share`), the Chrome & Edge extension, the Mac menu-bar app. Each tags its thoughts by id prefix (`ext-`, `mac-`, `cap-`, `share-`), which Studio counts.
 - **Extension:** highlight on any site and click the icon (or ⌥⇧P / Alt+Shift+P): the words, the first picture in the highlight and the page address go straight to the paper. No window.
 - **Language:** English only in the interface and for voice, for now. Thoughts in any script still display correctly.
@@ -56,10 +74,70 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - Move pictures out of the database into object storage (the biggest cost and speed risk as usage grows).
 - Sharing a paper (read-only link) and connecting thoughts: proposed, not built.
 - A universal (Apple silicon + Intel) Mac build: possible, untested on Intel.
+- Drops: should a person be able to turn a picture into a to-do (or words into a drop) by hand? Not yet: see the decision tree, step 3.
+
+---
+
+## Decision tree
+
+Walk this before building anything. Each answer either stops you or sends you to the next step, and the answers go in the decision-log entry.
+
+```
+1. Does it serve the core loop?  (drop it fast → see it → close the day → it comes back)
+   ├─ No  → Park it under "Open questions". Stop.
+   └─ Yes ↓
+2. Does it add a screen, a setting, a button or a notification?
+   ├─ Yes → Can it be decided from what the person already did, with nothing new to choose?
+   │        ├─ Yes → Do that instead (calm by default: fewer controls).
+   │        └─ No  → Keep it, but one control, in an existing menu. ↓
+   └─ No  ↓
+3. Does it change what a thought IS (its kind, or what strike / keep / crumple mean)?
+   ├─ Yes → Check every place a thought is acted on:
+   │        the canvas, Tonight's paper, the morning resurface, Sunday's rewind,
+   │        the 9 PM email, search, the extension, the Mac app, the homepage try-it.
+   │        Enforce it on the server too, not only in the UI. ↓
+   └─ No  ↓
+4. Does it need a database change?
+   ├─ Yes → Can it be worked out from columns we already have?
+   │        ├─ Yes → Work it out (no migration).
+   │        └─ No  → An add-only Drizzle migration (new column with a default, or a new table). ↓
+   └─ No  ↓
+5. Could it lose or hide someone's words, or expose them?
+   ├─ Yes → Add an Undo, keep data 7 days, and note it under "Security". ↓
+   └─ No  ↓
+6. Ship it: tests + PRODUCT.md (log entry, Current truth, Feature tickets row) in the same pull request.
+```
+
+---
+
+## Feature tickets
+
+Every feature asked for, newest first. One row each; move its state as it goes. The GitHub issue holds the discussion.
+
+| Feature | State | Ticket |
+| --- | --- | --- |
+| Canvas tools: Select, Text, Draw (with connectors), Eraser; hold Space to speak; "pen & paper, digitally" homepage | Shipped | [#31](https://github.com/yagnesh-pasam-07/penandpaper/issues/31) |
+| Drops vs to-dos: a picture is a drop, with no tick or strike, and stays out of the review | Shipped | [#29](https://github.com/yagnesh-pasam-07/penandpaper/issues/29) |
 
 ---
 
 ## Decision log
+
+### 2026-10-31 13:30 IST · product · Canvas tools: Select, Text, Draw (connectors) and an eraser; hold Space to speak
+Why: the canvas only took notes, but thinking on paper is also writing in the margins and drawing arrows between ideas. Decision tree: it serves the loop (step 1: faster capture, clearer thinking); three tools plus an eraser, not a shapes palette, and a connector is just a line drawn from one thing to another, with no separate Connect tool (step 2: calm by default); text written on the paper is a drop, never a to-do, and lines are never reviewed, so Tonight's paper, the resurface, the 9 PM email and strike all skip them, enforced on the server (step 3); one add-only migration: `drop_thoughts.kind` (default `note`) and a new `drop_strokes` table (step 4); erasing keeps a line 7 days with an Undo, like crumpling (step 5). Tool keys are 1–4, not letters, because typing a letter already opens the writer. Hold Space (280 ms) speaks with the browser's recogniser; a tap still opens the writer.
+Replaces: nothing
+
+### 2026-10-31 13:30 IST · growth · The story: first on paper, now pen & paper, digitally
+Why: the maintainer's framing of the product. The hero's line, the site description and a new "First, on paper. Now, pen & paper, digitally." section say it: keep paper's freedom, fix what paper loses. Vision section added above.
+Replaces: the hero line "A paper for the thoughts you don't have time to write. Type it, paste it, or just say it."
+
+### 2026-10-31 11:40 IST · product · Two kinds of thought: a picture is a drop, not a to-do
+Why: every note behaved like a to-do, so a picture dropped just to see more clearly could be struck by a stray double-click, swipe or tick, and it showed up in Tonight's paper and the morning resurface asking to be "done". A picture is kept to look at. Decision tree: it serves the loop (step 1); it is decided from the content, with no new toggle (step 2: calm by default); it changes what a thought is, so the canvas loses the tick, double-click and swipe-to-strike for pictures, the API refuses to strike one, and Tonight's paper (cards and counts) and the resurface skip them (step 3); worked out from the existing `image` column, so no migration (step 4). Pictures already struck before this keep their line. A manual "make it a to-do" switch is left open.
+Replaces: nothing (every thought was a to-do since 2026-10-18)
+
+### 2026-10-31 11:40 IST · product · PRODUCT.md gains a decision tree and a feature-ticket list
+Why: the maintainer wants every feature recorded here and a fixed set of questions for deciding changes, so this file holds the product knowledge, the decisions and how to make the next one. Each feature also gets a GitHub issue.
+Replaces: nothing
 
 ### 2026-10-31 11:20 IST · design · A Pen & Paper logo for the repo, and an open-source README header
 Why: the repo should read like an open-source project at a glance, the way RepoMind's does: a logo, a one-line pitch, links and badges at the top. The logo is a ruled sheet with the app's red fountain-pen nib finishing a line, in red, light and dark tiles plus bare marks (`public/brand/`), and `docs/social-preview.png` for link cards. The app's own favicon and install icons are unchanged. The README is now short and written for beginners (what it is, screenshots, a five-step quick start, how to contribute); the full feature and API reference moved unchanged to `docs/GUIDE.md`.

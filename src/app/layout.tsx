@@ -44,7 +44,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Pen & Paper",
-  description: "Drop every thought onto paper.",
+  description: "Pen and paper, digitally: write anywhere, draw between your thoughts, or just say it.",
   // iPhone and iPad: "Add to Home Screen" opens it like an app.
   appleWebApp: { capable: true, title: "Pen & Paper", statusBarStyle: "default" },
 };

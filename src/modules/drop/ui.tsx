@@ -5,18 +5,22 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Fly } from "@/components/canvas/fly";
 import { FreeCanvas, type Placement } from "@/components/canvas/free-canvas";
+import { InkLayer, type InkStroke } from "@/components/canvas/ink-layer";
+import { PaperText } from "@/components/canvas/paper-text";
 import { PaperSurface } from "@/components/canvas/paper-surface";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { uid } from "@/lib/mutations";
 import { viewKey } from "@/components/canvas/view";
 import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from "./chrome";
-import { paperTitle, type DropPaper, type PaperMeta, type Thought } from "./logic";
+import { isDrop, paperTitle, type DropPaper, type PaperMeta, type Stroke, type Thought, type ThoughtKind } from "./logic";
 import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { PaperBar, SearchButton, UNDO_PAPER_KEY } from "./papers-ui";
 import { ResurfaceCard } from "./resurface-card";
 import { TonightButton } from "./tonight-button";
 import { importTryPaper } from "./try-import";
+import { Toolbar, type Tool } from "./tools";
 import { useCanvasView, ViewControls } from "./use-view";
+import { useVoice } from "./use-voice";
 import { PenButton, Writer } from "./writer";
 
 /* ---------- A paper ---------- */
@@ -95,6 +99,15 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
   // Crumples waiting out their undo window; sent at once if the page goes away.
   const waiting = useRef(new Map<string, () => void>());
   const tz = useViewerTz();
+  // The tool in hand (desktop canvas): Select, Text, Draw or the eraser.
+  const [tool, setTool] = useState<Tool>("select");
+  // Text just placed with the Text tool, open for writing.
+  const [writingText, setWritingText] = useState<string | null>(null);
+  const [freshInk, setFreshInk] = useState<Set<string>>(new Set());
+  const [spoken, setSpoken] = useState<{ words: string; n: number } | null>(null);
+  // Text placed but not written in yet: never sent until it has words.
+  const unsaved = useRef(new Set<string>());
+  const strokes = paper.strokes ?? [];
 
   /** Queues a save in the background; on failure, undoes it on screen and says so. */
   const save = useCallback((work: () => Promise<unknown>, onFail?: () => void) => {
@@ -229,9 +242,23 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
 
+  // Hold Space to speak: the words land as text on the paper, where the pointer
+  // is (or into the text being written). A tap of Space still opens the writer.
+  const voiceAt = useRef<{ x: number; y: number } | null>(null);
+  const heard = useRef<(words: string) => void>(() => {});
+  const voice = useVoice((words) => heard.current(words), { hold: true });
+  const voiceRef = useRef(voice);
+  useEffect(() => {
+    voiceRef.current = voice;
+  });
+  const voiceFailed = voice.state.kind === "failed" ? voice.state.message : "";
+
   // Keyboard first: Space, or simply typing, opens the writer from anywhere on
   // the page (the first letter goes into it), so a thought never needs the mouse.
+  // Holding Space speaks instead; 1–4 pick a tool; Esc puts the tool down.
   useEffect(() => {
+    const HOLD_MS = 280;
+    let held: { timer: ReturnType<typeof setTimeout>; talking: boolean } | null = null;
     const open = (first?: string) => {
       if (first) setDraft((d) => d + first);
       setWriting(true);
@@ -240,21 +267,64 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
-      if (e.key === "Escape") return;
+      if (e.key === "Escape") {
+        setTool("select");
+        return;
+      }
       // A selected thought keeps its own keys (Enter edit, Delete crumple).
       if (el?.closest("[data-keys]") && ["delete", "backspace"].includes(e.key.toLowerCase())) return;
+      const pick = ["1", "2", "3", "4"].indexOf(e.key);
+      if (pick >= 0 && window.matchMedia("(min-width: 640px)").matches) {
+        e.preventDefault();
+        setTool((["select", "text", "draw", "erase"] as Tool[])[pick]);
+        return;
+      }
       if (e.key === " ") {
         // A focused button or link keeps Space for itself.
         if (el?.closest("button, a, summary")) return;
         e.preventDefault();
-        open();
+        if (e.repeat || held) return;
+        // A tap opens the writer; held, it listens (where the browser can).
+        if (!voiceRef.current.supported) {
+          open();
+          return;
+        }
+        held = {
+          talking: false,
+          timer: setTimeout(() => {
+            if (!held) return;
+            held.talking = true;
+            voiceAt.current = spot.current;
+            voiceRef.current.start();
+          }, HOLD_MS),
+        };
       } else if (e.key.length === 1) {
         e.preventDefault();
         open(e.key);
       }
     };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.key !== " " || !held) return;
+      clearTimeout(held.timer);
+      if (held.talking) voiceRef.current.stop();
+      else open();
+      held = null;
+    };
+    // Switching away mid-hold: stop listening and keep what was heard.
+    const onBlur = () => {
+      if (!held) return;
+      clearTimeout(held.timer);
+      if (held.talking) voiceRef.current.stop();
+      held = null;
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", onBlur);
+    };
   }, []);
 
   const closeWriter = () => {
@@ -290,9 +360,9 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
   };
 
   /** Puts a new thought on the paper and saves it; a picture and a spot are optional. */
-  const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number } }) => {
+  const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number }; kind?: ThoughtKind; id?: string }) => {
     const thought: Thought = {
-      id: uid(),
+      id: extra.id ?? uid(),
       text: value,
       status: "open",
       shape: Math.floor(Math.random() * 6),
@@ -301,6 +371,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
       x: extra.x ?? null,
       y: extra.y ?? null,
       image: extra.image ?? null,
+      kind: extra.kind ?? "note",
     };
     update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setFresh((f) => new Set(f).add(thought.id));
@@ -309,7 +380,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
       () =>
         call("/api/drop/thoughts", {
           method: "POST",
-          body: JSON.stringify({ paperId, id: thought.id, text: thought.text, shape: thought.shape, image: thought.image, x: thought.x, y: thought.y }),
+          body: JSON.stringify({ paperId, id: thought.id, text: thought.text, shape: thought.shape, image: thought.image, x: thought.x, y: thought.y, kind: thought.kind }),
         }),
       () => {
         update((p) => ({ ...p, thoughts: p.thoughts.filter((t) => t.id !== thought.id) }));
@@ -470,9 +541,85 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
   };
   const arranged = paper.thoughts.some((t) => t.x !== null);
 
+  /** Text tool: a click on bare paper puts the pen down there (the sheet keeps `spot` on the pointer). */
+  const placeText = () => {
+    const at = spot.current;
+    if (!at) return;
+    const id = uid();
+    // Shown at once and saved when the first words are written (an empty one is never saved).
+    const thought: Thought = { id, text: "", status: "open", shape: 0, createdAt: new Date().toISOString(), doneAt: null, x: at.x, y: at.y, image: null, kind: "text" };
+    unsaved.current.add(id);
+    update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
+    setWritingText(id);
+  };
+
+  /** Written text saved for the first time, or edited. */
+  const writeText = (id: string, value: string) => {
+    const t = live.current.thoughts.find((x) => x.id === id);
+    if (!t) return;
+    if (unsaved.current.has(id) || !t.text) {
+      unsaved.current.delete(id);
+      update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) }));
+      add(value, { kind: "text", x: t.x, y: t.y, id });
+      return;
+    }
+    patch(id, { text: value });
+  };
+
+  // What Space-held speech does with the words: into the text being written, or new text where the pointer was.
+  useEffect(() => {
+    heard.current = (words) => {
+      // Text open for writing: the words go into it, and the person saves it as usual.
+      if (writingText) {
+        setSpoken((sp) => ({ words, n: (sp?.n ?? 0) + 1 }));
+        return;
+      }
+      const at = voiceAt.current;
+      add(words, { kind: "text", x: at?.x ?? null, y: at?.y ?? null });
+    };
+  });
+
+  /** Rubs out written text: a blank one just goes; a saved one is crumpled (with Undo). */
+  const rubText = (id: string) => {
+    const t = live.current.thoughts.find((x) => x.id === id);
+    if (!t) return;
+    if (!t.text) update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) }));
+    else crumple(id);
+  };
+
+  /** Ink put down with the Draw tool. */
+  const draw = (stroke: InkStroke) => {
+    const s: Stroke = { ...stroke, id: uid() };
+    update((p) => ({ ...p, strokes: [...(p.strokes ?? []), s] }));
+    briefly(setFreshInk, [s.id], 500);
+    void save(
+      () => call("/api/drop/strokes", { method: "POST", body: JSON.stringify({ paperId, ...s }) }),
+      () => update((p) => ({ ...p, strokes: (p.strokes ?? []).filter((x) => x.id !== s.id) })),
+    );
+  };
+
+  /** Rubbed out with the eraser, with a moment to take it back. */
+  const erase = (id: string) => {
+    const s = (live.current.strokes ?? []).find((x) => x.id === id);
+    if (!s) return;
+    const gone = () => update((p) => ({ ...p, strokes: (p.strokes ?? []).filter((x) => x.id !== id) }));
+    const back = () => update((p) => ({ ...p, strokes: [...(p.strokes ?? []).filter((x) => x.id !== id), s] }));
+    gone();
+    void save(() => call(`/api/drop/strokes/${id}?paper=${paperId}`, { method: "DELETE" }), back);
+    setToast({
+      text: "Rubbed out",
+      undo: () => {
+        back();
+        void save(() => call(`/api/drop/strokes/${id}`, { method: "PATCH", body: JSON.stringify({ paperId }) }), gone);
+        setToast(null);
+      },
+    });
+  };
+
   const handlers = (t: Thought) => ({
     onEdit: (v: string) => patch(t.id, { text: v }),
-    onToggle: () => patch(t.id, { status: t.status === "done" ? "open" : "done" }),
+    // A drop (a picture) isn't a to-do: no strike, so a stray double-click or tick can't cross it out.
+    onToggle: isDrop(t) ? undefined : () => patch(t.id, { status: t.status === "done" ? "open" : "done" }),
     onDelete: () => crumple(t.id),
   });
 
@@ -491,6 +638,21 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
     />
   );
 
+  const textItem = (t: Thought, stream = false) => (
+    <PaperText
+      text={t.text}
+      seed={t.createdAt}
+      fresh={fresh.has(t.id)}
+      editing={writingText === t.id && !stream}
+      interim={writingText === t.id ? voice.interim : ""}
+      spoken={writingText === t.id ? spoken : null}
+      leaving={leaving.get(t.id) ?? null}
+      onEdit={(v) => writeText(t.id, v)}
+      onDelete={() => rubText(t.id)}
+      onDone={() => setWritingText((w) => (w === t.id ? null : w))}
+    />
+  );
+
   return (
     <div ref={page} className="canvas-surface canvas-page flex min-h-dvh flex-col bg-bg">
       <DropHeader
@@ -506,62 +668,93 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
           </>
         }
       />
+      <Toolbar tool={tool} onTool={setTool} listening={voice.state.kind === "recording"} />
       <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-3 pb-28 sm:px-8">
         <ResurfaceCard />
+        {/* On a phone: a vertical stream of the notes. */}
         {onSheet.length === 0 ? (
-          <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 items-center justify-center sm:min-h-[420px]`}>
+          <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 items-center justify-center sm:hidden`}>
             <span className="flex flex-col items-center gap-3 py-16 text-center">
               <span className="font-hand text-[34px] font-bold">A fresh sheet.</span>
-              <span className="text-mute">Press Space, or tap Write…, and put it down.</span>
+              <span className="text-mute">Tap Write…, and put it down.</span>
             </span>
           </PaperSurface>
         ) : (
-          <>
-            <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 flex-col gap-3 sm:hidden`}>
-              {onSheet.map((it) => (
-                <Fly key={it.id} from={flights.get(it.id)}>
-                  <div data-item={it.id}>
-                    {bubble(it.thought, { stream: true })}
-                  </div>
-                </Fly>
-              ))}
-            </PaperSurface>
-            {/* The page is the canvas: this runs the full width, and notes can go anywhere on it. */}
-            <div ref={origin} className="relative -mx-4 max-sm:hidden sm:-mx-8">
-              <div className="pointer-events-none absolute inset-x-0 top-2 z-10 px-4 sm:px-8">
-                <span className="mx-auto flex w-full max-w-[1056px] items-center justify-end gap-1 px-2">
-                  {arranged && (
-                    <button type="button" onClick={tidy} className="pointer-events-auto rounded-lg px-2.5 py-1 text-[13px] font-medium text-mute hover:bg-soft hover:text-ink">
-                      Tidy up
-                    </button>
-                  )}
-                </span>
-              </div>
-              <FreeCanvas
-                bare
-                view={view}
-                onPanBy={panBy}
-                minHeight="calc(100dvh - 12rem)"
-                label={paperTitle(initial)}
-                items={onSheet}
-                onArrange={onArrange}
-                spotRef={spot}
-                render={(it) => (
-                  <Fly from={flights.get(it.id)}>
-                    <div data-item={it.id}>
-                      {bubble(it.thought, { movable: true })}
-                    </div>
-                  </Fly>
-                )}
-              />
-            </div>
-          </>
+          <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 flex-col gap-3 sm:hidden`}>
+            {onSheet.map((it) => (
+              <Fly key={it.id} from={flights.get(it.id)}>
+                <div data-item={it.id}>{it.thought.kind === "text" ? textItem(it.thought, true) : bubble(it.thought, { stream: true })}</div>
+              </Fly>
+            ))}
+          </PaperSurface>
         )}
+        {/* The page is the canvas: this runs the full width, and anything can go anywhere on it. */}
+        <div
+          ref={origin}
+          onPointerDown={(e) => {
+            // Text tool: a click on bare paper puts the pen down right there.
+            if (tool !== "text" || e.button !== 0 || (e.target as HTMLElement).closest("[data-note], button, a, textarea")) return;
+            e.preventDefault();
+            placeText();
+          }}
+          // Text, Draw and the eraser keep a left press for themselves (the middle button or a scroll still pans).
+          data-no-pan={tool === "select" ? undefined : ""}
+          className={`relative -mx-4 flex-1 max-sm:hidden sm:-mx-8 ${tool === "text" ? "tool-text" : tool === "draw" ? "tool-draw" : tool === "erase" ? "tool-erase" : ""}`}
+        >
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-10 px-4 sm:px-8">
+            <span className="mx-auto flex w-full max-w-[1056px] items-center justify-end gap-1 px-2">
+              {arranged && tool === "select" && (
+                <button type="button" onClick={tidy} className="pointer-events-auto rounded-lg px-2.5 py-1 text-[13px] font-medium text-mute hover:bg-soft hover:text-ink">
+                  Tidy up
+                </button>
+              )}
+            </span>
+          </div>
+          {onSheet.length === 0 && strokes.length === 0 && (
+            <span className="pointer-events-none absolute inset-x-0 top-[22vh] flex flex-col items-center gap-3 text-center">
+              <span className="font-hand text-[40px] font-bold">A fresh sheet.</span>
+              <span className="text-mute">
+                {tool === "text"
+                  ? "Click anywhere and write. Hold Space to speak."
+                  : tool === "draw"
+                    ? "Draw anything. A line from one thought to another ties them."
+                    : "Press Space to write, hold it to speak, or pick a tool above."}
+              </span>
+            </span>
+          )}
+          <FreeCanvas
+            bare
+            view={view}
+            onPanBy={panBy}
+            minHeight="calc(100dvh - 12rem)"
+            label={paperTitle(initial)}
+            items={onSheet}
+            onArrange={onArrange}
+            spotRef={spot}
+            dragEnabled={tool === "select" || tool === "text"}
+            overlay={({ boxes, zoom }) => (
+              <InkLayer
+                strokes={strokes}
+                boxes={boxes}
+                zoom={zoom}
+                mode={tool === "draw" ? "draw" : tool === "erase" ? "erase" : null}
+                fresh={freshInk}
+                onDraw={draw}
+                onErase={erase}
+              />
+            )}
+            render={(it) => (
+              <Fly from={flights.get(it.id)}>
+                <div data-item={it.id}>{it.thought.kind === "text" ? textItem(it.thought) : bubble(it.thought, { movable: true })}</div>
+              </Fly>
+            )}
+          />
+        </div>
 
         <p className="text-center text-[13px] text-mute sm:hidden">Tap to edit · swipe right to strike, left to crumple</p>
       </main>
 
-      {onSheet.length > 0 && <ViewControls view={view} onZoom={(f) => zoomBy(f)} onReset={reset} onFit={fit} />}
+      {(onSheet.length > 0 || strokes.length > 0) && <ViewControls view={view} onZoom={(f) => zoomBy(f)} onReset={reset} onFit={fit} />}
 
       <PenButton ref={penButton} hidden={writing} onOpen={() => setWriting(true)} />
       {writing && mounted && (
@@ -575,9 +768,9 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
         </div>
       )}
 
-      {(toast || error) && (
-        <div role={error ? "alert" : "status"} className="fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-bg">
-          <span className="flex-1">{error || toast?.text}</span>
+      {(toast || error || voiceFailed) && (
+        <div role={error || voiceFailed ? "alert" : "status"} className="fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-bg">
+          <span className="flex-1">{error || voiceFailed || toast?.text}</span>
           {!error && toast?.action && (
             <button
               type="button"
@@ -600,6 +793,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
               onClick={() => {
                 setError("");
                 setToast(null);
+                voice.cancel();
               }}
               className="font-semibold"
             >

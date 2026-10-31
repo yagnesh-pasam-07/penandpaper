@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/drop",
     name: "Pen & Paper",
     short_name: "Pen & Paper",
-    description: "Drop every thought onto paper.",
+    description: "Pen and paper, digitally.",
     start_url: "/drop",
     scope: "/",
     display: "standalone",

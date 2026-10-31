@@ -4,6 +4,7 @@ import { Logo, ThemeToggle } from "@/components/ui";
 import { Everywhere, Fonts, HeroGallery, Highlight } from "./everywhere";
 import { GitHubButton, OpenSource } from "./github";
 import { PainPoints } from "./pain-points";
+import { TwoWays } from "./two-ways";
 import { TryIt } from "./try-it";
 
 const START = "/signup?next=/drop";
@@ -49,7 +50,7 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
             <br />
             <span className="highlight">Put it down.</span>
           </h1>
-          <p className="max-w-[460px] text-[18px] leading-normal text-mute sm:text-[21px]">A paper for the thoughts you don&apos;t have time to write. Type it, paste it, or just say it.</p>
+          <p className="max-w-[520px] text-[18px] leading-normal text-mute sm:text-[21px]">Pen and paper, digitally. Write anywhere, draw between your thoughts, or just say it.</p>
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-6">
             <Link href={START} className={`${btn.primary} h-[56px] px-8 text-[17px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text`}>
               Start a paper
@@ -62,6 +63,8 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
         <div className="mx-auto w-full max-w-[1320px] pb-8">
           <HeroGallery />
         </div>
+
+        <TwoWays />
 
         <PainPoints />
 

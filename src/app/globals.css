@@ -482,3 +482,28 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .shot-fade { animation: none; }
 }
+
+/* Canvas tools: the listening dot while Space is held, and ink drawing on. */
+@keyframes voice-dot {
+  0%, 100% { opacity: 1; scale: 1; }
+  50% { opacity: 0.45; scale: 0.7; }
+}
+.voice-dot { animation: voice-dot 1.1s ease-in-out infinite; }
+@keyframes ink-draw {
+  from { stroke-dashoffset: var(--len); }
+  to { stroke-dashoffset: 0; }
+}
+.ink-draw { stroke-dasharray: var(--len); animation: ink-draw 380ms ease-out both; }
+/* Words written straight on the paper: no card, just ink. */
+.paper-text { cursor: text; }
+.paper-text:hover { outline: 1.5px dashed color-mix(in srgb, var(--ink) 18%, transparent); outline-offset: 6px; border-radius: 4px; }
+.tool-text, .tool-text [data-note] { cursor: text; }
+.tool-draw, .tool-draw * { cursor: crosshair !important; }
+.tool-erase, .tool-erase * { cursor: cell !important; }
+@media (prefers-reduced-motion: reduce) {
+  .voice-dot, .ink-draw { animation: none; }
+}
+.fade-away { animation: fade-out 320ms ease-in forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .fade-away { animation: none; opacity: 0; }
+}
