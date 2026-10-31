@@ -36,6 +36,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - Minimal and calm: one idea per screen, quiet controls, no clutter. Menus are short and grouped.
 - The paper header sits above the canvas; notes slide under it, never over it.
 - Keys are shown in the visitor's own system (⌥ on Mac, Alt on Windows).
+- Logo: a ruled sheet with the red fountain-pen nib, in `public/brand/` (see its README). The favicon is the nib alone.
 
 ### Tech
 - Next.js 16 on Vercel (`sin1`), Neon Postgres, Drizzle, Better Auth.
@@ -59,6 +60,10 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 ---
 
 ## Decision log
+
+### 2026-10-31 11:20 IST · design · A Pen & Paper logo for the repo, and an open-source README header
+Why: the repo should read like an open-source project at a glance, the way RepoMind's does: a logo, a one-line pitch, links and badges at the top. The logo is a ruled sheet with the app's red fountain-pen nib finishing a line, in red, light and dark tiles plus bare marks (`public/brand/`), and `docs/social-preview.png` for link cards. The app's own favicon and install icons are unchanged. The README is now short and written for beginners (what it is, screenshots, a five-step quick start, how to contribute); the full feature and API reference moved unchanged to `docs/GUIDE.md`.
+Replaces: nothing
 
 ### 2026-10-30 11:30 IST · tech · Email through Brevo or Resend, whichever is set
 Why: Resend's free plan only emails anyone after you verify a domain you own, and the site is on vercel.app. Brevo's free plan (300 a day) sends to anyone after confirming one sender address. One HTTPS call, no new package.
