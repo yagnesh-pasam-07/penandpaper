@@ -73,7 +73,7 @@ export function Toolbar({ tool, onTool, listening }: { tool: Tool; onTool: (t: T
       role="toolbar"
       aria-label="Canvas tools"
       data-no-pan=""
-      className="fixed top-[68px] left-1/2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-2xl border border-line bg-sheet p-1 shadow-[0_10px_30px_-16px_var(--shadow)] max-sm:hidden"
+      className="fixed top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-2xl border border-line bg-sheet p-1 shadow-[0_10px_30px_-16px_var(--shadow)] max-sm:hidden"
     >
       {TOOLS.map((d, i) => {
         const on = tool === d.tool;

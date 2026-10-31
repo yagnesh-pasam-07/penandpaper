@@ -43,7 +43,8 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **Papers:** you make as many as you like; captures land on the paper you touched last. Library and search across all of them.
 - **Two kinds of thought:** a **to-do** (a note with words, links, videos) can be struck with the red pen, is reviewed in Tonight's paper and comes back in the morning. A **drop** (anything with a picture, and text written straight on the paper) is kept just to look at: no tick, no strike, not in Tonight's paper or the morning resurface. It can still be moved, edited, zoomed and crumpled. Which kind is decided by what it is, not chosen (`isDrop` in `src/modules/drop/logic.ts`).
 - **Canvas tools** (desktop, a bar at the top; keys 1–4, Esc back to Select): **Select** (move, edit, arrange; drag bare paper to pan), **Text** (click anywhere and write straight on the paper: no card, Enter is a new line, Esc or a click away puts the pen down; written text is a drop), **Draw** (freehand ink; a line that starts on one thing and ends on another is a **connector** with an arrowhead and follows both when they move; a line that starts and ends on the same thing is a mark on it), **Eraser** (press or rub over a line, with Undo). Letters are left for typing, which still opens the writer. The phone keeps the simple stream.
-- **Voice:** tap Space to open the writer; **hold Space** to speak, and the words land as text where the pointer is (or into the text being written). Uses the browser's own recogniser, no key.
+- **Voice, hold to talk** (like Claude's CLI): in any text box (text on the paper, the writer) a tap of Space is a space; **held**, it listens until you let go, takes back the spaces the key typed, shows the words as they're heard and puts them in at the cursor. A **mic** sits beside the cursor for speaking without holding. On bare paper, tap Space for the writer; hold it and the words land as text where the pointer is. Uses the browser's own recogniser (no key), listening continuously while held so a pause doesn't cut it off.
+- **The paper has no header bar:** the logo and paper name float top-left, search, Library and the account top-right, the tools top-centre, and the canvas runs to the top of the screen. Other pages (library, settings, rewind) keep the bar.
 - **Capture surfaces:** the web canvas, the quick box (`/capture`), phone share (`/share`), the Chrome & Edge extension, the Mac menu-bar app. Each tags its thoughts by id prefix (`ext-`, `mac-`, `cap-`, `share-`), which Studio counts.
 - **Extension:** highlight on any site and click the icon (or ⌥⇧P / Alt+Shift+P): the words, the first picture in the highlight and the page address go straight to the paper. No window.
 - **Language:** English only in the interface and for voice, for now. Thoughts in any script still display correctly.
@@ -116,12 +117,17 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 | Feature | State | Ticket |
 | --- | --- | --- |
+| Hold Space to talk in any text box (like Claude's CLI), a mic by the cursor, no header bar on the paper | Shipped | [#33](https://github.com/yagnesh-pasam-07/penandpaper/issues/33) |
 | Canvas tools: Select, Text, Draw (with connectors), Eraser; hold Space to speak; "pen & paper, digitally" homepage | Shipped | [#31](https://github.com/yagnesh-pasam-07/penandpaper/issues/31) |
 | Drops vs to-dos: a picture is a drop, with no tick or strike, and stays out of the review | Shipped | [#29](https://github.com/yagnesh-pasam-07/penandpaper/issues/29) |
 
 ---
 
 ## Decision log
+
+### 2026-10-31 15:00 IST · product · Hold Space to talk inside text, a mic by the cursor; the paper loses its header bar
+Why: holding Space while writing text did nothing but move the cursor (the text box had the keyboard and typed spaces), and there was no way to speak into text being written. Now every text box works like Claude's CLI: a tap is a space, held (350 ms) it listens until released, the spaces the key repeat typed are taken back, and the words go in at the cursor; a mic button beside it does the same without holding. The recogniser listens continuously while held, so a pause mid-sentence doesn't end it (more of what was said gets through). The header bar on the paper is replaced by floating islands so the canvas runs to the top. Decision tree: it serves the loop (step 1: faster capture); no new setting (step 2); nothing about what a thought is changes (step 3); no migration (step 4).
+Replaces: 2026-10-31 13:30 · hold Space speaks only on bare paper
 
 ### 2026-10-31 13:30 IST · product · Canvas tools: Select, Text, Draw (connectors) and an eraser; hold Space to speak
 Why: the canvas only took notes, but thinking on paper is also writing in the margins and drawing arrows between ideas. Decision tree: it serves the loop (step 1: faster capture, clearer thinking); three tools plus an eraser, not a shapes palette, and a connector is just a line drawn from one thing to another, with no separate Connect tool (step 2: calm by default); text written on the paper is a drop, never a to-do, and lines are never reviewed, so Tonight's paper, the resurface, the 9 PM email and strike all skip them, enforced on the server (step 3); one add-only migration: `drop_thoughts.kind` (default `note`) and a new `drop_strokes` table (step 4); erasing keeps a line 7 days with an Undo, like crumpling (step 5). Tool keys are 1–4, not letters, because typing a letter already opens the writer. Hold Space (280 ms) speaks with the browser's recogniser; a tap still opens the writer.

@@ -160,3 +160,13 @@ export function WhenIcon({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+/** A small microphone, for "speak a thought". */
+export function MicIcon({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={1.7} {...stroke}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" />
+    </svg>
+  );
+}

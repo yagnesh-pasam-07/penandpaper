@@ -1,11 +1,12 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { PenIcon } from "@/components/icons";
+import { MicIcon, PenIcon } from "@/components/icons";
 import { shortcutText, usePlatform } from "@/lib/platform";
 import { imageFiles, shrinkImage, type Picture } from "./image";
 import { MAX_THOUGHT } from "./logic";
 import { SPEECH_LANGS, parseSpeechLang } from "./speech";
+import { useHoldToTalk } from "./use-hold-to-talk";
 import { useVoice } from "./use-voice";
 import { formatElapsed, insertAtCursor } from "./voice";
 
@@ -101,7 +102,7 @@ export function Writer({
       area.current?.setSelectionRange(at.cursor, at.cursor);
     });
   };
-  const voice = useVoice(insertSpoken);
+  const voice = useVoice(insertSpoken, { hold: true });
   const listening = voice.state.kind === "recording";
   const working = voice.state.kind === "transcribing";
   /** The text on screen: while the browser is still working out the words, they show at the cursor as a preview. */
@@ -118,6 +119,21 @@ export function Writer({
     }
     voice.toggle();
   };
+  // Hold Space to talk, like Claude's CLI: a tap is a space, held it listens until you let go.
+  const talk = useHoldToTalk(
+    {
+      ...voice,
+      start: () => {
+        const el = area.current;
+        const here = { start: el?.selectionStart ?? draftRef.current.length, end: el?.selectionEnd ?? draftRef.current.length };
+        anchor.current = here;
+        setAnchorAt(here);
+        voice.start();
+      },
+    },
+    area,
+    (fn) => onDraft(fn(draftRef.current)),
+  );
 
   /** Pastes or picks a picture onto this thought (the first, if there are several). */
   const attach = async (files: File[]) => {
@@ -196,7 +212,7 @@ export function Writer({
             rows={Math.min(6, Math.max(2, preview.split("\n").length, Math.ceil(preview.length / 44)))}
             aria-label="Thought"
             enterKeyHint="send"
-            placeholder="What's on your mind?"
+            placeholder="What's on your mind? Hold Space to talk."
             onChange={(e) => onDraft(e.target.value)}
             onPaste={(e) => {
               const files = imageFiles(e.clipboardData);
@@ -206,7 +222,9 @@ export function Writer({
               e.stopPropagation();
               void attach(files);
             }}
+            onKeyUp={talk.onKeyUp}
             onKeyDown={(e) => {
+              if (talk.onKeyDown(e)) return;
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 send();
@@ -319,12 +337,12 @@ export function Writer({
                   listening
                     ? "Stop recording"
                     : voice.engine === "speech"
-                      ? `Speak a thought (${shortcutText(["⌘", "⇧", "M"], platform)}). Chrome's built-in recogniser sends your voice to Google; Safari uses Apple.`
-                      : `Speak a thought (${shortcutText(["⌘", "⇧", "M"], platform)})`
+                      ? `Speak a thought: click, or hold Space (${shortcutText(["⌘", "⇧", "M"], platform)}). Chrome's built-in recogniser sends your voice to Google; Safari uses Apple.`
+                      : `Speak a thought: click, or hold Space (${shortcutText(["⌘", "⇧", "M"], platform)})`
                 }
                 className={`flex size-9 items-center justify-center rounded-lg disabled:opacity-40 ${listening ? "bg-red text-on-red" : "hover:bg-soft hover:text-ink"}`}
               >
-                {listening ? <StopIcon /> : <MicIcon />}
+                {listening ? <StopIcon /> : <MicIcon size={18} />}
               </button>
             )}
             <button type="button" onClick={() => picker.current?.click()} aria-label="Add a picture" title="Add a picture" className="flex size-9 items-center justify-center rounded-lg hover:bg-soft hover:text-ink">
@@ -340,16 +358,6 @@ export function Writer({
         </div>
       </div>
     </div>
-  );
-}
-
-/** A small microphone, for "speak a thought". */
-function MicIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" />
-    </svg>
   );
 }
 

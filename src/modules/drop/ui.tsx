@@ -104,7 +104,6 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
   // Text just placed with the Text tool, open for writing.
   const [writingText, setWritingText] = useState<string | null>(null);
   const [freshInk, setFreshInk] = useState<Set<string>>(new Set());
-  const [spoken, setSpoken] = useState<{ words: string; n: number } | null>(null);
   // Text placed but not written in yet: never sent until it has words.
   const unsaved = useRef(new Set<string>());
   const strokes = paper.strokes ?? [];
@@ -566,14 +565,10 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
     patch(id, { text: value });
   };
 
-  // What Space-held speech does with the words: into the text being written, or new text where the pointer was.
+  // What Space-held speech on bare paper does with the words: new text where the pointer was.
+  // (Text being written listens for itself: see PaperText.)
   useEffect(() => {
     heard.current = (words) => {
-      // Text open for writing: the words go into it, and the person saves it as usual.
-      if (writingText) {
-        setSpoken((sp) => ({ words, n: (sp?.n ?? 0) + 1 }));
-        return;
-      }
       const at = voiceAt.current;
       add(words, { kind: "text", x: at?.x ?? null, y: at?.y ?? null });
     };
@@ -645,7 +640,6 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
       fresh={fresh.has(t.id)}
       editing={writingText === t.id && !stream}
       interim={writingText === t.id ? voice.interim : ""}
-      spoken={writingText === t.id ? spoken : null}
       leaving={leaving.get(t.id) ?? null}
       onEdit={(v) => writeText(t.id, v)}
       onDelete={() => rubText(t.id)}
@@ -656,6 +650,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
   return (
     <div ref={page} className="canvas-surface canvas-page flex min-h-dvh flex-col bg-bg">
       <DropHeader
+        floating
         me={me}
         title={<PaperBar paper={{ id: paperId, name: initial.name, createdAt: initial.createdAt, archivedAt: initial.archivedAt }} papers={papers} />}
         right={
@@ -669,7 +664,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
         }
       />
       <Toolbar tool={tool} onTool={setTool} listening={voice.state.kind === "recording"} />
-      <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-3 pb-28 sm:px-8">
+      <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-[72px] pb-28 sm:px-8 sm:pt-[76px]">
         <ResurfaceCard />
         {/* On a phone: a vertical stream of the notes. */}
         {onSheet.length === 0 ? (
