@@ -239,7 +239,16 @@ export async function updateThought(userId: string, paperId: string, id: string,
       ...(patch.text !== undefined ? { text: patch.text } : {}),
       ...(patch.status ? { status: patch.status, doneAt: patch.status === "done" ? sql`now()` : null } : {}),
     })
-    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt)))
+    .where(
+      and(
+        eq(dropThoughts.id, id),
+        eq(dropThoughts.userId, userId),
+        eq(dropThoughts.paperId, paperId),
+        isNull(dropThoughts.crumpledAt),
+        // A drop (a picture) is never struck: see isDrop. Its caption can still be edited.
+        patch.status ? isNull(dropThoughts.image) : undefined,
+      ),
+    )
     .returning();
   if (!row) return null;
   await touch(paperId);

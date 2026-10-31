@@ -63,6 +63,15 @@ export const CRUMPLE_KEEP_DAYS = 7;
 
 export { firstLink, firstYoutube, isOnlyYoutube, linkify, youtubeId, type TextPart } from "@/lib/linkify";
 
+/**
+ * A drop is kept to look at, not to do: a picture (with or without a caption).
+ * It can't be struck, and Tonight's paper and the morning resurface pass it by.
+ * Everything else is a to-do.
+ */
+export function isDrop(t: { image?: string | null }): boolean {
+  return Boolean(t.image);
+}
+
 /** What a thought reads as in lists: its words, or "Image" for a picture with no caption. */
 export function thoughtLabel(t: Pick<Thought, "text" | "image">): string {
   return t.text || (t.image ? "Image" : "");

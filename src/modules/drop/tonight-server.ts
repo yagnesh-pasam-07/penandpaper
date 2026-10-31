@@ -34,10 +34,11 @@ export type TonightCounts = { date: string; total: number; reviewed: number; rem
 
 const iso = (d: Date | string) => new Date(d).toISOString();
 
-/** Thoughts dropped on this local day, on papers that are not deleted (archived ones count), still in the review. */
+/** To-dos dropped on this local day, on papers that are not deleted (archived ones count), still in the review. Drops (pictures) aren't reviewed. */
 function inReviewToday(userId: string, start: Date, end: Date) {
   return and(
     eq(dropThoughts.userId, userId),
+    isNull(dropThoughts.image),
     gte(dropThoughts.createdAt, start.toISOString()),
     lt(dropThoughts.createdAt, end.toISOString()),
     isNull(dropPapers.deletedAt),
@@ -94,7 +95,7 @@ async function countsFor(userId: string, tz: string, date: string): Promise<{ su
     })
     .from(dropThoughts)
     .innerJoin(dropPapers, eq(dropPapers.id, dropThoughts.paperId))
-    .where(and(eq(dropThoughts.userId, userId), gte(dropThoughts.createdAt, start.toISOString()), lt(dropThoughts.createdAt, end.toISOString()), isNull(dropPapers.deletedAt)));
+    .where(and(eq(dropThoughts.userId, userId), isNull(dropThoughts.image), gte(dropThoughts.createdAt, start.toISOString()), lt(dropThoughts.createdAt, end.toISOString()), isNull(dropPapers.deletedAt)));
   return { summary: { struck: row?.struck ?? 0, kept: row?.kept ?? 0, crumpled: row?.crumpled ?? 0 }, remaining: row?.remaining ?? 0 };
 }
 
@@ -143,7 +144,7 @@ export async function reviewThought(userId: string, thoughtId: string, action: D
     .select({ id: dropThoughts.id, createdAt: dropThoughts.createdAt, status: dropThoughts.status, reviewedAt: dropThoughts.reviewedAt, crumpledAt: dropThoughts.crumpledAt })
     .from(dropThoughts)
     .innerJoin(dropPapers, eq(dropPapers.id, dropThoughts.paperId))
-    .where(and(eq(dropThoughts.id, thoughtId), eq(dropThoughts.userId, userId), isNull(dropPapers.deletedAt)));
+    .where(and(eq(dropThoughts.id, thoughtId), eq(dropThoughts.userId, userId), isNull(dropThoughts.image), isNull(dropPapers.deletedAt)));
   if (!t) return "not_found";
   if (!isInReview(t)) return "not_reviewable";
 

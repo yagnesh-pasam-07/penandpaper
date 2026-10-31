@@ -11,3 +11,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Product memory: PRODUCT.md
 
 Every change that adds or removes a feature, or makes a product, design, tech, security or infra decision, adds one entry to the **Decision log** in `PRODUCT.md` (date and IST time, area, the decision, why, what it replaces) and updates **Current truth** if it changes what is true now. Same commit as the code. Never edit or delete an old entry; supersede it with a new one. Read `PRODUCT.md` before changing how the product works.
+
+Every new feature also: walks the **Decision tree** in `PRODUCT.md` (and cites the steps in its log entry), gets a GitHub issue (`gh issue create --label enhancement`), and adds a row to **Feature tickets** linking that issue.

@@ -19,6 +19,7 @@ import {
   searchTerm,
   snippetAround,
   splitMatch,
+  isDrop,
   thoughtLabel,
   youtubeId,
   type DigestRow,
@@ -231,5 +232,13 @@ describe("appearance", () => {
     expect(resolveTheme("system", false)).toBe("light");
     expect(resolveTheme("light", true)).toBe("light");
     expect(resolveTheme("dark", false)).toBe("dark");
+  });
+});
+
+describe("drops and to-dos", () => {
+  it("a picture is a drop, words are a to-do", () => {
+    expect(isDrop({ image: "data:image/webp;base64,AA" })).toBe(true);
+    expect(isDrop({ image: null })).toBe(false);
+    expect(isDrop({})).toBe(false);
   });
 });

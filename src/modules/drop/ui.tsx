@@ -10,7 +10,7 @@ import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { uid } from "@/lib/mutations";
 import { viewKey } from "@/components/canvas/view";
 import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from "./chrome";
-import { paperTitle, type DropPaper, type PaperMeta, type Thought } from "./logic";
+import { isDrop, paperTitle, type DropPaper, type PaperMeta, type Thought } from "./logic";
 import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { PaperBar, SearchButton, UNDO_PAPER_KEY } from "./papers-ui";
 import { ResurfaceCard } from "./resurface-card";
@@ -472,7 +472,8 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
 
   const handlers = (t: Thought) => ({
     onEdit: (v: string) => patch(t.id, { text: v }),
-    onToggle: () => patch(t.id, { status: t.status === "done" ? "open" : "done" }),
+    // A drop (a picture) isn't a to-do: no strike, so a stray double-click or tick can't cross it out.
+    onToggle: isDrop(t) ? undefined : () => patch(t.id, { status: t.status === "done" ? "open" : "done" }),
     onDelete: () => crumple(t.id),
   });
 

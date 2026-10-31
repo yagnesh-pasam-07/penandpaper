@@ -1,11 +1,13 @@
 # Pen & Paper: product memory
 
-What we decided, and why. Two parts:
+The one place for product knowledge: what Pen & Paper is, what we decided and why, and how to decide the next thing. Four parts:
 
 1. **Current truth**: the decisions in force today, short and grouped. Read this first.
-2. **Decision log**: every decision, newest first, with its date and reason. Append only: a change gets a new entry that says what it replaces; old entries are never edited or deleted.
+2. **Decision tree**: the questions to walk through before adding or changing anything.
+3. **Feature tickets**: every feature asked for, with its state and its GitHub issue.
+4. **Decision log**: every decision, newest first, with its date and reason. Append only: a change gets a new entry that says what it replaces; old entries are never edited or deleted.
 
-**Rule for every change (people and coding agents alike):** a new feature, a removed feature, or a product, design, tech or security choice adds one log entry here, *and* updates "Current truth" if it changes what is true now. Same commit as the code.
+**Rule for every change (people and coding agents alike):** a new feature, a removed feature, or a product, design, tech or security choice adds one log entry here, *and* updates "Current truth" if it changes what is true now, *and* adds or moves its row in "Feature tickets". Walk the decision tree first. Same commit as the code.
 
 Entry format:
 
@@ -26,6 +28,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **What it is:** one calm paper for the thoughts you don't have time to write. Personal, not a team planner (the team planner is parked; its routes redirect to `/drop`).
 - **The core loop:** drop a thought in a second (type, paste, speak, share, highlight) → see it on one canvas → close the day with Tonight's paper → a 9 PM email of what you dropped → **the thought comes back**: one each morning (1, 7, 30 days later: do it, keep, let go) and the whole week in Sunday's rewind (`/rewind`). Quiet by design: no streaks or badges, and it can be switched off in Settings.
 - **Papers:** you make as many as you like; captures land on the paper you touched last. Library and search across all of them.
+- **Two kinds of thought:** a **to-do** (words, links, videos) can be struck with the red pen, is reviewed in Tonight's paper and comes back in the morning. A **drop** (anything with a picture) is kept just to look at: no tick, no strike, not in Tonight's paper or the morning resurface. It can still be moved, captioned, zoomed and crumpled. Which kind is decided by the content, not chosen (`isDrop` in `src/modules/drop/logic.ts`).
 - **Capture surfaces:** the web canvas, the quick box (`/capture`), phone share (`/share`), the Chrome & Edge extension, the Mac menu-bar app. Each tags its thoughts by id prefix (`ext-`, `mac-`, `cap-`, `share-`), which Studio counts.
 - **Extension:** highlight on any site and click the icon (or ⌥⇧P / Alt+Shift+P): the words, the first picture in the highlight and the page address go straight to the paper. No window.
 - **Language:** English only in the interface and for voice, for now. Thoughts in any script still display correctly.
@@ -55,10 +58,61 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - Move pictures out of the database into object storage (the biggest cost and speed risk as usage grows).
 - Sharing a paper (read-only link) and connecting thoughts: proposed, not built.
 - A universal (Apple silicon + Intel) Mac build: possible, untested on Intel.
+- Drops: should a person be able to turn a picture into a to-do (or words into a drop) by hand? Not yet: see the decision tree, step 3.
+
+---
+
+## Decision tree
+
+Walk this before building anything. Each answer either stops you or sends you to the next step, and the answers go in the decision-log entry.
+
+```
+1. Does it serve the core loop?  (drop it fast → see it → close the day → it comes back)
+   ├─ No  → Park it under "Open questions". Stop.
+   └─ Yes ↓
+2. Does it add a screen, a setting, a button or a notification?
+   ├─ Yes → Can it be decided from what the person already did, with nothing new to choose?
+   │        ├─ Yes → Do that instead (calm by default: fewer controls).
+   │        └─ No  → Keep it, but one control, in an existing menu. ↓
+   └─ No  ↓
+3. Does it change what a thought IS (its kind, or what strike / keep / crumple mean)?
+   ├─ Yes → Check every place a thought is acted on:
+   │        the canvas, Tonight's paper, the morning resurface, Sunday's rewind,
+   │        the 9 PM email, search, the extension, the Mac app, the homepage try-it.
+   │        Enforce it on the server too, not only in the UI. ↓
+   └─ No  ↓
+4. Does it need a database change?
+   ├─ Yes → Can it be worked out from columns we already have?
+   │        ├─ Yes → Work it out (no migration).
+   │        └─ No  → An add-only Drizzle migration (new column with a default, or a new table). ↓
+   └─ No  ↓
+5. Could it lose or hide someone's words, or expose them?
+   ├─ Yes → Add an Undo, keep data 7 days, and note it under "Security". ↓
+   └─ No  ↓
+6. Ship it: tests + PRODUCT.md (log entry, Current truth, Feature tickets row) in the same pull request.
+```
+
+---
+
+## Feature tickets
+
+Every feature asked for, newest first. One row each; move its state as it goes. The GitHub issue holds the discussion.
+
+| Feature | State | Ticket |
+| --- | --- | --- |
+| Drops vs to-dos: a picture is a drop, with no tick or strike, and stays out of the review | Built (`feat/drops`) | [#29](https://github.com/yagnesh-pasam-07/penandpaper/issues/29) |
 
 ---
 
 ## Decision log
+
+### 2026-10-31 11:40 IST · product · Two kinds of thought: a picture is a drop, not a to-do
+Why: every note behaved like a to-do, so a picture dropped just to see more clearly could be struck by a stray double-click, swipe or tick, and it showed up in Tonight's paper and the morning resurface asking to be "done". A picture is kept to look at. Decision tree: it serves the loop (step 1); it is decided from the content, with no new toggle (step 2: calm by default); it changes what a thought is, so the canvas loses the tick, double-click and swipe-to-strike for pictures, the API refuses to strike one, and Tonight's paper (cards and counts) and the resurface skip them (step 3); worked out from the existing `image` column, so no migration (step 4). Pictures already struck before this keep their line. A manual "make it a to-do" switch is left open.
+Replaces: nothing (every thought was a to-do since 2026-10-18)
+
+### 2026-10-31 11:40 IST · product · PRODUCT.md gains a decision tree and a feature-ticket list
+Why: the maintainer wants every feature recorded here and a fixed set of questions for deciding changes, so this file holds the product knowledge, the decisions and how to make the next one. Each feature also gets a GitHub issue.
+Replaces: nothing
 
 ### 2026-10-30 11:30 IST · tech · Email through Brevo or Resend, whichever is set
 Why: Resend's free plan only emails anyone after you verify a domain you own, and the site is on vercel.app. Brevo's free plan (300 a day) sends to anyone after confirming one sender address. One HTTPS call, no new package.
