@@ -58,6 +58,7 @@ export async function todaysResurface(userId: string, now: Date = new Date()): P
           or(lte(dropThoughts.resurfaceAt, at), and(isNull(dropThoughts.resurfaceAt), lte(dropThoughts.createdAt, dayAgo))),
           // Only to-dos come back: a drop (a picture) was kept to look at, not to do.
           isNull(dropThoughts.image),
+          eq(dropThoughts.kind, "note"),
           sql`length(trim(${dropThoughts.text})) > 0`,
         ),
       )
@@ -78,7 +79,7 @@ export async function resolveResurface(userId: string, thoughtId: string, choice
   const [t] = await db
     .select({ step: dropThoughts.resurfaceStep, at: dropThoughts.resurfaceAt })
     .from(dropThoughts)
-    .where(and(eq(dropThoughts.id, thoughtId), eq(dropThoughts.userId, userId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image)));
+    .where(and(eq(dropThoughts.id, thoughtId), eq(dropThoughts.userId, userId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image), eq(dropThoughts.kind, "note")));
   if (!t) return false;
   const next = resolve({ step: t.step, dueAt: t.at }, choice, now);
   await db

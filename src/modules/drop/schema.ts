@@ -1,4 +1,4 @@
-import { boolean, date, index, integer, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, jsonb, pgTable, real, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
 /** A canvas a person made: as many as they like, each with its own thoughts. */
@@ -51,6 +51,8 @@ export const dropThoughts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     text: text("text").notNull(),
+    /** "note": a hand-cut note (a to-do unless it holds a picture). "text": words written straight on the paper with the Text tool, a drop. */
+    kind: text("kind", { enum: ["note", "text"] }).notNull().default("note"),
     status: text("status", { enum: ["open", "done"] }).notNull().default("open"),
     shape: integer("shape").notNull().default(0),
     /** When it was dropped. */
@@ -73,6 +75,34 @@ export const dropThoughts = pgTable(
     resurfaceDone: boolean("resurface_done").notNull().default(false),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
+);
+
+/**
+ * Ink drawn on a paper with the Draw tool: a freehand line. One that starts on
+ * one thing and ends on another is a connector, and follows them when they
+ * move: its ends are kept relative to each thing's centre.
+ */
+export const dropStrokes = pgTable(
+  "drop_strokes",
+  {
+    /** Made in the browser, so a line shows before the server answers. */
+    id: text("id").primaryKey(),
+    paperId: uuid("paper_id")
+      .notNull()
+      .references(() => dropPapers.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The line, in canvas px: [[x, y], …] (smoothed and thinned in the browser). */
+    points: jsonb("points").$type<[number, number][]>().notNull(),
+    /** The thought each end is tied to, or null for a free end. */
+    fromId: text("from_id"),
+    toId: text("to_id"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    /** Erased: hidden at once, swept up a week later like a crumpled thought. */
+    erasedAt: timestamp("erased_at", { withTimezone: true, mode: "string" }),
+  },
+  (t) => [index("drop_strokes_paper_idx").on(t.paperId)],
 );
 
 /** Keys for apps that save to a paper without a browser sign-in (the Mac menu-bar app). Only the hash of the secret is kept. */

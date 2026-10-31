@@ -21,6 +21,8 @@ const body = z
     /** Where it was pasted on the sheet. */
     x: z.number().min(-X_SHARE_LIMIT).max(X_SHARE_LIMIT).nullable().optional(),
     y: z.number().min(-Y_LIMIT).max(Y_LIMIT).nullable().optional(),
+    /** "text": written straight on the paper with the Text tool (a drop, never a to-do). */
+    kind: z.enum(["note", "text"]).optional(),
   })
   // Words, a picture, or both.
   .refine((b) => b.text.length > 0 || !!b.image);

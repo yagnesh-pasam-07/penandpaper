@@ -16,9 +16,11 @@ import {
   type PaperCardData,
   type PaperMeta,
   type SearchHit,
+  type Stroke,
   type Thought,
+  type ThoughtKind,
 } from "./logic";
-import { dropPapers, dropPrefs, dropThoughts } from "./schema";
+import { dropPapers, dropPrefs, dropStrokes, dropThoughts } from "./schema";
 
 const db = httpDb;
 
@@ -42,6 +44,7 @@ function toThought(r: ThoughtRow): Thought {
     x: r.x,
     y: r.y,
     image: r.image,
+    kind: r.kind,
   };
 }
 
@@ -87,7 +90,44 @@ async function contentsOf(paper: { id: string; name: string | null; createdAt: D
     .from(dropThoughts)
     .where(and(eq(dropThoughts.paperId, paper.id), isNull(dropThoughts.crumpledAt)))
     .orderBy(asc(dropThoughts.createdAt), asc(dropThoughts.id));
-  return { id: paper.id, name: paper.name, createdAt: iso(paper.createdAt), archivedAt: paper.archivedAt ? iso(paper.archivedAt) : null, thoughts: rows.map(toThought) };
+  const strokes = await strokesOf(paper.id);
+  return { id: paper.id, name: paper.name, createdAt: iso(paper.createdAt), archivedAt: paper.archivedAt ? iso(paper.archivedAt) : null, thoughts: rows.map(toThought), strokes };
+}
+
+/** A paper's lines and connectors, oldest first, leaving out erased ones. Empty before the migration has run. */
+async function strokesOf(paperId: string): Promise<Stroke[]> {
+  try {
+    const rows = await db
+      .select({ id: dropStrokes.id, points: dropStrokes.points, fromId: dropStrokes.fromId, toId: dropStrokes.toId })
+      .from(dropStrokes)
+      .where(and(eq(dropStrokes.paperId, paperId), isNull(dropStrokes.erasedAt)))
+      .orderBy(asc(dropStrokes.createdAt), asc(dropStrokes.id));
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+/** Draws a line on this paper. The same id twice (a retry) is one line. */
+export async function addStroke(userId: string, paperId: string, input: Stroke): Promise<Stroke> {
+  if (!(await ownedPaper(userId, paperId))) throw new PaperNotFound();
+  await db
+    .insert(dropStrokes)
+    .values({ id: input.id, paperId, userId, points: input.points, fromId: input.fromId, toId: input.toId })
+    .onConflictDoNothing();
+  await touch(paperId);
+  return input;
+}
+
+/** Erases a line on this paper (or brings it back, for an undo). */
+export async function eraseStroke(userId: string, paperId: string, id: string, erased = true): Promise<boolean> {
+  const rows = await db
+    .update(dropStrokes)
+    .set({ erasedAt: erased ? sql`now()` : null })
+    .where(and(eq(dropStrokes.id, id), eq(dropStrokes.userId, userId), eq(dropStrokes.paperId, paperId)))
+    .returning({ id: dropStrokes.id });
+  if (rows.length) await touch(paperId);
+  return rows.length > 0;
 }
 
 /** Opens a paper with its thoughts, if it is theirs. */
@@ -188,12 +228,12 @@ export class PaperNotFound extends Error {}
 export async function addThought(
   userId: string,
   paperId: string,
-  input: { id: string; text: string; shape: number; image?: string | null; x?: number | null; y?: number | null },
+  input: { id: string; text: string; shape: number; image?: string | null; x?: number | null; y?: number | null; kind?: ThoughtKind },
 ): Promise<Thought> {
   if (!(await ownedPaper(userId, paperId))) throw new PaperNotFound();
   const [row] = await db
     .insert(dropThoughts)
-    .values({ id: input.id, paperId, userId, text: input.text, shape: input.shape, image: input.image ?? null, x: input.x ?? null, y: input.y ?? null })
+    .values({ id: input.id, paperId, userId, text: input.text, shape: input.shape, image: input.image ?? null, x: input.x ?? null, y: input.y ?? null, kind: input.kind ?? "note" })
     .onConflictDoNothing()
     .returning();
   if (row) {
@@ -246,7 +286,7 @@ export async function updateThought(userId: string, paperId: string, id: string,
         eq(dropThoughts.paperId, paperId),
         isNull(dropThoughts.crumpledAt),
         // A drop (a picture) is never struck: see isDrop. Its caption can still be edited.
-        patch.status ? isNull(dropThoughts.image) : undefined,
+        patch.status ? and(isNull(dropThoughts.image), eq(dropThoughts.kind, "note")) : undefined,
       ),
     )
     .returning();
@@ -382,6 +422,7 @@ export async function digestsFor(date: string): Promise<{ email: string; name: s
 export async function sweepCrumpled(): Promise<{ thoughts: number; papers: number }> {
   const cutoff = sql`now() - make_interval(days => ${CRUMPLE_KEEP_DAYS})`;
   const thoughts = await db.delete(dropThoughts).where(lt(dropThoughts.crumpledAt, cutoff)).returning({ id: dropThoughts.id });
+  await db.delete(dropStrokes).where(lt(dropStrokes.erasedAt, cutoff));
   // A paper's thoughts go with it.
   const papers = await db.delete(dropPapers).where(lt(dropPapers.deletedAt, cutoff)).returning({ id: dropPapers.id });
   return { thoughts: thoughts.length, papers: papers.length };

@@ -7,6 +7,17 @@ import { autoPanVelocity, HOME, isHome, type View } from "./view";
 type Item = { id: string; x: number | null; y: number | null };
 export type Placement = { id: string; x: number; y: number };
 
+export type OverlayCtx = {
+  boxes: Map<string, Box>;
+  zoom: number;
+};
+
+/** A point on screen as a point on the sheet, in its own units (pan and zoom both undone). */
+export function pointOn(sheet: HTMLElement | null, zoom: number, clientX: number, clientY: number): Point {
+  const r = sheet?.getBoundingClientRect();
+  return { x: (clientX - (r?.left ?? 0)) / zoom, y: (clientY - (r?.top ?? 0)) / zoom };
+}
+
 /** Before a bubble is measured. */
 const GUESS: Size = { w: 220, h: 110 };
 /** Pointer travel (px) before a press becomes a drag, so clicks still edit. */
@@ -41,6 +52,8 @@ export function FreeCanvas<T extends Item>({
   bare = false,
   view = HOME,
   onPanBy,
+  overlay,
+  dragEnabled = true,
 }: {
   items: T[];
   label: string;
@@ -68,6 +81,14 @@ export function FreeCanvas<T extends Item>({
   view?: View;
   /** Called every frame while a note is carried near the window's edge: shift the view by this many screen px. */
   onPanBy?: (dx: number, dy: number) => void;
+  /**
+   * Drawn over the sheet in its own units (it pans and zooms with the notes):
+   * gets every bubble's box as it shows now, the dragged one included, and how
+   * to turn a saved spot into a canvas point and back. Ink lives here.
+   */
+  overlay?: (ctx: OverlayCtx) => ReactNode;
+  /** Off while another tool is in hand: presses go to the overlay, not to dragging. */
+  dragEnabled?: boolean;
 }) {
   const sheet = useRef<HTMLElement>(null);
   const nodes = useRef(new Map<string, HTMLElement>());
@@ -253,7 +274,7 @@ export function FreeCanvas<T extends Item>({
   };
 
   const down = (id: string) => (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!onArrange || e.button !== 0 || drag) return;
+    if (!onArrange || !dragEnabled || e.button !== 0 || drag) return;
     if ((e.target as HTMLElement).closest("button:not([data-drag]), a:not([data-drag]), textarea, input")) return;
     const start = boxes.get(id);
     if (!start) return;
@@ -274,6 +295,7 @@ export function FreeCanvas<T extends Item>({
     >
       {guides.x !== undefined && <span aria-hidden="true" className="pointer-events-none absolute w-px bg-red-text/60" style={{ left: guides.x, top: -200000, height: 400000 }} />}
       {guides.y !== undefined && <span aria-hidden="true" className="pointer-events-none absolute h-px bg-red-text/60" style={{ top: guides.y, left: -200000, width: 400000 }} />}
+      {overlay?.({ boxes, zoom: view.zoom })}
       {items.map((it) => {
         const b = boxes.get(it.id);
         const dragging = drag?.moving && drag.id === it.id;
