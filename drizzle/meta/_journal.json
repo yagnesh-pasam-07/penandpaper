@@ -120,6 +120,13 @@
       "when": 1793427666351,
       "tag": "0016_text_and_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793435325465,
+      "tag": "0017_thought_of_the_day",
+      "breakpoints": true
     }
   ]
 }

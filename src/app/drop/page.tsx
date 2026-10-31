@@ -8,12 +8,12 @@ import { currentUser } from "@/server/session";
 export const metadata: Metadata = { title: "Pen & Paper" };
 
 /** Opens the paper touched last (a first blank one if there are none yet). */
-async function Latest({ searchParams }: { searchParams: Promise<{ write?: string | string[] }> }): Promise<null> {
+async function Latest({ searchParams }: { searchParams: Promise<{ write?: string | string[]; today?: string | string[] }> }): Promise<null> {
   // Needs the live request (session cookie); never part of a prerender.
   await connection();
-  const { write } = await searchParams;
-  // ?write=1 (the "New thought" shortcut) opens the writer on arrival.
-  const suffix = write === "1" ? "?write=1" : "";
+  const { write, today } = await searchParams;
+  // ?write=1 (the "New thought" shortcut) opens the writer on arrival; ?today=1 (the daily notification) opens the day's thought.
+  const suffix = write === "1" ? "?write=1" : today === "1" ? "?today=1" : "";
   const user = await currentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/drop${suffix}`)}`);
   redirect(`/drop/${await latestPaperId(user.id)}${suffix}`);

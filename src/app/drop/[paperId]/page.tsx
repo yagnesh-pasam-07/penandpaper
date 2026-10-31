@@ -11,13 +11,13 @@ import { currentUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "Pen & Paper" };
 
-async function Paper({ params, searchParams }: { params: Promise<{ paperId: string }>; searchParams: Promise<{ note?: string | string[]; write?: string | string[]; skipped?: string | string[] }> }) {
+async function Paper({ params, searchParams }: { params: Promise<{ paperId: string }>; searchParams: Promise<{ note?: string | string[]; write?: string | string[]; skipped?: string | string[]; today?: string | string[] }> }) {
   // Needs the live request (session cookie); never part of a prerender.
   await connection();
   const { paperId } = await params;
-  const { note, write, skipped } = await searchParams;
+  const { note, write, skipped, today } = await searchParams;
   const user = await currentUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/drop/${paperId}${write === "1" ? "?write=1" : ""}`)}`);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/drop/${paperId}${write === "1" ? "?write=1" : today === "1" ? "?today=1" : ""}`)}`);
   if (!z.uuid().safeParse(paperId).success) notFound();
   const [paper, papers, appearance] = await Promise.all([getPaper(user.id, paperId), listPapers(user.id), getAppearance(user.id)]);
   if (!paper) notFound();
@@ -27,7 +27,7 @@ async function Paper({ params, searchParams }: { params: Promise<{ paperId: stri
     <>
       <AppearanceSync canvas={appearance.canvas} theme={appearance.theme} noteFont={appearance.noteFont} />
       {skipped === "image" && <ShareNotice>That picture was too big to add from a share. Drop it on the paper and it will shrink first.</ShareNotice>}
-      <DropCanvas key={paper.id} initial={paper} papers={listed} me={{ name: user.name, email: user.email, admin: user.role === "admin" }} focus={typeof note === "string" ? note : null} write={write === "1"} />
+      <DropCanvas key={paper.id} initial={paper} papers={listed} me={{ name: user.name, email: user.email, admin: user.role === "admin" }} focus={typeof note === "string" ? note : null} write={write === "1"} today={today === "1"} />
     </>
   );
 }

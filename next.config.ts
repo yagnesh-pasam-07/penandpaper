@@ -24,7 +24,11 @@ const nextConfig: NextConfig = {
     return ["/projects", "/projects/:path*", "/me", "/me/:path*", "/join/:path*", "/demo"].map((source) => ({ source, destination: "/drop", permanent: false }));
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The notification worker: always the latest, never from a cache.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Service-Worker-Allowed", value: "/" }] },
+    ];
   },
 };
 

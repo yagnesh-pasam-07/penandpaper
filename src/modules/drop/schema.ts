@@ -34,9 +34,41 @@ export const dropPrefs = pgTable("drop_prefs", {
   theme: text("theme"),
   /** How thoughts are written (an id from NOTE_FONTS in src/lib/canvases.ts); null means handwritten. */
   noteFont: text("note_font"),
-  /** Old thoughts come back each morning and the Sunday rewind is emailed; on unless switched off. */
+  /** Thought of the Day (one past thought a day) and the Sunday rewind; on unless switched off. */
   resurface: boolean("resurface").notNull().default(true),
+  /** When the day's thought is ready, "HH:MM" in their own zone; null = only when they open the app (no notification). */
+  recallTime: text("recall_time").default("09:00"),
+  /** The weekdays it comes, 0 = Sunday; every day by default. */
+  recallDays: jsonb("recall_days").$type<number[]>(),
+  /** The signature sound when the day's thought arrives. */
+  recallSound: boolean("recall_sound").notNull().default(true),
+  /** Their time zone as the browser last said it, so the daily job knows their 9 AM. */
+  timeZone: text("time_zone"),
+  /** The local date (YYYY-MM-DD) the day's thought was last opened: it greets once a day, on one device. */
+  recallSeenOn: text("recall_seen_on"),
+  /** The local date it was last notified, so a run never notifies twice. */
+  recallNotifiedOn: text("recall_notified_on"),
+  /** Thoughts passed over today with "Show another" (ids), and the date they're for. */
+  recallSkipped: jsonb("recall_skipped").$type<{ date: string; ids: string[] }>(),
 });
+
+/** A browser or installed app that gets the daily notification (web push). One per device. */
+export const dropPushSubscriptions = pgTable(
+  "drop_push_subscriptions",
+  {
+    /** The push service's address for this device: unique, and how a device is told apart. */
+    endpoint: text("endpoint").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    /** "Chrome on Mac", for the settings list. */
+    device: text("device"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (t) => [index("drop_push_user_idx").on(t.userId)],
+);
 
 export const dropThoughts = pgTable(
   "drop_thoughts",
@@ -73,6 +105,8 @@ export const dropThoughts = pgTable(
     resurfaceAt: timestamp("resurface_at", { withTimezone: true, mode: "string" }),
     /** Acted on, let go, or through the whole rhythm: never comes back on its own. */
     resurfaceDone: boolean("resurface_done").notNull().default(false),
+    /** When it was last the thought of the day: never twice within a day. */
+    recallShownAt: timestamp("recall_shown_at", { withTimezone: true, mode: "string" }),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

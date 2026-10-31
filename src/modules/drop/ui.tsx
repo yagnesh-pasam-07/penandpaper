@@ -15,7 +15,7 @@ import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from
 import { isDrop, paperTitle, type DropPaper, type PaperMeta, type Stroke, type Thought, type ThoughtKind } from "./logic";
 import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { PaperBar, SearchButton, UNDO_PAPER_KEY } from "./papers-ui";
-import { ResurfaceCard } from "./resurface-card";
+import { TodayThought } from "./today";
 import { TonightButton } from "./tonight-button";
 import { importTryPaper } from "./try-import";
 import { Toolbar, type Tool } from "./tools";
@@ -52,7 +52,7 @@ const CRUMPLE_MS = 450;
 type Toast = { text: string; undo?: () => void; action?: { label: string; run: () => void } };
 type Leaving = Map<string, "crumple">;
 
-export function DropCanvas({ initial, papers, me, focus = null, write = false }: { initial: DropPaper; papers: PaperMeta[]; me: Me; focus?: string | null; write?: boolean }) {
+export function DropCanvas({ initial, papers, me, focus = null, write = false, today = false }: { initial: DropPaper; papers: PaperMeta[]; me: Me; focus?: string | null; write?: boolean; today?: boolean }) {
   const router = useRouter();
   // One paper per mount (the page keys this by paper), so its id is fixed.
   const paperId = initial.id;
@@ -665,7 +665,6 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
       />
       <Toolbar tool={tool} onTool={setTool} listening={voice.state.kind === "recording"} />
       <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-[72px] pb-28 sm:px-8 sm:pt-[76px]">
-        <ResurfaceCard />
         {/* On a phone: a vertical stream of the notes. */}
         {onSheet.length === 0 ? (
           <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 items-center justify-center sm:hidden`}>
@@ -751,6 +750,23 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false }:
 
       {(onSheet.length > 0 || strokes.length > 0) && <ViewControls view={view} onZoom={(f) => zoomBy(f)} onReset={reset} onFit={fit} />}
 
+      <TodayThought
+        force={today}
+        onUsed={(onPaper, newId) => {
+          // Used: it lands on today's paper. Here, show it at once; elsewhere, go there with it highlighted.
+          if (onPaper !== paperId) {
+            router.push(`/drop/${onPaper}?note=${encodeURIComponent(newId)}`);
+            return;
+          }
+          void call<DropPaper>(`/api/drop/papers/${paperId}`)
+            .then((next) => {
+              update(() => next);
+              briefly(setFresh, [newId], 1200);
+            })
+            .catch(() => {});
+          setToast({ text: "On today's paper" });
+        }}
+      />
       <PenButton ref={penButton} hidden={writing} onOpen={() => setWriting(true)} />
       {writing && mounted && (
         <Writer draft={draft} onDraft={setDraft} image={draftImage} onImage={setDraftImage} onDrop={drop} onClose={closeWriter} />

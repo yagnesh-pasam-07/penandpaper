@@ -3,6 +3,7 @@ import { longDate, todayIn } from "@/lib/time";
 import { digestItems } from "@/modules/drop/digest";
 import { isSunday } from "@/modules/drop/resurface";
 import { emailSubject } from "@/modules/drop/tonight";
+import { sendRecalls } from "@/modules/drop/recall-server";
 import { digestsFor, dropZone, sweepCrumpled } from "@/modules/drop/server";
 import { sendMail } from "@/server/email";
 
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
     return Response.json({ error: "Not allowed." }, { status: 401 });
   }
   const swept = await sweepCrumpled();
+  // Thought of the Day for anyone whose time came after the morning run (an evening recall time).
+  const recalls = await sendRecalls(new Date(), 24 * 60, dropZone()).catch(() => null);
   const zone = dropZone();
   const date = todayIn(zone);
   const digests = await digestsFor(date);
@@ -41,5 +44,5 @@ export async function GET(request: Request) {
     });
     if (ok) sent += 1;
   }
-  return Response.json({ date, people: digests.length, sent, swept });
+  return Response.json({ date, people: digests.length, sent, swept, recalls });
 }

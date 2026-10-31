@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed.ts",
     "predev": "rm -rf .next",
-    "set-role": "tsx scripts/set-role.ts"
+    "set-role": "tsx scripts/set-role.ts",
+    "vapid": "node scripts/vapid.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

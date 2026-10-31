@@ -1,14 +1,7 @@
 import { z } from "zod";
 import { noStore, requireUser } from "@/modules/drop/http";
-import { resolveResurface, setResurface, todaysResurface } from "@/modules/drop/resurface-server";
+import { resolveResurface, setResurface } from "@/modules/drop/resurface-server";
 import { isSameSite } from "@/modules/drop/share";
-
-/** `GET` → `{ card }`: the thought that comes back this morning, or `{ card: null }`. */
-export async function GET() {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
-  return Response.json({ card: await todaysResurface(user.id) }, noStore);
-}
 
 const body = z.union([
   z.object({ thoughtId: z.string().regex(/^[A-Za-z0-9-]{6,64}$/), choice: z.enum(["act", "keep", "let_go", "later"]) }),
@@ -16,9 +9,9 @@ const body = z.union([
 ]);
 
 /**
- * `{ thoughtId, choice }`: settle a thought that came back (do it, keep, let go,
- * later). `{ enabled }`: switch the morning resurface and Sunday rewind on or
- * off. Same-site only. Replies the next card, if one is due.
+ * `{ thoughtId, choice }`: settle a thought from the Sunday rewind (do it,
+ * keep, let go, later). `{ enabled }`: switch Thought of the Day and the
+ * rewind on or off. Same-site only.
  */
 export async function POST(request: Request) {
   if (!isSameSite(request.headers, new URL(request.url).origin)) return Response.json({ error: "Not from this site." }, { status: 403 });

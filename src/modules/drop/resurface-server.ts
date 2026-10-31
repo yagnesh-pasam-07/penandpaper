@@ -1,15 +1,12 @@
 import "server-only";
-import { and, asc, desc, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { dropPapers, dropPrefs, dropThoughts } from "./schema";
 import { dayRange } from "./tonight";
 import { addDays } from "@/lib/time";
-import { agoText, groupRewind, MAX_STEP, resolve, weekStart, type Resolution, type RewindGroup } from "./resurface";
+import { groupRewind, MAX_STEP, resolve, weekStart, type Resolution, type RewindGroup } from "./resurface";
 
 const db = httpDb;
-
-/** The one thought that comes back this morning. */
-export type ResurfaceCard = { id: string; text: string; image: string | null; createdAt: string; ago: string; paperId: string; paperName: string | null };
 
 /** Whether this person wants thoughts to come back (on unless switched off, or before the column exists). */
 export async function resurfaceOn(userId: string): Promise<boolean> {
@@ -23,52 +20,6 @@ export async function resurfaceOn(userId: string): Promise<boolean> {
 
 export async function setResurface(userId: string, on: boolean): Promise<void> {
   await db.insert(dropPrefs).values({ userId, resurface: on }).onConflictDoUpdate({ target: dropPrefs.userId, set: { resurface: on } });
-}
-
-/**
- * Today's thought, if one is due: still open, not crumpled, on a paper that
- * isn't deleted, not done coming back, and due (its own `resurfaceAt`, or a
- * day after it was written when it has never come back). Among the due ones,
- * the oldest first, so nothing waits forever. Null when nothing is due, or
- * when the person switched it off.
- */
-export async function todaysResurface(userId: string, now: Date = new Date()): Promise<ResurfaceCard | null> {
-  if (!(await resurfaceOn(userId))) return null;
-  const at = now.toISOString();
-  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  try {
-    const [r] = await db
-      .select({
-        id: dropThoughts.id,
-        text: dropThoughts.text,
-        image: dropThoughts.image,
-        createdAt: dropThoughts.createdAt,
-        paperId: dropPapers.id,
-        paperName: dropPapers.name,
-      })
-      .from(dropThoughts)
-      .innerJoin(dropPapers, eq(dropPapers.id, dropThoughts.paperId))
-      .where(
-        and(
-          eq(dropThoughts.userId, userId),
-          eq(dropThoughts.status, "open"),
-          isNull(dropThoughts.crumpledAt),
-          isNull(dropPapers.deletedAt),
-          eq(dropThoughts.resurfaceDone, false),
-          or(lte(dropThoughts.resurfaceAt, at), and(isNull(dropThoughts.resurfaceAt), lte(dropThoughts.createdAt, dayAgo))),
-          // Only to-dos come back: a drop (a picture) was kept to look at, not to do.
-          isNull(dropThoughts.image),
-          eq(dropThoughts.kind, "note"),
-          sql`length(trim(${dropThoughts.text})) > 0`,
-        ),
-      )
-      .orderBy(asc(sql`coalesce(${dropThoughts.resurfaceAt}, ${dropThoughts.createdAt})`), asc(dropThoughts.id))
-      .limit(1);
-    return r ? { id: r.id, text: r.text, image: r.image, createdAt: new Date(r.createdAt).toISOString(), ago: agoText(r.createdAt, now), paperId: r.paperId, paperName: r.paperName } : null;
-  } catch {
-    // Before `npm run db:migrate` the columns aren't there: nothing comes back yet.
-    return null;
-  }
 }
 
 /**
