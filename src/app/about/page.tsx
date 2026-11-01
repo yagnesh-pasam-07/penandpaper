@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StoriesShell } from "@/modules/stories/chrome";
+import { WritingJourney } from "@/modules/about/writing-journey";
 import { storyFonts } from "@/modules/stories/fonts";
 
 export const metadata: Metadata = {
@@ -27,27 +28,9 @@ export default function AboutPage() {
 
           <p>Since I was a child, nothing has shaped me more than a pen and a sheet of paper. Exams. Drawings. Ideas at midnight. Even code, which I still sketch on paper before I type it. Almost everything that mattered to me started there.</p>
 
-          <figure className="my-2 flex flex-col gap-3 sm:-mx-10">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a public image from Wikimedia Commons */}
-            <img
-              src="https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Fountain_pen_writing_%28literacy%29.jpg/1280px-Fountain_pen_writing_%28literacy%29.jpg"
-              alt="A fountain pen writing on paper"
-              width={1280}
-              height={939}
-              loading="lazy"
-              decoding="async"
-              className="h-auto w-full rounded-md bg-soft"
-            />
-            <figcaption className="px-1 text-center font-sans text-[14px] leading-relaxed text-mute">
-              Where almost everything starts.
-              <span className="mt-1 block text-[12px]">
-                Photo:{" "}
-                <a href="https://commons.wikimedia.org/wiki/File:Fountain_pen_writing_(literacy).jpg" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-                  Petar Milošević, Wikimedia Commons, CC BY-SA 4.0
-                </a>
-              </span>
-            </figcaption>
-          </figure>
+          <p>And it&apos;s an old love. Long before paper, people scratched marks on cave walls, just to say: we were here, this happened. About 5,000 years ago, in Mesopotamia, people pressed the first writing into wet clay. In India, scribes wrote on dried palm leaves and tied them with string. Then, around 105 CE, a court official in China named Cai Lun made paper, and thoughts could finally travel.</p>
+
+          <WritingJourney />
 
           <h2 className="pt-4 font-sans text-[22px] font-semibold tracking-[-0.01em] text-ink">Writers are the original thinkers</h2>
 
@@ -55,18 +38,18 @@ export default function AboutPage() {
 
           <p>Think of the Ramayana. Valmiki witnessed it, and he wrote it down. That&apos;s the only reason we can still feel it today. If no one had written it, this generation would never have known the story at all.</p>
 
-          <figure className="my-2 flex flex-col gap-3 sm:-mx-10">
+          <figure className="mx-auto my-2 flex w-full max-w-[360px] flex-col gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element -- a public-domain painting from Wikimedia Commons */}
             <img
-              src="https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Sage_Narada_at_the_hermitage_of_Sage_Valmiki_requesting_him_to_write_the_Story_of_Rama.jpg/1280px-Sage_Narada_at_the_hermitage_of_Sage_Valmiki_requesting_him_to_write_the_Story_of_Rama.jpg"
+              src="https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Sage_Narada_at_the_hermitage_of_Sage_Valmiki_requesting_him_to_write_the_Story_of_Rama.jpg/960px-Sage_Narada_at_the_hermitage_of_Sage_Valmiki_requesting_him_to_write_the_Story_of_Rama.jpg"
               alt="A painting of Sage Narada at Valmiki's hermitage, asking him to write the story of Rama"
-              width={1280}
-              height={890}
+              width={960}
+              height={667}
               loading="lazy"
               decoding="async"
               className="h-auto w-full rounded-md bg-soft"
             />
-            <figcaption className="px-1 text-center font-sans text-[14px] leading-relaxed text-mute">
+            <figcaption className="px-1 text-center font-sans text-[13px] leading-relaxed text-mute">
               Narada at Valmiki&apos;s hermitage, asking him to write the story of Rama. Because he wrote it, we still have it.
               <span className="mt-1 block text-[12px]">
                 Kangra painting, early 19th century,{" "}
