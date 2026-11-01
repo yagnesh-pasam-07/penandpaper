@@ -145,6 +145,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-01 12:30 IST · design · The stories header reads as one name: "pen & paper stories"
+Why: "Stories" in a different, smaller serif beside the handwritten logo looked like two things that didn't fit. Now one handwritten name, the last word in the pen's red.
+Replaces: the "pen & paper | Stories" header in the 11:30 entry.
+
 ### 2026-11-01 11:30 IST · product · Stories: a public, calm place for real human stories, history and art
 Why: Pen & Paper is a brand, not only an app; stories build the audience (a link on WhatsApp is how most people here will meet it). Made for one-handed reading on a phone, listening while working, and feeling better after a bad day. Like Medium for the reader and the writer, without the noise: no claps, comments, counts or paywall.
 Decision tree: (1) not the core loop of the app: so it lives outside it, on the public website, and never touches anyone's paper. (2) One new page set (/stories) and one homepage section; the writer's controls stay in Studio. (3) Doesn't change what a thought is. (4) Add-only migration 0018: stories, story_media, story_media_parts. (5) Drafts and scheduled stories are never public (files of an unpublished story 404); deleting a story asks first. (6) Tests for the role guard, scheduling, slugs, reading time, Markdown, the editor's round trip and the Medium importer; checked end to end against a real Postgres (publish, unpublish, schedule, upload, Range audio, share image, 375 px, dark).

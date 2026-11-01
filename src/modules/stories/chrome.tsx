@@ -7,13 +7,15 @@ export function StoriesHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-line/70 bg-bg/90 backdrop-blur-md">
       <nav aria-label="Stories" className="mx-auto flex h-14 w-full max-w-[1120px] items-center gap-3 px-4 sm:px-8">
-        <Link href="/" aria-label="Pen & Paper home" className="rounded-sm">
-          <Logo size="sm" />
-        </Link>
-        <span aria-hidden="true" className="h-5 w-px bg-line" />
-        <Link href="/stories" className="story-serif text-[19px] text-ink italic hover:text-red-text">
-          Stories
-        </Link>
+        {/* One name, one hand: "pen & paper stories", the last word in red. */}
+        <span className="flex items-center gap-2">
+          <Link href="/" aria-label="Pen & Paper home" className="rounded-sm">
+            <Logo size="sm" />
+          </Link>
+          <Link href="/stories" className="font-hand text-2xl font-bold text-red-text hover:underline hover:decoration-2 hover:underline-offset-4">
+            stories
+          </Link>
+        </span>
         <span className="ml-auto">
           <ThemeToggle />
         </span>
