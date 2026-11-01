@@ -14,9 +14,9 @@ You get the job.
 
 And it feels exactly like first grade again. Junior. Senior. Lead. Manager. Whatever your field, the names change, but the ladder is the same: beginner to expert, one more level to chase. A new tunnel inside the old one.
 
-Now the list gets longer. Fancy CTC. A bike. An iPhone in your pocket. A Rare Rabbit shirt. Cool photos on Instagram. Weekends at a mid-tier pub, drinking enough to forget the week. Then Monday comes, and it starts again.
+Now the list gets longer. Fancy CTC. A bike. An iPhone in your pocket. A Rare Rabbit shirt. Cool photos on Instagram. Weekends at a mid-tier pub, drinking to escape your own life. Then Monday comes, and it starts again. Every weekend, the same escape.
 
-Your 30s arrive. A few grey hairs. You’re told it’s time to get married, so you do. Kids come next.
+Your 30s arrive. A few grey hairs. You’re told it’s time to get married, so you do. You sleep with your partner, and a kid arrives, almost as a by-product.
 
 And one day you notice: you’ve become your father. Your child has become you. Same tunnel, different timeline.
 
