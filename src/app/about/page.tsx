@@ -20,9 +20,9 @@ export default function AboutPage() {
           <p>Pen and Paper is a small publication of real stories: ordinary people, history, art. Each one is a few minutes long, made to be read on a phone on the way somewhere, or listened to with your eyes closed.</p>
           <p>We don&apos;t do likes for the sake of it, or popups, or feeds that never end. A story, read slowly. If it stays with you, send it to one person.</p>
           <p>
-            And there is a tool, too: a quiet paper for your own thoughts, where you can drop a thought in a second and see it again when it matters.{" "}
-            <Link href="/tool" className="underline decoration-1 underline-offset-4">
-              See the tool
+            And there is Desk: a quiet paper for your own thoughts, where you can drop a thought in a second and see it again when it matters.{" "}
+            <Link href="/desk" className="underline decoration-1 underline-offset-4">
+              Open your desk
             </Link>
             .
           </p>

@@ -19,14 +19,20 @@ function LinkedInGlyph() {
   );
 }
 
-/** The thinking tool's page: what it is, three steps, try it, one button. Nothing else. */
+/** Pen and Paper Desk: what it is, three steps, try it, one button. Nothing else. */
 export function Home({ supportEmail }: { supportEmail?: string }) {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <nav aria-label="Main" className="mx-auto flex h-16 w-full max-w-[1120px] items-center gap-3 px-4 sm:px-8">
-        <Link href="/" aria-label="Pen & Paper home" className={link}>
-          <Logo size="sm" />
-        </Link>
+        {/* One name, one hand: "pen & paper desk", the product in red (like "pen & paper stories"). */}
+        <span className="flex items-center gap-2">
+          <Link href="/" aria-label="Pen and Paper home" className={link}>
+            <Logo size="sm" />
+          </Link>
+          <Link href="/desk" className="font-hand text-2xl font-bold text-red-text hover:underline hover:decoration-2 hover:underline-offset-4">
+            desk
+          </Link>
+        </span>
         <span className="ml-auto flex items-center gap-1">
           <Link href="/stories" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
             Stories

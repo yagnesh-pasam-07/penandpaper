@@ -156,6 +156,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-01 22:00 IST · product · One brand, two named products: Pen and Paper Stories and Pen and Paper Desk
+Why: a story site with an app underneath felt like two unrelated things and cost trust. A parent with a belief and two named children feels intentional (like Google with Gmail and Maps). The homepage: "Pen and Paper" and the belief "Your thoughts deserve to be written down." (other people's, in our stories; your own, on your desk); two equal doors, *pen & paper* **stories** ("Real people, written down." → /stories) and *pen & paper* **desk** ("A quiet place for your own thoughts." → /desk); a short founder note with the founder's photo, in his words. Each product carries its name in its own header. The tool is "Desk": /tool redirects (308) to /desk. Desk is live, so its door says "Open your desk", not a waitlist.
+Replaces: the story-first homepage (21:00) and the name "the tool".
+
 ### 2026-11-01 21:30 IST · design · The tool page says one thing, in four parts
 Why: the writer couldn't tell what the tool was; nine sections below the gallery (two ways, pain points, highlight, fonts, everywhere, open source…) buried it. Now: "Your head is full. Put it down." + "One quiet paper for every thought you don't want to lose." + Start a paper; the scrolling screenshots; three steps (Drop it. See it. It comes back.); Try it, no account; one closing line and button, with "Also on Mac and in Chrome". Header: Stories, Sign in, theme. Unused sections deleted.
 Replaces: the long tool landing page (2026-10-31 13:30 and earlier sections).

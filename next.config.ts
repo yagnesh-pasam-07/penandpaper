@@ -21,7 +21,11 @@ const nextConfig: NextConfig = {
   },
   // The team planner is parked for now: its pages are still in the repo, but every way in leads to Drop.
   async redirects() {
-    return ["/projects", "/projects/:path*", "/me", "/me/:path*", "/join/:path*", "/demo"].map((source) => ({ source, destination: "/drop", permanent: false }));
+    return [
+      ...["/projects", "/projects/:path*", "/me", "/me/:path*", "/join/:path*", "/demo"].map((source) => ({ source, destination: "/drop", permanent: false })),
+      // The tool is now "Pen and Paper Desk".
+      { source: "/tool", destination: "/desk", permanent: true },
+    ];
   },
   async headers() {
     return [
