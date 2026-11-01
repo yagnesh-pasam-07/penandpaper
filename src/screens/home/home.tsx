@@ -5,7 +5,6 @@ import { Everywhere, Fonts, HeroGallery, Highlight } from "./everywhere";
 import { GitHubButton, OpenSource } from "./github";
 import { PainPoints } from "./pain-points";
 import { TwoWays } from "./two-ways";
-import { ThisWeeksStory } from "./this-week";
 import { TryIt } from "./try-it";
 
 const START = "/signup?next=/drop";
@@ -70,7 +69,6 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
 
         <TwoWays />
 
-        <ThisWeeksStory />
 
         <PainPoints />
 

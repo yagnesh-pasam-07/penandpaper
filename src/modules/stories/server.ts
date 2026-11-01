@@ -4,7 +4,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { httpDb } from "@/db";
 import { users } from "@/db/schema";
 import { isLive, readingMinutes, slugify, storyState, uniqueSlug, type Category, type StoryState } from "./logic";
-import { firstLine } from "./markdown";
+import { firstLine, pullQuote } from "./markdown";
 import { stories, storyMedia, storyMediaParts } from "./schema";
 
 /** Every cached read of stories carries this tag; every write expires it. */
@@ -24,6 +24,10 @@ export type StoryCard = {
   series: string;
   language: string;
   claps: number;
+  personName: string;
+  personPlace: string;
+  /** The story's first pull quote, else its hook: what the homepage and cards quote. */
+  quote: string;
 };
 
 export type Story = StoryCard & {
@@ -61,9 +65,11 @@ const cardCols = {
   series: stories.series,
   language: stories.language,
   claps: stories.claps,
+  personName: stories.personName,
+  personPlace: stories.personPlace,
 };
 
-type CardRow = { id: string; slug: string; title: string; subtitle: string; hook: string; body: string; category: Category; readingMinutes: number; coverId: string | null; audioId: string | null; publishAt: Date | null; series: string; language: string; claps: number };
+type CardRow = { id: string; slug: string; title: string; subtitle: string; hook: string; body: string; category: Category; readingMinutes: number; coverId: string | null; audioId: string | null; publishAt: Date | null; series: string; language: string; claps: number; personName: string; personPlace: string };
 
 const toCard = (r: CardRow): StoryCard => ({
   id: r.id,
@@ -79,6 +85,9 @@ const toCard = (r: CardRow): StoryCard => ({
   series: r.series,
   language: r.language,
   claps: r.claps,
+  personName: r.personName,
+  personPlace: r.personPlace,
+  quote: pullQuote(r.body) || r.hook || firstLine(r.body),
 });
 
 const live = (now: Date) => and(eq(stories.status, "published"), lte(stories.publishAt, now));

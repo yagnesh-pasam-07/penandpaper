@@ -137,3 +137,11 @@ export function firstLine(body: string, max = 160): string {
   const text = p && p.t === "p" ? plain(p.c).replace(/\s+/g, " ").trim() : "";
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
+
+/** The story's first pull quote (a "> " line), as plain text: what a card or the homepage quotes. Empty when there is none. */
+export function pullQuote(body: string, max = 200): string {
+  const plain = (c: Inline[]): string => c.map((n) => (n.t === "text" ? n.v : n.t === "br" ? " " : plain(n.c))).join("");
+  const q = parse(body).find((b) => b.t === "quote");
+  const text = q && q.t === "quote" ? plain(q.c).replace(/\s+/g, " ").trim() : "";
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toBlocks, toMarkdown } from "./blocks";
 import { isLive, isSlug, parseSources, readingMinutes, seriesSlug, slugify, storyState, uniqueSlug } from "./logic";
-import { firstLine, imageLine, inline, parse, safeHref } from "./markdown";
+import { firstLine, imageLine, inline, parse, pullQuote, safeHref } from "./markdown";
 import { htmlToMarkdown, mediumFeedUrl, mediumPostId, postFromFeed } from "./medium";
 
 const now = new Date("2026-11-01T06:00:00Z");
@@ -86,6 +86,10 @@ describe("markdown", () => {
   });
   it("italics on each of two lines", () => {
     expect(inline("*one*\n*two*")).toEqual([{ t: "em", c: [{ t: "text", v: "one" }] }, { t: "br" }, { t: "em", c: [{ t: "text", v: "two" }] }]);
+  });
+  it("finds the first pull quote", () => {
+    expect(pullQuote("Para.\n\n> You know what? *Life* is beautiful.\n\n> Second.")).toBe("You know what? Life is beautiful.");
+    expect(pullQuote("No quote here.")).toBe("");
   });
   it("gives a plain first line", () => {
     expect(firstLine("## Head\n\nSay a **word** for me.")).toBe("Say a word for me.");

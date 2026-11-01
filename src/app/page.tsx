@@ -3,15 +3,15 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { storyFonts } from "@/modules/stories/fonts";
-import { Home } from "@/screens/home/home";
+import { StoryHome } from "@/screens/story-home";
 import { currentUser } from "@/server/session";
 
 export const metadata: Metadata = {
-  title: "Pen & Paper: empty your head onto paper",
-  description: "A paper for the thoughts you don't have time to write. Save a thought in a second from the web, your Mac menu bar or Chrome, by typing, pasting or speaking, then see it all on one calm canvas.",
+  title: "Pen and Paper: every person is a story",
+  description: "Real people, written down. Short stories of ordinary lives, history and art, to read on the way or listen to. And a quiet place for your own thoughts.",
   openGraph: {
-    title: "Pen & Paper: empty your head onto paper",
-    description: "Save a thought in a second, by typing, pasting or speaking, and see it all on one calm canvas.",
+    title: "Pen and Paper: every person is a story",
+    description: "Real people, written down. Read a story on the way, or listen.",
     type: "website",
   },
 };
@@ -34,7 +34,7 @@ export default function Page() {
         <SignedInGoesToPaper />
       </Suspense>
       <div className={storyFonts}>
-        <Home supportEmail={process.env.SUPPORT_EMAIL} />
+        <StoryHome />
       </div>
     </>
   );

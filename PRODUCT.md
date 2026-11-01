@@ -156,6 +156,11 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-01 21:00 IST · product · The homepage is a story publication; the tool moves to /tool
+Why: Pen and Paper is becoming a brand about people ("Every person is a story. We write them down."), in the spirit of Humans of Bombay and The Marginalian; the thinking tool is a quiet room at the back, not the front door. The homepage: the tagline, the featured story (most loved this month, else newest) with its pull quote, cover, who and where, Read and Listen; "More stories" as a magazine grid (a story without a picture becomes a quote card); "Writers are witnesses."; a small tool section (A quiet place for your thoughts, a paper mock, Start a paper); a one-line footer. Signed-in people still land on their paper. The old landing page lives on at /tool. A short /about. Header: Stories, Tool, About.
+Not done from the brief, on purpose: no "Coming soon" waitlist (the tool is live), no "free notebook" promise (not decided), no placeholder stories on the live site, no Instagram/WhatsApp links (no handles yet).
+Replaces: the tool-first homepage (2026-10-31 13:30 "The story: first on paper, now pen & paper, digitally").
+
 ### 2026-11-01 20:00 IST · product · A clap is from a person: readers sign in (Google) to clap and save
 Why: the writer wants to know who did something, and anonymous claps can be inflated by clearing a browser. Reading stays open (sign-in to read would kill the WhatsApp traffic); only actions that carry a person (clap, save) ask for it, at the moment of the action, and come straight back. Google first because almost every reader has it and it is one tap.
 Decision tree: (1) the stories. (2) One sheet, shown only at the moment of an action; one header control. (3) Doesn't change what a thought is. (4) Add-only migration 0022: story_claps.user_id, story_saves. (5) Names are shown only to the writer in Studio; anonymous claps are merged into the account without double counting. (6) Checked against a real Postgres: signed-out clap 401, claim on sign-in keeps the total exact, cap holds, save and Saved, Studio list, 375 px sheet.
