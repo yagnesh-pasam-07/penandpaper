@@ -32,6 +32,10 @@ Now, if we stop for a second and think about it, why is all of this happening? W
 
 ![If you’ve seen the ocean at 6:30 a.m., you’re blessed.](media:de8ede33-8d4b-476d-a1bf-6a38fe81908f)
 
+Watch the ocean. A wave rises, rushes to the shore, and is gone. Then another. That’s our cycle.
+
+From the shore, you are not the wave. You’re watching it. Let’s watch life like that for a few minutes.
+
 I’m an accidental arrangement of matter, right? I was born through an unintentional combination of circumstances. My existence wasn’t planned by me. I’m just a random human being who came into existence.
 
 Then people gave me a name. They told me to go to school. I made friends, grew up, and started living my life. And that’s it. It’s a cycle.
