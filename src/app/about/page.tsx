@@ -21,17 +21,61 @@ export default function AboutPage() {
             <h1 className="text-[40px] leading-[1.05] font-medium tracking-[-0.02em] text-ink sm:text-[48px]">Hi, I&apos;m Yagnesh.</h1>
           </div>
 
-          <p>I love making things. The field doesn&apos;t matter much to me: software, a drawing, an idea, a story. If I can create it, I&apos;m happy.</p>
+          <p>I love creating things. Software, sport, art, design, photography, videos: the field doesn&apos;t matter to me. I love producing something that wasn&apos;t there before.</p>
 
           <p>Pen and Paper comes from one love: putting thoughts down on paper.</p>
 
           <p>Since I was a child, nothing has shaped me more than a pen and a sheet of paper. Exams. Drawings. Ideas at midnight. Even code, which I still sketch on paper before I type it. Almost everything that mattered to me started there.</p>
+
+          <figure className="my-2 flex flex-col gap-3 sm:-mx-10">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a public image from Wikimedia Commons */}
+            <img
+              src="https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Fountain_pen_writing_%28literacy%29.jpg/1280px-Fountain_pen_writing_%28literacy%29.jpg"
+              alt="A fountain pen writing on paper"
+              width={1280}
+              height={939}
+              loading="lazy"
+              decoding="async"
+              className="h-auto w-full rounded-md bg-soft"
+            />
+            <figcaption className="px-1 text-center font-sans text-[14px] leading-relaxed text-mute">
+              Where almost everything starts.
+              <span className="mt-1 block text-[12px]">
+                Photo:{" "}
+                <a href="https://commons.wikimedia.org/wiki/File:Fountain_pen_writing_(literacy).jpg" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  Petar Milošević, Wikimedia Commons, CC BY-SA 4.0
+                </a>
+              </span>
+            </figcaption>
+          </figure>
 
           <h2 className="pt-4 font-sans text-[22px] font-semibold tracking-[-0.01em] text-ink">Writers are the original thinkers</h2>
 
           <p>I believe writing is the one truly original thing we make. Everything else is a summary.</p>
 
           <p>Think of the Ramayana. Valmiki witnessed it, and he wrote it down. That&apos;s the only reason we can still feel it today. If no one had written it, this generation would never have known the story at all.</p>
+
+          <figure className="my-2 flex flex-col gap-3 sm:-mx-10">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a public-domain painting from Wikimedia Commons */}
+            <img
+              src="https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Sage_Narada_at_the_hermitage_of_Sage_Valmiki_requesting_him_to_write_the_Story_of_Rama.jpg/1280px-Sage_Narada_at_the_hermitage_of_Sage_Valmiki_requesting_him_to_write_the_Story_of_Rama.jpg"
+              alt="A painting of Sage Narada at Valmiki's hermitage, asking him to write the story of Rama"
+              width={1280}
+              height={890}
+              loading="lazy"
+              decoding="async"
+              className="h-auto w-full rounded-md bg-soft"
+            />
+            <figcaption className="px-1 text-center font-sans text-[14px] leading-relaxed text-mute">
+              Narada at Valmiki&apos;s hermitage, asking him to write the story of Rama. Because he wrote it, we still have it.
+              <span className="mt-1 block text-[12px]">
+                Kangra painting, early 19th century,{" "}
+                <a href="https://commons.wikimedia.org/wiki/File:Sage_Narada_at_the_hermitage_of_Sage_Valmiki_requesting_him_to_write_the_Story_of_Rama.jpg" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  public domain, Wikimedia Commons
+                </a>
+              </span>
+            </figcaption>
+          </figure>
 
           <p>Writers are witnesses. They keep people alive. And our stories matter. They are what make us want to live.</p>
 
