@@ -235,11 +235,16 @@ export type StoryPatch = {
  * draft, and is fixed once published (links shared on WhatsApp keep working).
  */
 export async function saveStory(id: string, patch: StoryPatch): Promise<{ slug: string; readingMinutes: number } | null> {
-  const [cur] = await httpDb.select({ status: stories.status, slug: stories.slug, body: stories.body, translationOf: stories.translationOf }).from(stories).where(eq(stories.id, id)).limit(1);
+  const [cur] = await httpDb.select({ status: stories.status, slug: stories.slug, body: stories.body, translationOf: stories.translationOf, title: stories.title, subtitle: stories.subtitle }).from(stories).where(eq(stories.id, id)).limit(1);
   if (!cur) return null;
   const set: Partial<typeof stories.$inferInsert> = { ...patch, updatedAt: new Date() };
   if (patch.body !== undefined) set.readingMinutes = readingMinutes(patch.body);
-  if (patch.title !== undefined && cur.status === "draft" && !cur.translationOf) set.slug = await freeSlug(patch.title, id);
+  // A draft's address follows its title, or its subtitle when the title has no Latin letters (a Telugu title).
+  if ((patch.title !== undefined || patch.subtitle !== undefined) && cur.status === "draft" && !cur.translationOf) {
+    const title = patch.title ?? cur.title;
+    const subtitle = patch.subtitle ?? cur.subtitle;
+    set.slug = await freeSlug(slugify(title) !== "story" ? title : subtitle.split(/[.!?]/)[0] || title, id);
+  }
   const [row] = await httpDb.update(stories).set(set).where(eq(stories.id, id)).returning({ slug: stories.slug, readingMinutes: stories.readingMinutes });
   return row ?? null;
 }
