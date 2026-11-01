@@ -12,7 +12,7 @@ Plus one, plus two. Entrance exams. Engineering. Four more levels: first year, s
 
 You get the job.
 
-And it feels exactly like first grade again. Junior. Senior. Lead. Manager. CTO. Ten more levels. A new tunnel inside the old one.
+And it feels exactly like first grade again. Junior. Senior. Lead. Manager. Whatever your field, the names change, but the ladder is the same: beginner to expert, one more level to chase. A new tunnel inside the old one.
 
 Now the list gets longer. Fancy CTC. A bike. An iPhone in your pocket. A Rare Rabbit shirt. Cool photos on Instagram. Weekends at a mid-tier pub, drinking enough to forget the week. Then Monday comes, and it starts again.
 
