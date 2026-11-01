@@ -60,6 +60,9 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **Writing** (`/studio/stories`): behind Studio's two locks (admin role + passcode), checked on the server for every save and upload. A Medium-style editor: you type on a page that looks like the published one (Enter = paragraph, `## ` heading, `> ` quote, ⌘B/⌘I, + for a picture or break), it saves itself, Preview shows the real page, Publish is "now" or "schedule" (default next Sunday 9 AM). The address follows the title until first published, then never changes. A Medium post can be imported as a draft, pictures copied in.
 - **Scheduling:** "scheduled" is a published story with `publish_at` ahead. Public pages are cached and re-checked every 15 minutes, so a scheduled story appears within 15 minutes of its time; publishing in Studio shows at once.
 - **Discovery:** "This week's story" on the homepage (the newest one), Stories in the homepage nav, WhatsApp-first share, a per-story share image (~45 KB JPEG), `sitemap.xml`, `robots.txt`, `/stories/rss.xml`.
+- **Story Studio** (`/studio/stories`, like YouTube Studio, writer only): per story, views, readers, read to the end, shares (by WhatsApp, Instagram, copy, phone share), listens, where readers came from (WhatsApp, Instagram, Google, home, direct) and phone vs computer, with a 28-day chart (`/studio/stories/[id]/reach`); totals across all stories at the top of the list. **Readers never see any count.** Anonymous: a random id the browser keeps (no cookie, no IP), keyed on the server; a view, read or listen counts once a day per reader; link-preview bots and crawlers are ignored; only live stories are counted. A "read" is reaching the last line after at least 20 seconds. Share links carry `?s=wa|ig|link` (WhatsApp strips the referrer), removed from the address bar on arrival.
+- **Sharing:** WhatsApp sends a warm message ("I read this and thought of you." by default, the writer can change it per story), the title, the hook and the link; the preview picture is the cover or a picture the writer picks. **Instagram:** a 1080×1920 story card (`/stories/[slug]/card`) sent through the phone's share sheet, downloaded on a computer. Then Copy link and the phone's own share.
+- **Latest reads** on the homepage: the newest story large, the next three as cards.
 - **Story files** (pictures, audio) are stored in Postgres in 1.5 MB parts (`story_media_parts`), the same "database for now" choice as the paper's pictures; moves with them to object storage.
 - **Stories in Markdown files** (`content/stories/*.md`) go into Studio as drafts with `npm run story:add -- <file> <admin email>`; never published by the script.
 
@@ -135,6 +138,7 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 | Feature | State | Ticket |
 | --- | --- | --- |
+| Story Studio (reads, reach, shares by channel), Latest reads on the homepage, Instagram story card, a custom WhatsApp message and picture | Shipped | [#36](https://github.com/yagnesh-pasam-07/penandpaper/issues/36) |
 | Stories: real human stories, history and art, written in Studio, read or heard at /stories; This week's story on the homepage | Shipped | [#35](https://github.com/yagnesh-pasam-07/penandpaper/issues/35) |
 | Thought of the Day: one past thought a day, full screen, signature sound, recall time, notifications on every device | Shipped | [#34](https://github.com/yagnesh-pasam-07/penandpaper/issues/34) |
 | Hold Space to talk in any text box (like Claude's CLI), a mic by the cursor, no header bar on the paper | Shipped | [#33](https://github.com/yagnesh-pasam-07/penandpaper/issues/33) |
@@ -144,6 +148,19 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-01 13:45 IST · product · Story Studio: the writer sees reach; readers see no numbers
+Why: to know which stories move people, and where they travel (WhatsApp first here), without turning the reading page into a scoreboard. Like YouTube Studio for the writer; calm and count-free for the reader.
+Decision tree: (1) serves the stories, not the app's loop: public site and Studio only. (2) No new reader controls; one Instagram button beside WhatsApp; the writer gets one page per story and a line in the publish panel. (3) Doesn't change what a thought is. (4) Add-only migration 0019: story_events; stories.share_text, stories.share_media_id. (5) Privacy: no cookies, no IP, no names; a random browser id keyed with the app's secret; bots and drafts never counted; rate-limited. (6) Tests for sources, bots, the WhatsApp message, read-through and the daily chart; checked end to end against a real Postgres (dedupe, sources, channels, bots ignored, scheduled story refused, the Instagram card, the Studio page).
+Replaces: nothing.
+
+### 2026-11-01 13:45 IST · growth · Sharing is the growth engine: WhatsApp message and Instagram story card
+Why: most first readers will arrive from a friend on WhatsApp, and Instagram Stories can't take a link from the web, so we give a card made for it. The default WhatsApp line is personal ("I read this and thought of you.") because a recommendation from a friend is read; a link alone is not.
+Replaces: the plain WhatsApp link (title + URL) from the 11:30 Stories entry.
+
+### 2026-11-01 13:00 IST · design · Stories read at Medium's measure
+Why: the writer compared it with Medium and wanted the same comfortable width and gaps: a 680 px column with 24 px gutters, 20 px text at 1.6, and pictures at the column width (not wider).
+Replaces: the 21 px / 1.75 text and wider pictures from the 11:30 Stories entry.
 
 ### 2026-11-01 12:30 IST · design · The stories header reads as one name: "pen & paper stories"
 Why: "Stories" in a different, smaller serif beside the handwritten logo looked like two things that didn't fit. Now one handwritten name, the last word in the pen's red.

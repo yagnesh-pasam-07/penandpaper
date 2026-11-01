@@ -34,6 +34,8 @@ const patch = z.object({
   audioMediaId: z.uuid().nullable().optional(),
   audioDurationSec: z.number().int().min(0).max(36_000).nullable().optional(),
   originalUrl: z.url().max(500).nullable().optional(),
+  shareText: z.string().max(160).optional(),
+  shareMediaId: z.uuid().nullable().optional(),
 });
 
 /** Autosave. Returns the address and reading time as they are now. */

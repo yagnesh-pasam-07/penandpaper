@@ -25,7 +25,7 @@ async function cover(id: string | null): Promise<string | null> {
 export default async function Image(props: { params: Promise<{ slug: string }> }): Promise<Response> {
   const { slug } = await props.params;
   const s = await publishedStory(slug);
-  const img = await cover(s?.coverId ?? null);
+  const img = await cover(s?.shareMediaId ?? s?.coverId ?? null);
   const title = s?.title ?? "Pen & Paper Stories";
   const hook = s ? s.hook || s.subtitle : "Real stories, read slowly.";
   const png = new ImageResponse(

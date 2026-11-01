@@ -20,6 +20,8 @@ export type EditorStory = {
   audioId: string | null;
   audioDurationSec: number | null;
   originalUrl: string | null;
+  shareText: string;
+  shareMediaId: string | null;
   readingMinutes: number;
   state: StoryState;
   publishAt: string | null;
@@ -105,6 +107,8 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
       audioMediaId: patch.audioId,
       audioDurationSec: patch.audioDurationSec,
       originalUrl: patch.originalUrl === "" ? null : patch.originalUrl,
+      shareText: patch.shareText,
+      shareMediaId: patch.shareMediaId,
     }).catch(() => ({ error: "Not saved. Check your connection." }));
     if ("error" in res) {
       setSaved("error");
@@ -150,7 +154,7 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
     el.setSelectionRange(at, at);
   }, [blocks]);
 
-  const field = (k: "title" | "subtitle" | "hook" | "coverCaption" | "originalUrl", v: string) => {
+  const field = (k: "title" | "subtitle" | "hook" | "coverCaption" | "originalUrl" | "shareText", v: string) => {
     setS((cur) => ({ ...cur, [k]: v }));
     queue({ [k]: v });
   };
@@ -302,6 +306,19 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
     }
   };
 
+  const setSharePic = async (file: File) => {
+    setBusy("Adding the WhatsApp picture…");
+    try {
+      const { id } = await uploadImage(s.id, file);
+      setS((cur) => ({ ...cur, shareMediaId: id }));
+      queue({ shareMediaId: id });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That picture couldn't be added.");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const setAudio = async (file: File) => {
     setBusy("Uploading your recording… 0%");
     try {
@@ -386,6 +403,11 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
           onRemoveAudio={() => {
             setS((cur) => ({ ...cur, audioId: null, audioDurationSec: null }));
             queue({ audioId: null, audioDurationSec: null });
+          }}
+          onSharePic={(f) => void setSharePic(f)}
+          onRemoveSharePic={() => {
+            setS((cur) => ({ ...cur, shareMediaId: null }));
+            queue({ shareMediaId: null });
           }}
         />
       )}
@@ -542,6 +564,8 @@ function PublishPanel({
   onRemoveCover,
   onAudio,
   onRemoveAudio,
+  onSharePic,
+  onRemoveSharePic,
 }: {
   s: EditorStory;
   words: number;
@@ -549,7 +573,9 @@ function PublishPanel({
   setSchedule: (v: string) => void;
   onPublish: (when: "now" | "unpublish" | string) => void;
   onClose: () => void;
-  onField: (k: "hook" | "originalUrl", v: string) => void;
+  onField: (k: "hook" | "originalUrl" | "shareText", v: string) => void;
+  onSharePic: (f: File) => void;
+  onRemoveSharePic: () => void;
   onCategory: (c: Category) => void;
   onCover: (f: File) => void;
   onRemoveCover: () => void;
@@ -620,6 +646,31 @@ function PublishPanel({
             </FileButton>
           )}
           <span className="text-[12px] text-mute">Readers get a Listen button. Without a recording, there is none.</span>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className={label}>When someone shares it on WhatsApp</span>
+          <input type="text" maxLength={160} value={s.shareText} onChange={(e) => onField("shareText", e.target.value)} placeholder="I read this and thought of you." aria-label="WhatsApp message" className={input} />
+          <div className="rounded-xl border border-line bg-sheet p-3 text-[13px] leading-snug">
+            <p className="text-ink">{s.shareText.trim() || "I read this and thought of you."}</p>
+            <p className="mt-1 font-semibold text-ink">{s.title || "Title"}</p>
+            {s.hook && <p className="text-mute">{s.hook}</p>}
+          </div>
+          <div className="flex items-center gap-3">
+            {s.shareMediaId ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- the writer's own upload */}
+                <img src={`${MEDIA}${s.shareMediaId}?w=480`} alt="" className="h-14 w-24 rounded-md object-cover" />
+                <button type="button" onClick={onRemoveSharePic} className="text-[13px] text-mute underline">
+                  Use the cover instead
+                </button>
+              </>
+            ) : (
+              <FileButton accept="image/*" onFile={onSharePic} className="text-[13px] text-mute underline">
+                Use a different picture for the preview (the cover by default)
+              </FileButton>
+            )}
+          </div>
         </div>
 
         <label className="flex flex-col gap-2">

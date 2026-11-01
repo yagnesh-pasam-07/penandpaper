@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { clock } from "./logic";
+import { track } from "./track";
 
 function PlayGlyph({ playing }: { playing: boolean }) {
   return playing ? (
@@ -23,7 +24,7 @@ function PlayGlyph({ playing }: { playing: boolean }) {
  * in your pocket. Media Session puts the same controls on the lock screen, and
  * the audio keeps playing with the screen off.
  */
-export function Listen({ src, title, author, artwork, duration }: { src: string; title: string; author: string; artwork: string | null; duration: number | null }) {
+export function Listen({ src, title, author, artwork, duration, slug }: { src: string; title: string; author: string; artwork: string | null; duration: number | null; slug?: string }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [open, setOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -61,6 +62,7 @@ export function Listen({ src, title, author, artwork, duration }: { src: string;
   };
   const start = () => {
     setOpen(true);
+    if (slug) track(slug, "listen");
     // In the same tap, so iPhone allows it.
     void audio.current?.play().catch(() => {});
   };

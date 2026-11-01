@@ -382,6 +382,9 @@ async function Studio() {
       <Brand
         right={
           <>
+            <Link href="/studio/stories" className="h-8 rounded-lg px-3 text-[13px] leading-8 font-medium text-mute hover:bg-soft hover:text-ink">
+              Stories
+            </Link>
             <span className="text-[12px] text-mute max-sm:hidden">Last {WINDOW_DAYS} days</span>
             <form action={leave}>
               <button type="submit" className="h-8 rounded-lg px-3 text-[13px] font-medium text-mute hover:bg-soft hover:text-ink">

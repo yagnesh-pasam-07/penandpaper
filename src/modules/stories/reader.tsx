@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { CATEGORY_LABEL, readLabel, storyDate, type Category } from "./logic";
 import { parse, type Block, type Inline } from "./markdown";
 import { Listen } from "./listen";
+import { ReadingSignal } from "./reading-signal";
 import { ShareStory } from "./share";
 
 /** Where a story's files come from: the public route, or the writer's (drafts too). */
@@ -101,6 +102,9 @@ export type ReaderStory = {
   audioDurationSec: number | null;
   originalUrl: string | null;
   language: string;
+  slug: string;
+  hook: string;
+  shareText: string;
 };
 
 /**
@@ -108,7 +112,8 @@ export type ReaderStory = {
  * paper or ink, nothing on the sides. Shared by the public page and the
  * writer's preview, so what you preview is exactly what is published.
  */
-export function StoryReader({ story, base, sizes, url, more }: { story: ReaderStory; base: MediaBase; sizes: Sizes; url: string; more?: ReactNode }) {
+export function StoryReader({ story, base, sizes, url, more, count = false }: { story: ReaderStory; base: MediaBase; sizes: Sizes; url: string; more?: ReactNode; count?: boolean }) {
+  const info = { slug: story.slug, url, title: story.title, hook: story.hook, line: story.shareText };
   const blocks = parse(story.body);
   const firstP = blocks.findIndex((b) => b.t === "p");
   const audio = story.audioId ? `${base}${story.audioId}` : null;
@@ -137,8 +142,8 @@ export function StoryReader({ story, base, sizes, url, more }: { story: ReaderSt
             </span>
           </span>
           <span className="ml-auto flex items-center gap-2">
-            {audio && <Listen src={audio} title={story.title} author={story.author} artwork={artwork} duration={story.audioDurationSec} />}
-            <ShareStory url={url} title={story.title} compact />
+            {audio && <Listen src={audio} title={story.title} author={story.author} artwork={artwork} duration={story.audioDurationSec} slug={count ? story.slug : undefined} />}
+            <ShareStory info={info} compact />
           </span>
         </div>
       </header>
@@ -157,7 +162,8 @@ export function StoryReader({ story, base, sizes, url, more }: { story: ReaderSt
       </div>
 
       <footer className="mx-auto flex w-full max-w-[728px] flex-col gap-6 px-6 pt-4 pb-16 font-sans">
-        <p aria-hidden="true" className="text-center text-[22px] text-red-text">
+        {count && <ReadingSignal slug={story.slug} />}
+        <p id="story-end" aria-hidden="true" className="text-center text-[22px] text-red-text">
           ✒
         </p>
         {story.originalUrl && (
@@ -171,7 +177,7 @@ export function StoryReader({ story, base, sizes, url, more }: { story: ReaderSt
         )}
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-sheet px-5 py-6 text-center">
           <p className="story-serif text-[20px] text-ink">If it stayed with you, send it to someone.</p>
-          <ShareStory url={url} title={story.title} />
+          <ShareStory info={info} />
         </div>
         {more}
       </footer>

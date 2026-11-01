@@ -30,6 +30,8 @@ export type Story = StoryCard & {
   audioId: string | null;
   audioDurationSec: number | null;
   originalUrl: string | null;
+  shareText: string;
+  shareMediaId: string | null;
   author: string;
   updatedAt: string;
 };
@@ -97,7 +99,7 @@ export async function latestStory(): Promise<StoryCard | null> {
 
 async function loadStory(where: ReturnType<typeof eq>): Promise<(Story & { status: "draft" | "published"; publishAtRaw: Date | null }) | null> {
   const [r] = await httpDb
-    .select({ ...cardCols, coverCaption: stories.coverCaption, language: stories.language, audioDurationSec: stories.audioDurationSec, originalUrl: stories.originalUrl, status: stories.status, updatedAt: stories.updatedAt, author: users.name })
+    .select({ ...cardCols, coverCaption: stories.coverCaption, language: stories.language, audioDurationSec: stories.audioDurationSec, originalUrl: stories.originalUrl, shareText: stories.shareText, shareMediaId: stories.shareMediaId, status: stories.status, updatedAt: stories.updatedAt, author: users.name })
     .from(stories)
     .innerJoin(users, eq(users.id, stories.authorId))
     .where(where)
@@ -111,6 +113,8 @@ async function loadStory(where: ReturnType<typeof eq>): Promise<(Story & { statu
     audioId: r.audioId,
     audioDurationSec: r.audioDurationSec,
     originalUrl: r.originalUrl,
+    shareText: r.shareText,
+    shareMediaId: r.shareMediaId,
     author: r.author,
     updatedAt: r.updatedAt.toISOString(),
     status: r.status,
@@ -191,6 +195,8 @@ export type StoryPatch = {
   audioMediaId?: string | null;
   audioDurationSec?: number | null;
   originalUrl?: string | null;
+  shareText?: string;
+  shareMediaId?: string | null;
 };
 
 /**

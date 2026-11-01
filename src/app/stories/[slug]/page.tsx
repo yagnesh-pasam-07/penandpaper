@@ -69,6 +69,7 @@ export default async function StoryPage(props: PageProps<"/stories/[slug]">) {
         base="/api/stories/media/"
         sizes={sizes}
         url={url}
+        count
         more={
           next.length > 0 && (
             <section aria-label="More stories" className="flex flex-col pt-6">

@@ -32,6 +32,10 @@ export const stories = pgTable(
     audioDurationSec: integer("audio_duration_sec"),
     status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
     publishAt: timestamp("publish_at", { withTimezone: true }),
+    /** The line a reader's WhatsApp message starts with; empty = the default ("I read this and thought of you."). */
+    shareText: text("share_text").notNull().default(""),
+    /** A picture for link previews, if not the cover. */
+    shareMediaId: uuid("share_media_id"),
     /** Where it first appeared (e.g. Medium), for "First published on …" and the canonical link. */
     originalUrl: text("original_url"),
     /** One author today; the column is here so more writers need no rewrite. */
@@ -78,4 +82,29 @@ export const storyMediaParts = pgTable(
     data: text("data").notNull(),
   },
   (t) => [primaryKey({ columns: [t.mediaId, t.n], name: "story_media_parts_pk" })],
+);
+
+/**
+ * What readers do with a story, for the writer's Story Studio: a view, a
+ * read to the end, a listen, a share (and where to). Anonymous: `reader` is a
+ * hash of a random id the browser keeps (never a cookie, never an IP), so we
+ * can count people, not who they are. Readers never see these numbers.
+ */
+export const storyEvents = pgTable(
+  "story_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storyId: uuid("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["view", "read", "listen", "share"] }).notNull(),
+    /** For a share: whatsapp, instagram, copy, native, x, other. */
+    channel: text("channel"),
+    /** Where the reader came from: whatsapp, instagram, google, home, stories, direct, other. */
+    source: text("source"),
+    device: text("device", { enum: ["phone", "desktop"] }),
+    reader: text("reader").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("story_events_story_idx").on(t.storyId, t.kind), index("story_events_time_idx").on(t.createdAt)],
 );

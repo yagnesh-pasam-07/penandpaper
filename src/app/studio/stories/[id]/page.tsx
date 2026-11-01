@@ -33,6 +33,8 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
         audioId: s.audioId,
         audioDurationSec: s.audioDurationSec,
         originalUrl: s.originalUrl,
+        shareText: s.shareText,
+        shareMediaId: s.shareMediaId,
         readingMinutes: s.readingMinutes,
         state: s.state,
         publishAt: s.publishAtRaw?.toISOString() ?? null,

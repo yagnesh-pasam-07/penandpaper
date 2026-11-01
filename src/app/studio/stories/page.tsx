@@ -4,6 +4,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Logo } from "@/components/ui";
 import { readLabel } from "@/modules/stories/logic";
+import { CHANNEL_LABEL, readThrough, SOURCE_LABEL, type Channel, type Source } from "@/modules/stories/reach";
+import { allReach, totalsByStory } from "@/modules/stories/reach-server";
 import { allStories } from "@/modules/stories/server";
 import { writerOrPage } from "@/modules/stories/studio-gate";
 import { newStory } from "./actions";
@@ -19,7 +21,8 @@ async function List() {
   await connection();
   const writer = await writerOrPage("/studio/stories");
   if (!writer || typeof writer !== "object" || !("id" in writer)) return writer;
-  const list = await allStories();
+  const [list, totals, all] = await Promise.all([allStories(), totalsByStory(), allReach()]);
+  const n = (v: number) => v.toLocaleString("en-IN");
   return (
     <main className="mx-auto flex w-full max-w-[880px] flex-col gap-8 px-4 pt-8 pb-24 sm:px-8">
       <div className="flex items-end justify-between gap-4">
@@ -33,6 +36,21 @@ async function List() {
           </button>
         </form>
       </div>
+      <section aria-label="All stories" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Views", value: n(all.views) },
+          { label: "Readers", value: n(all.readers) },
+          { label: "Read to the end", value: `${readThrough(all)}%` },
+          { label: "Shares", value: n(all.shares), note: all.topChannel ? `most on ${CHANNEL_LABEL[all.topChannel as Channel] ?? all.topChannel}` : undefined },
+        ].map((k) => (
+          <div key={k.label} className="flex flex-col gap-1 rounded-2xl border border-line bg-sheet p-4">
+            <span className="text-[12px] font-medium text-mute">{k.label}</span>
+            <span className="text-[26px] leading-none font-semibold tracking-[-0.02em] [font-feature-settings:'tnum'_1]">{k.value}</span>
+            {k.note && <span className="text-[12px] text-mute">{k.note}</span>}
+          </div>
+        ))}
+        {all.topSource && <p className="col-span-full text-[13px] text-mute">Most readers come from {SOURCE_LABEL[all.topSource as Source] ?? all.topSource}.</p>}
+      </section>
       <ul className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-sheet">
         {list.length === 0 && <li className="px-5 py-10 text-center text-mute">No stories yet.</li>}
         {list.map((s) => (
@@ -46,8 +64,25 @@ async function List() {
                   {s.state !== "draft" ? ` · ${when(s.publishAt)}` : ` · edited ${when(s.updatedAt)}`} · {readLabel(s.readingMinutes)}
                 </span>
               </span>
-              {s.state === "published" && <span className="text-[13px] text-mute max-sm:hidden">/stories/{s.slug}</span>}
+              {s.state === "published" && (
+                <span className="flex shrink-0 gap-4 text-right text-[13px] text-mute [font-feature-settings:'tnum'_1]">
+                  <span className="flex flex-col">
+                    <span className="text-[15px] font-semibold text-ink">{n(totals[s.id]?.views ?? 0)}</span>views
+                  </span>
+                  <span className="flex flex-col max-sm:hidden">
+                    <span className="text-[15px] font-semibold text-ink">{totals[s.id] ? `${readThrough(totals[s.id])}%` : "0%"}</span>read
+                  </span>
+                  <span className="flex flex-col">
+                    <span className="text-[15px] font-semibold text-ink">{n(totals[s.id]?.shares ?? 0)}</span>shares
+                  </span>
+                </span>
+              )}
             </Link>
+            {s.state === "published" && (
+              <Link href={`/studio/stories/${s.id}/reach`} className="block border-t border-line/60 px-5 py-2 text-[13px] text-mute hover:bg-soft hover:text-ink">
+                See reach: where readers came from, and where it was shared →
+              </Link>
+            )}
           </li>
         ))}
       </ul>
