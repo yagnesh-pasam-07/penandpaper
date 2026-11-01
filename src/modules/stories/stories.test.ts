@@ -79,6 +79,9 @@ describe("markdown", () => {
     expect(inline("[x](javascript:alert(1))")).toEqual([{ t: "text", v: "[x](javascript:alert(1))" }]);
     expect(inline("[x](https://a.b)")).toEqual([{ t: "link", href: "https://a.b", c: [{ t: "text", v: "x" }] }]);
   });
+  it("italics on each of two lines", () => {
+    expect(inline("*one*\n*two*")).toEqual([{ t: "em", c: [{ t: "text", v: "one" }] }, { t: "br" }, { t: "em", c: [{ t: "text", v: "two" }] }]);
+  });
   it("gives a plain first line", () => {
     expect(firstLine("## Head\n\nSay a **word** for me.")).toBe("Say a word for me.");
   });

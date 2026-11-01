@@ -390,7 +390,7 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
         />
       )}
 
-      <main className="story-serif mx-auto flex w-full max-w-[680px] flex-col px-5 pt-10 pb-40 sm:px-6 sm:pt-16">
+      <main className="story-serif mx-auto flex w-full max-w-[728px] flex-col px-6 pt-10 pb-40 sm:pt-14">
         <p className="pb-4 font-sans text-[13px] font-semibold tracking-[0.08em] text-red-text uppercase">{CATEGORY_LABEL[s.category]}</p>
         <Grow label="Title" value={s.title} onChange={(v) => field("title", v.replace(/\n/g, " "))} autoFocus={!s.title} placeholder="Title" className="text-[38px] leading-[1.08] font-medium tracking-[-0.02em] text-ink sm:text-[52px]" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), refs.current.get("subtitle")?.focus())} />
         <Grow
@@ -412,10 +412,10 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
         {/* The cover, as it will sit under the byline. */}
         <div className="mt-8">
           {s.coverId ? (
-            <figure className="group relative flex flex-col gap-2 sm:-mx-10">
+            <figure className="group relative flex flex-col gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- the writer's own upload, resized by our route */}
               <img src={`${MEDIA}${s.coverId}?w=960`} alt="" className="w-full rounded-md bg-soft" />
-              <input value={s.coverCaption} onChange={(e) => field("coverCaption", e.target.value)} placeholder="A caption for the cover (optional)" aria-label="Cover caption" className="px-1 text-center font-sans text-[14px] text-mute sm:px-10" />
+              <input value={s.coverCaption} onChange={(e) => field("coverCaption", e.target.value)} placeholder="A caption for the cover (optional)" aria-label="Cover caption" className="px-1 text-center font-sans text-[14px] text-mute" />
             </figure>
           ) : (
             <FileButton accept="image/*" onFile={(f) => void setCover(f)} className="flex h-28 w-full items-center justify-center rounded-md border border-dashed border-line font-sans text-[14px] text-mute hover:border-mute hover:text-ink">
@@ -424,7 +424,7 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
           )}
         </div>
 
-        <div className="mt-10 flex flex-col gap-7 text-[20px] leading-[1.75] text-ink/90 sm:text-[21px]">
+        <div className="mt-10 flex flex-col gap-8 text-[19px] leading-[1.6] tracking-[-0.003em] text-ink/90 sm:text-[20px]">
           {blocks.map((b, i) => (
             <div key={b.key} className="group relative">
               <Margin
@@ -437,11 +437,11 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
                   · · ·
                 </div>
               ) : b.t === "img" ? (
-                <figure className="flex flex-col gap-2 sm:-mx-10">
+                <figure className="flex flex-col gap-2">
                   {/* eslint-disable-next-line @next/next/no-img-element -- the writer's own upload, resized by our route */}
                   <img src={`${MEDIA}${b.id}?w=960`} alt={b.caption} className="w-full rounded-md bg-soft" />
-                  <input value={b.caption} onChange={(e) => update(b.key, { caption: e.target.value })} placeholder="Caption: what are we looking at?" aria-label="Picture caption" className="px-1 text-center font-sans text-[14px] text-mute sm:px-10" />
-                  <input value={b.credit} onChange={(e) => update(b.key, { credit: e.target.value })} placeholder="Artist (optional)" aria-label="Artist credit" className="px-1 text-center font-sans text-[12px] tracking-[0.04em] text-mute uppercase sm:px-10" />
+                  <input value={b.caption} onChange={(e) => update(b.key, { caption: e.target.value })} placeholder="Caption: what are we looking at?" aria-label="Picture caption" className="px-1 text-center font-sans text-[14px] text-mute" />
+                  <input value={b.credit} onChange={(e) => update(b.key, { credit: e.target.value })} placeholder="Artist (optional)" aria-label="Artist credit" className="px-1 text-center font-sans text-[12px] tracking-[0.04em] text-mute uppercase" />
                 </figure>
               ) : (
                 <Grow

@@ -74,10 +74,10 @@ function BlockView({ b, base, sizes, first }: { b: Block; base: MediaBase; sizes
       );
     case "img":
       return (
-        <figure className="my-4 flex flex-col gap-3 sm:-mx-10">
-          <Picture base={base} id={b.id} alt={b.caption || "A picture from the story"} sizes="(max-width: 760px) 100vw, 760px" size={sizes[b.id]} className="rounded-md" />
+        <figure className="my-2 flex flex-col gap-3">
+          <Picture base={base} id={b.id} alt={b.caption || "A picture from the story"} sizes="(max-width: 728px) 100vw, 680px" size={sizes[b.id]} className="rounded-md" />
           {(b.caption || b.credit) && (
-            <figcaption className="px-1 text-center font-sans text-[14px] leading-relaxed text-mute sm:px-10">
+            <figcaption className="px-1 text-center font-sans text-[14px] leading-relaxed text-mute">
               {b.caption}
               {b.credit && <span className="block text-[12px] tracking-[0.04em] uppercase">Art: {b.credit}</span>}
             </figcaption>
@@ -115,7 +115,7 @@ export function StoryReader({ story, base, sizes, url, more }: { story: ReaderSt
   const artwork = story.coverId ? `${base}${story.coverId}?w=480` : null;
   return (
     <article lang={story.language} className="story-serif flex flex-col">
-      <header className="mx-auto flex w-full max-w-[680px] flex-col gap-5 px-5 pt-10 sm:px-6 sm:pt-16">
+      <header className="mx-auto flex w-full max-w-[728px] flex-col gap-5 px-6 pt-10 sm:pt-14">
         <p className="font-sans text-[13px] font-semibold tracking-[0.08em] text-red-text uppercase">
           <Link href="/stories" className="hover:underline">
             {CATEGORY_LABEL[story.category]}
@@ -144,19 +144,19 @@ export function StoryReader({ story, base, sizes, url, more }: { story: ReaderSt
       </header>
 
       {story.coverId && (
-        <figure className="mx-auto mt-8 flex w-full max-w-[1040px] flex-col gap-3 sm:mt-10 sm:px-6">
-          <Picture base={base} id={story.coverId} alt={story.coverCaption || story.title} sizes="(max-width: 1040px) 100vw, 1040px" size={sizes[story.coverId]} eager className="sm:rounded-lg" />
+        <figure className="mx-auto mt-8 flex w-full max-w-[728px] flex-col gap-3 sm:mt-10 sm:px-6">
+          <Picture base={base} id={story.coverId} alt={story.coverCaption || story.title} sizes="(max-width: 728px) 100vw, 680px" size={sizes[story.coverId]} eager className="sm:rounded-md" />
           {story.coverCaption && <figcaption className="px-5 text-center font-sans text-[14px] leading-relaxed text-mute">{story.coverCaption}</figcaption>}
         </figure>
       )}
 
-      <div className="story-body mx-auto flex w-full max-w-[680px] flex-col gap-7 px-5 pt-10 pb-6 text-[20px] leading-[1.75] text-ink/90 sm:px-6 sm:text-[21px]">
+      <div className="story-body mx-auto flex w-full max-w-[728px] flex-col gap-8 px-6 pt-10 pb-6 text-[19px] leading-[1.6] tracking-[-0.003em] text-ink/90 sm:text-[20px]">
         {blocks.map((b, i) => (
           <BlockView key={i} b={b} base={base} sizes={sizes} first={i === firstP} />
         ))}
       </div>
 
-      <footer className="mx-auto flex w-full max-w-[680px] flex-col gap-6 px-5 pt-4 pb-16 font-sans sm:px-6">
+      <footer className="mx-auto flex w-full max-w-[728px] flex-col gap-6 px-6 pt-4 pb-16 font-sans">
         <p aria-hidden="true" className="text-center text-[22px] text-red-text">
           ✒
         </p>
