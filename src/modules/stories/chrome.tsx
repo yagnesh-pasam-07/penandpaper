@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo, ThemeToggle } from "@/components/ui";
+import { ReaderAccount } from "./reader-account";
 
 /** The stories' own header: the brand, "Stories", and the theme. No app chrome, no sign-up nag. */
 export function StoriesHeader() {
@@ -16,8 +17,9 @@ export function StoriesHeader() {
             stories
           </Link>
         </span>
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-1">
           <ThemeToggle />
+          <ReaderAccount />
         </span>
       </nav>
     </header>

@@ -134,10 +134,27 @@ export const storyClaps = pgTable(
     storyId: uuid("story_id")
       .notNull()
       .references(() => stories.id, { onDelete: "cascade" }),
-    /** The same anonymous reader key as story_events. */
+    /** The anonymous reader key as story_events, or "u:<user id>" for a signed-in reader (one count across all their devices). */
     reader: text("reader").notNull(),
+    /** Set when a signed-in reader clapped, so the writer can see who loved a story. */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     count: integer("count").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.storyId, t.reader], name: "story_claps_pk" })],
+);
+
+/** A reader's "save for later" list: signed-in readers only. */
+export const storySaves = pgTable(
+  "story_saves",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    storyId: uuid("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.storyId], name: "story_saves_pk" }), index("story_saves_user_idx").on(t.userId, t.createdAt)],
 );

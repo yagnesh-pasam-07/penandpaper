@@ -5,6 +5,7 @@ import { parse, type Block, type Inline } from "./markdown";
 import { Listen } from "./listen";
 import { Clap } from "./clap";
 import { ReadingSignal } from "./reading-signal";
+import { SaveButton } from "./save-button";
 import { ShareStory } from "./share";
 
 /** Where a story's files come from: the public route, or the writer's (drafts too). */
@@ -232,6 +233,7 @@ export function StoryReader({ story, base, sizes, url, more, count = false, othe
           </span>
           <span className="ml-auto flex items-center gap-2">
             {audio && <Listen src={audio} title={story.title} author={story.author} artwork={artwork} duration={story.audioDurationSec} slug={count ? story.slug : undefined} />}
+            {count && <SaveButton slug={story.slug} />}
             <ShareStory info={info} compact />
           </span>
         </div>

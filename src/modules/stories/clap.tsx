@@ -2,7 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_CLAPS, shortCount } from "./reach";
+import { ReaderSignIn } from "./reader-sign-in";
 import { readerId } from "./track";
+
+/** Claps tapped before signing in, kept for the same story until the reader comes back signed in. */
+const PENDING = "pp-clap-pending";
+const keepPending = (slug: string, n: number) => {
+  try {
+    sessionStorage.setItem(PENDING, JSON.stringify({ slug, n }));
+  } catch {}
+};
+const takePending = (slug: string): number => {
+  try {
+    const raw = sessionStorage.getItem(PENDING);
+    if (!raw) return 0;
+    const d = JSON.parse(raw) as { slug: string; n: number };
+    if (d.slug !== slug) return 0;
+    sessionStorage.removeItem(PENDING);
+    return Math.max(0, Math.min(50, Math.floor(d.n)));
+  } catch {
+    return 0;
+  }
+};
 
 let ctx: AudioContext | null = null;
 
@@ -77,6 +98,8 @@ export function Clap({ slug, floating = false }: { slug: string; floating?: bool
   const [mine, setMine] = useState(0);
   const [burst, setBurst] = useState(0);
   const [pop, setPop] = useState(0);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [asking, setAsking] = useState(false);
   const pending = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,10 +130,11 @@ export function Clap({ slug, floating = false }: { slug: string; floating?: bool
     let live = true;
     void fetch(`/api/stories/clap?slug=${encodeURIComponent(slug)}&reader=${encodeURIComponent(readerId())}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d: { mine: number; total: number }) => {
+      .then((d: { mine: number; total: number; signedIn?: boolean }) => {
         if (!live) return;
         setTotal(d.total);
         setMine(d.mine);
+        setSignedIn(!!d.signedIn);
       })
       .catch(() => setTotal(0));
     return () => {
@@ -123,7 +147,16 @@ export function Clap({ slug, floating = false }: { slug: string; floating?: bool
     pending.current = 0;
     if (!n) return;
     void fetch("/api/stories/clap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, reader: readerId(), n }), keepalive: true })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (r.status === 401) {
+          // Signed out after all: keep what they gave and ask.
+          keepPending(slug, n);
+          setSignedIn(false);
+          setAsking(true);
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
       .then((d: { mine: number; total: number } | null) => {
         if (d) {
           setTotal(d.total);
@@ -133,6 +166,16 @@ export function Clap({ slug, floating = false }: { slug: string; floating?: bool
       })
       .catch(() => {});
   }, [slug]);
+
+  // Back from signing in: the claps they gave before are sent now (by the button at the end, once).
+  useEffect(() => {
+    if (!signedIn || floating) return;
+    const n = takePending(slug);
+    if (!n) return;
+    pending.current += n;
+    const t = setTimeout(send, 0);
+    return () => clearTimeout(t);
+  }, [signedIn, floating, slug, send]);
 
   // Send anything still waiting when the reader leaves.
   useEffect(() => {
@@ -148,6 +191,16 @@ export function Clap({ slug, floating = false }: { slug: string; floating?: bool
   const clap = () => {
     if (full) return;
     clapSound(mine);
+    if (signedIn === false) {
+      // A clap is from a person: one tap, a sound, and a gentle ask. The tap is kept for when they're back.
+      try {
+        navigator.vibrate?.(12);
+      } catch {}
+      setPop((p) => p + 1);
+      keepPending(slug, Math.min(MAX_CLAPS, takePending(slug) + 1));
+      setAsking(true);
+      return;
+    }
     try {
       navigator.vibrate?.(12);
     } catch {}
@@ -166,7 +219,7 @@ export function Clap({ slug, floating = false }: { slug: string; floating?: bool
     }, 900);
   };
 
-  const label = full ? "You gave this story all 50 claps" : mine ? `Clap again (you've given ${mine})` : "Clap for this story";
+  const label = signedIn === false ? "Clap for this story (sign in first)" : full ? "You gave this story all 50 claps" : mine ? `Clap again (you've given ${mine})` : "Clap for this story";
   return (
     <div
       aria-hidden={floating && hidden ? true : undefined}
@@ -200,9 +253,10 @@ export function Clap({ slug, floating = false }: { slug: string; floating?: bool
       {!floating && (
         <span className="flex flex-col font-sans leading-tight">
           <span className="text-[18px] font-semibold text-ink tabular-nums">{total === null ? "…" : shortCount(total)}</span>
-          <span className="text-[12px] text-mute">{full ? "All 50 given. Thank you." : mine ? `${mine} from you` : "claps · tap more if it moved you"}</span>
+          <span className="text-[12px] text-mute">{full ? "All 50 given. Thank you." : mine ? `${mine} from you` : signedIn === false ? "claps · sign in to add yours" : "claps · tap more if it moved you"}</span>
         </span>
       )}
+      {asking && <ReaderSignIn reason="clap" onClose={() => setAsking(false)} />}
     </div>
   );
 }

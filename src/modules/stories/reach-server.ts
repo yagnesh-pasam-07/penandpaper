@@ -4,7 +4,8 @@ import { and, count, countDistinct, desc, eq, gte, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { env } from "@/lib/env";
 import { MAX_CLAPS, type Channel, type EventKind, type Source, type Totals } from "./reach";
-import { stories, storyClaps, storyEvents } from "./schema";
+import { users } from "@/db/schema";
+import { stories, storyClaps, storyEvents, storySaves } from "./schema";
 
 /**
  * A reader as Studio counts them: the browser's random id, keyed with the
@@ -120,15 +121,15 @@ export async function liveStoryId(slug: string): Promise<string | null> {
  * all, and keeps the story's total in step, in one statement. Returns this
  * reader's count and the story's total.
  */
-export async function addClaps(storyId: string, reader: string, n: number): Promise<{ mine: number; total: number }> {
+export async function addClaps(storyId: string, reader: string, n: number, userId: string | null = null): Promise<{ mine: number; total: number }> {
   const add = Math.max(1, Math.min(Math.floor(n), MAX_CLAPS));
   const rows = await httpDb.execute<{ mine: number; total: number }>(sql`
     with prev as (
       select coalesce((select ${storyClaps.count} from ${storyClaps} where ${storyClaps.storyId} = ${storyId}::uuid and ${storyClaps.reader} = ${reader}), 0) as c
     ),
     up as (
-      insert into ${storyClaps} (story_id, reader, count, updated_at)
-      values (${storyId}::uuid, ${reader}, least(${add}::int, ${MAX_CLAPS}::int), now())
+      insert into ${storyClaps} (story_id, reader, user_id, count, updated_at)
+      values (${storyId}::uuid, ${reader}, ${userId}::uuid, least(${add}::int, ${MAX_CLAPS}::int), now())
       on conflict (story_id, reader) do update set count = least(${storyClaps.count} + ${add}::int, ${MAX_CLAPS}::int), updated_at = now()
       returning count
     ),
@@ -150,4 +151,70 @@ export async function clapsOf(storyId: string, reader: string): Promise<{ mine: 
     httpDb.select({ mine: storyClaps.count }).from(storyClaps).where(and(eq(storyClaps.storyId, storyId), eq(storyClaps.reader, reader))).limit(1),
   ]);
   return { mine: m?.mine ?? 0, total: s?.total ?? 0 };
+}
+
+/** The clap key for a signed-in reader: one count per person, on every device. */
+export const userReader = (userId: string) => `u:${userId}`;
+
+/**
+ * A reader signed in: their anonymous claps on this browser become theirs.
+ * Per story, the account keeps the larger of the two counts (still at most
+ * MAX_CLAPS), the anonymous row goes, and the story total is corrected.
+ */
+export async function claimClaps(anon: string, userId: string): Promise<void> {
+  const me = userReader(userId);
+  await httpDb.execute(sql`
+    with a as (
+      delete from ${storyClaps} where ${storyClaps.reader} = ${anon} returning story_id, count
+    ),
+    u as (
+      select c.story_id, c.count from ${storyClaps} c join a on a.story_id = c.story_id where c.reader = ${me}
+    ),
+    merged as (
+      insert into ${storyClaps} (story_id, reader, user_id, count, updated_at)
+      select a.story_id, ${me}, ${userId}::uuid, least(greatest(a.count, coalesce(u.count, 0)), ${MAX_CLAPS}::int), now()
+      from a left join u on u.story_id = a.story_id
+      on conflict (story_id, reader) do update set count = excluded.count, user_id = excluded.user_id, updated_at = now()
+      returning story_id
+    )
+    update ${stories} s set claps = coalesce((select sum(c.count) from ${storyClaps} c where c.story_id = s.id), 0)
+    where s.id in (select story_id from merged)
+  `);
+}
+
+/** Signed-in readers who clapped for a story, most claps first: for the writer only. */
+export async function clappers(storyId: string, limit = 50): Promise<{ name: string; image: string | null; count: number }[]> {
+  try {
+    return await httpDb
+      .select({ name: users.name, image: users.image, count: storyClaps.count })
+      .from(storyClaps)
+      .innerJoin(users, eq(users.id, storyClaps.userId))
+      .where(eq(storyClaps.storyId, storyId))
+      .orderBy(desc(storyClaps.count))
+      .limit(limit);
+  } catch {
+    return [];
+  }
+}
+
+/** Save or unsave a story for later. Returns whether it is saved now. */
+export async function setSaved(userId: string, storyId: string, saved: boolean): Promise<boolean> {
+  if (saved) await httpDb.insert(storySaves).values({ userId, storyId }).onConflictDoNothing();
+  else await httpDb.delete(storySaves).where(and(eq(storySaves.userId, userId), eq(storySaves.storyId, storyId)));
+  return saved;
+}
+
+export async function isSaved(userId: string, storyId: string): Promise<boolean> {
+  const [r] = await httpDb.select({ s: storySaves.storyId }).from(storySaves).where(and(eq(storySaves.userId, userId), eq(storySaves.storyId, storyId))).limit(1);
+  return !!r;
+}
+
+/** A reader's saved stories, newest saved first (live stories only). */
+export async function savedStories(userId: string): Promise<{ slug: string; title: string; hook: string; readingMinutes: number; coverId: string | null }[]> {
+  return httpDb
+    .select({ slug: stories.slug, title: stories.title, hook: stories.hook, readingMinutes: stories.readingMinutes, coverId: stories.coverMediaId })
+    .from(storySaves)
+    .innerJoin(stories, eq(stories.id, storySaves.storyId))
+    .where(and(eq(storySaves.userId, userId), eq(stories.status, "published"), sql`${stories.publishAt} <= now()`))
+    .orderBy(desc(storySaves.createdAt));
 }

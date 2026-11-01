@@ -7,7 +7,7 @@ import { z } from "zod";
 import { Logo } from "@/components/ui";
 import { readLabel, storyDate } from "@/modules/stories/logic";
 import { CHANNEL_LABEL, daily, readThrough, shareRate, SOURCE_LABEL, type Channel, type Source } from "@/modules/stories/reach";
-import { storyReach } from "@/modules/stories/reach-server";
+import { clappers, storyReach } from "@/modules/stories/reach-server";
 import { storyForWriter } from "@/modules/stories/server";
 import { writerOrPage } from "@/modules/stories/studio-gate";
 import { Bars } from "../../../charts";
@@ -66,7 +66,7 @@ async function Reach({ params }: { params: Promise<{ id: string }> }) {
   if (!z.uuid().safeParse(id).success) notFound();
   const s = await storyForWriter(id);
   if (!s) notFound();
-  const r = await storyReach(id).catch(() => null);
+  const [r, fans] = await Promise.all([storyReach(id).catch(() => null), clappers(id)]);
   if (!r) return <p className="p-10 text-center text-mute">Numbers aren&apos;t available yet.</p>;
   const days = daily(r.daily, 28, new Date());
   const sources = Object.entries(r.bySource)
@@ -119,6 +119,23 @@ async function Reach({ params }: { params: Promise<{ id: string }> }) {
         <Ranked title="Where readers came from" rows={sources} unit="readers" empty="No readers yet. Share it on WhatsApp to start." />
         <Ranked title="Where it was shared" rows={channels} unit="shares" empty="Nobody has shared it yet." />
       </div>
+
+      <section className={`${card} flex flex-col gap-3 p-5`}>
+        <h2 className="text-[15px] font-semibold">Who loved it</h2>
+        {fans.length === 0 ? (
+          <p className="text-[14px] text-mute">No claps from signed-in readers yet.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {fans.map((f, i) => (
+              <li key={i} className="flex items-center gap-2 rounded-full border border-line py-1 pr-3 pl-1 text-[14px]">
+                <span className="flex size-7 items-center justify-center rounded-full bg-soft text-[12px] font-semibold">{f.name.trim().charAt(0).toUpperCase()}</span>
+                {f.name}
+                <span className="text-mute">👏 {f.count}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className={`${card} flex flex-col gap-2 p-5`}>
         <h2 className="text-[15px] font-semibold">How they read</h2>
