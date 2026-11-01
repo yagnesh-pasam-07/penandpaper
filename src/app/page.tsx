@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { storyFonts } from "@/modules/stories/fonts";
 import { Home } from "@/screens/home/home";
 import { currentUser } from "@/server/session";
 
@@ -32,7 +33,9 @@ export default function Page() {
       <Suspense fallback={null}>
         <SignedInGoesToPaper />
       </Suspense>
-      <Home supportEmail={process.env.SUPPORT_EMAIL} />
+      <div className={storyFonts}>
+        <Home supportEmail={process.env.SUPPORT_EMAIL} />
+      </div>
     </>
   );
 }

@@ -5,6 +5,7 @@ import { Everywhere, Fonts, HeroGallery, Highlight } from "./everywhere";
 import { GitHubButton, OpenSource } from "./github";
 import { PainPoints } from "./pain-points";
 import { TwoWays } from "./two-ways";
+import { ThisWeeksStory } from "./this-week";
 import { TryIt } from "./try-it";
 
 const START = "/signup?next=/drop";
@@ -33,6 +34,9 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
         <span className="ml-auto flex items-center gap-1.5">
           <GitHubButton />
           <ThemeToggle />
+          <Link href="/stories" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
+            Stories
+          </Link>
           <Link href="/download" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
             Download
           </Link>
@@ -65,6 +69,8 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
         </div>
 
         <TwoWays />
+
+        <ThisWeeksStory />
 
         <PainPoints />
 
