@@ -1,6 +1,6 @@
 ---
 title: The man behind the words
-subtitle: మాట వెనుక మనిషి. Why the Telugu states have a birthday, and who paid for it.
+subtitle: మాట వెనుక మనిషి. Why 1 November is Andhra Pradesh's birthday, and who paid for it.
 hook: Every time you say "Amma" in Telugu, a man who stopped eating for 58 days is part of the sentence.
 category: history
 language: en
@@ -18,9 +18,9 @@ This is a story about the man who built the pipe.
 
 His name was Potti Sriramulu. He was born in Madras in 1901, to a Telugu family whose village was near Nellore. He was not a king, not a film star, not a minister. He studied sanitary engineering, got a job with the railways, and earned well. A good, ordinary life was waiting for him.
 
-Then, in his late twenties, he lost his wife and his newborn child within days of each other.
+Then, in 1928, when he was 27, his wife died giving birth, and a few days later, so did their child. Two years after that, he lost his mother too.
 
-Some people break when that happens. He went very quiet instead. He gave away what he owned, left his job, and walked into Gandhi's Sabarmati Ashram. He marched for salt. He went to jail. He fasted so that people the world called "untouchable" could walk into a temple in Nellore.
+Some people break when that happens. He went very quiet instead. He gave up his railway job and walked into Gandhi's Sabarmati Ashram. He marched for salt. He went to jail. He fasted so that people the world called "untouchable" could walk into a temple in Nellore.
 
 Gandhi is often quoted as saying that with eleven more people like Sriramulu, he could win freedom in a year.
 
@@ -30,7 +30,7 @@ He wasn't loud. He was stubborn the way a river is stubborn.
 
 India became free in 1947. But for the Telugu people, something was still missing.
 
-Millions of us spoke one language, sang the same lullabies, cried at the same films, and argued about the same mangoes. And yet we were split up. Most Telugu districts were part of the huge Madras State, run from a city where our language was a guest, not the host. Courts, offices and schools spoke to people in a language that was not theirs.
+Millions of us spoke one language, sang the same lullabies, and argued about the same mangoes. And yet we were split up. The coastal and Rayalaseema districts were part of the huge Madras State, run from a city where our language was a guest, not the host. The Telangana districts were in Hyderabad State. Courts, offices and schools spoke to people in a language that was not theirs.
 
 Imagine walking into a government office and not being able to explain your own problem in your mother tongue. Now imagine that for your whole life.
 
@@ -58,7 +58,9 @@ The news went through the Telugu land like a fire. Towns shut down. Trains stopp
 
 Four days later, Prime Minister Nehru announced that a Telugu state would be formed. Andhra State came into being on 1 October 1953, the first state in India drawn around a language.
 
-And it didn't stop there. His sacrifice forced the whole country to ask a question: *should states follow the languages their people speak?* In 1956, India redrew its map. On **1 November 1956**, the Telugu-speaking regions came together as Andhra Pradesh.
+And it didn't stop there. His sacrifice forced the whole country to ask a question: *should states follow the languages their people speak?* In 1956, India redrew its map. On **1 November 1956**, Andhra State and the Telugu districts of Hyderabad State came together as Andhra Pradesh.
+
+In 2014, Telangana became a state of its own, with its own birthday on 2 June. Two homes now, one language.
 
 That is why the first of November means something. It isn't just a date on a government calendar. It is the birthday of a home built for a language, and a man gave his life as the price of it.
 

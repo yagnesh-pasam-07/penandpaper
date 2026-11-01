@@ -31,6 +31,8 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 
 **Guardrails:** three tools, not thirteen (Select, Text, Draw, plus the eraser). Voice is first-class (hold Space and talk onto the paper). Calm by default: no shapes palette, no templates, no streaks.
 
+**The brand:** Pen & Paper is the website, the thinking app, **Stories** (real human stories, history and art, read slowly or listened to), and a shop later. The app is private; Stories are public. They share the brand and the look, never data.
+
 **Next bets:** Apple Pencil and touch pen on iPad (literally better than paper); connected thoughts in Tonight's paper ("these three are one idea").
 
 ---
@@ -50,6 +52,16 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **Extension:** highlight on any site and click the icon (or ⌥⇧P / Alt+Shift+P): the words, the first picture in the highlight and the page address go straight to the paper. No window.
 - **Language:** English only in the interface and for voice, for now. Thoughts in any script still display correctly.
 - **Windows:** no native app yet; the installable web app and the extension stand in.
+
+### Stories (public)
+- **What:** real human stories, history and art, written by the admin in Studio, read or heard by anyone at `/stories` (no account). Made for one hand on a phone in the metro, an auto driver who listens, and someone after a bad day. No likes, comments, counts or popups.
+- **Reading page** (`/stories/[slug]`): Newsreader serif at 20–21 px, about 65 characters a line, warm paper and ink (dark mode), drop cap, red pull quotes, pictures with captions and artist credit. Pictures are offered at 480/960/1600 px as WebP and lazy-loaded (a phone on 4G loads a 7 KB cover, not 84 KB).
+- **Listen:** only when the writer recorded their own voice (no text-to-speech). A real `<audio>` with lock-screen controls (Media Session), served with byte ranges so iPhone can seek and keep playing with the screen off.
+- **Writing** (`/studio/stories`): behind Studio's two locks (admin role + passcode), checked on the server for every save and upload. A Medium-style editor: you type on a page that looks like the published one (Enter = paragraph, `## ` heading, `> ` quote, ⌘B/⌘I, + for a picture or break), it saves itself, Preview shows the real page, Publish is "now" or "schedule" (default next Sunday 9 AM). The address follows the title until first published, then never changes. A Medium post can be imported as a draft, pictures copied in.
+- **Scheduling:** "scheduled" is a published story with `publish_at` ahead. Public pages are cached and re-checked every 15 minutes, so a scheduled story appears within 15 minutes of its time; publishing in Studio shows at once.
+- **Discovery:** "This week's story" on the homepage (the newest one), Stories in the homepage nav, WhatsApp-first share, a per-story share image (~45 KB JPEG), `sitemap.xml`, `robots.txt`, `/stories/rss.xml`.
+- **Story files** (pictures, audio) are stored in Postgres in 1.5 MB parts (`story_media_parts`), the same "database for now" choice as the paper's pictures; moves with them to object storage.
+- **Stories in Markdown files** (`content/stories/*.md`) go into Studio as drafts with `npm run story:add -- <file> <admin email>`; never published by the script.
 
 ### Design
 - Paper, ink and one red. Handwritten headings. Notes in one of two fonts, chosen per user in Settings: **Handwritten** (Kalam, the default, for loose thinking) or **Clear** (Inter, medium weight, so a thought reads like a decision you'll remember).
@@ -73,6 +85,8 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - The server fetches pictures and link previews only from public addresses, never with the visitor's cookies.
 
 ### Open questions
+- Stories: Telugu translations (the `language` column is there), more writers (`author_id` is there), a newsletter, and a weekly reminder to readers. Out of v1.
+- Story audio up to 40 MB lives in Postgres today; move to object storage (Vercel Blob) once there are more than a handful of recordings.
 - Move pictures out of the database into object storage (the biggest cost and speed risk as usage grows).
 - Sharing a paper (read-only link) and connecting thoughts: proposed, not built.
 - A universal (Apple silicon + Intel) Mac build: possible, untested on Intel.
@@ -121,6 +135,7 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 | Feature | State | Ticket |
 | --- | --- | --- |
+| Stories: real human stories, history and art, written in Studio, read or heard at /stories; This week's story on the homepage | Shipped | [#35](https://github.com/yagnesh-pasam-07/penandpaper/issues/35) |
 | Thought of the Day: one past thought a day, full screen, signature sound, recall time, notifications on every device | Shipped | [#34](https://github.com/yagnesh-pasam-07/penandpaper/issues/34) |
 | Hold Space to talk in any text box (like Claude's CLI), a mic by the cursor, no header bar on the paper | Shipped | [#33](https://github.com/yagnesh-pasam-07/penandpaper/issues/33) |
 | Canvas tools: Select, Text, Draw (with connectors), Eraser; hold Space to speak; "pen & paper, digitally" homepage | Shipped | [#31](https://github.com/yagnesh-pasam-07/penandpaper/issues/31) |
@@ -129,6 +144,15 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-01 11:30 IST · product · Stories: a public, calm place for real human stories, history and art
+Why: Pen & Paper is a brand, not only an app; stories build the audience (a link on WhatsApp is how most people here will meet it). Made for one-handed reading on a phone, listening while working, and feeling better after a bad day. Like Medium for the reader and the writer, without the noise: no claps, comments, counts or paywall.
+Decision tree: (1) not the core loop of the app: so it lives outside it, on the public website, and never touches anyone's paper. (2) One new page set (/stories) and one homepage section; the writer's controls stay in Studio. (3) Doesn't change what a thought is. (4) Add-only migration 0018: stories, story_media, story_media_parts. (5) Drafts and scheduled stories are never public (files of an unpublished story 404); deleting a story asks first. (6) Tests for the role guard, scheduling, slugs, reading time, Markdown, the editor's round trip and the Medium importer; checked end to end against a real Postgres (publish, unpublish, schedule, upload, Range audio, share image, 375 px, dark).
+Replaces: nothing.
+
+### 2026-11-01 11:30 IST · tech · Story files in Postgres for v1, served by our own route
+Why: no object storage is set up and audio can't be a data URL. Files are split into 1.5 MB parts (each request stays under Vercel's 4.5 MB limit), pictures resized on the fly to 480/960/1600 WebP and cached for a year, audio served with byte ranges. Moves to Vercel Blob with the paper's pictures.
+Replaces: nothing.
 
 ### 2026-10-31 18:00 IST · design · Thought of the Day sits on solid paper over a blurred canvas
 
