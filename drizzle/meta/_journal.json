@@ -127,6 +127,13 @@
       "when": 1793435325465,
       "tag": "0017_thought_of_the_day",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793508455759,
+      "tag": "0018_stories",
+      "breakpoints": true
     }
   ]
 }
