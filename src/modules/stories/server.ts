@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
 import { httpDb } from "@/db";
 import { users } from "@/db/schema";
@@ -259,17 +259,20 @@ export async function mediaMeta(id: string): Promise<MediaMeta | null> {
 
 /** Sizes of a story's pictures, so the page reserves their space (no jumping while they load). */
 export async function mediaSizes(ids: string[]): Promise<Record<string, { w: number; h: number }>> {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 900, expire: 86400 });
+  cacheTag(STORIES_TAG);
   if (!ids.length) return {};
   const rows = await httpDb.select({ id: storyMedia.id, w: storyMedia.width, h: storyMedia.height }).from(storyMedia).where(inArray(storyMedia.id, ids));
   return Object.fromEntries(rows.filter((r) => r.w && r.h).map((r) => [r.id, { w: r.w!, h: r.h! }]));
 }
 
-/** The parts in `[from, to]`, decoded, in order. */
-export async function mediaBytes(id: string, from = 0, to = Number.MAX_SAFE_INTEGER): Promise<Buffer> {
+/** The parts in `[from, to]` (all of them when `to` is left out), decoded, in order. */
+export async function mediaBytes(id: string, from = 0, to?: number): Promise<Buffer> {
   const rows = await httpDb
     .select({ n: storyMediaParts.n, data: storyMediaParts.data })
     .from(storyMediaParts)
-    .where(and(eq(storyMediaParts.mediaId, id), sql`${storyMediaParts.n} between ${from} and ${to}`))
+    .where(and(eq(storyMediaParts.mediaId, id), gte(storyMediaParts.n, from), to === undefined ? undefined : lte(storyMediaParts.n, to)))
     .orderBy(asc(storyMediaParts.n));
   return Buffer.concat(rows.map((r) => Buffer.from(r.data, "base64")));
 }

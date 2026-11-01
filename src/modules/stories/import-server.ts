@@ -4,8 +4,24 @@ import { imageLine } from "./markdown";
 import { htmlToMarkdown, isMediumImage, mediumFeedUrl, mediumPostId, postFromFeed } from "./medium";
 import { createStory, PART_CHARS, putMediaPart, saveStory, startMedia } from "./server";
 
-async function get(url: string): Promise<Response> {
-  return fetch(url, { redirect: "error", signal: AbortSignal.timeout(15000), headers: { "User-Agent": "PenAndPaper/1.0 (+stories import)" } });
+/** https on medium.com or one of its subdomains (pictures, feeds), nothing else. */
+function onMedium(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && (u.hostname === "medium.com" || u.hostname.endsWith(".medium.com"));
+  } catch {
+    return false;
+  }
+}
+
+/** Fetches from Medium, following up to three redirects, each one checked to stay on Medium's own hosts. */
+async function get(url: string, hops = 3): Promise<Response> {
+  const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000), headers: { "User-Agent": "PenAndPaper/1.0 (+stories import)" } });
+  const next = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+  if (!next) return res;
+  const to = new URL(next, url).toString();
+  if (hops <= 0 || !onMedium(to)) throw new Error("Redirected off Medium.");
+  return get(to, hops - 1);
 }
 
 /** Copies one Medium picture into the story, as WebP at most 2000px wide. */
@@ -33,6 +49,7 @@ async function copyImage(storyId: string, src: string): Promise<string | null> {
  * author's public RSS feed, which carries the full post.
  */
 export async function importMedium(authorId: string, url: string): Promise<{ id: string } | { error: string }> {
+  if (!onMedium(url)) return { error: "Paste the address of a Medium post." };
   const postId = mediumPostId(url);
   const feedUrl = mediumFeedUrl(url);
   if (!postId || !feedUrl) return { error: "Paste the address of a Medium post." };

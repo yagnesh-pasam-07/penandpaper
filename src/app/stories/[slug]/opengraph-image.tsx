@@ -5,7 +5,7 @@ import { mediaBytes, publishedStory } from "@/modules/stories/server";
 
 export const alt = "A story on Pen & Paper";
 export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+export const contentType = "image/jpeg";
 
 /** The cover, small enough to embed (WhatsApp wants the whole card under about 300 KB). */
 async function cover(id: string | null): Promise<string | null> {
@@ -22,13 +22,13 @@ async function cover(id: string | null): Promise<string | null> {
  * The picture a shared story shows on WhatsApp, Instagram and X: the cover on
  * the right, the title and the hook on warm paper, the red nib.
  */
-export default async function Image(props: { params: Promise<{ slug: string }> }) {
+export default async function Image(props: { params: Promise<{ slug: string }> }): Promise<Response> {
   const { slug } = await props.params;
   const s = await publishedStory(slug);
   const img = await cover(s?.coverId ?? null);
   const title = s?.title ?? "Pen & Paper Stories";
   const hook = s ? s.hook || s.subtitle : "Real stories, read slowly.";
-  return new ImageResponse(
+  const png = new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", background: "#FAF8F3", fontFamily: "serif" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "64px 56px 56px 72px" }}>
@@ -48,4 +48,7 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
     ),
     size,
   );
+  // A JPEG, about 100 KB: WhatsApp skips previews much over 300 KB, and a PNG of a photo is 400.
+  const jpg = await sharp(Buffer.from(await png.arrayBuffer())).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+  return new Response(new Uint8Array(jpg), { headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=3600, s-maxage=86400" } });
 }

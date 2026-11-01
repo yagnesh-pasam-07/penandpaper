@@ -42,7 +42,11 @@ const jetbrains = JetBrains_Mono({
   weight: ["500"],
 });
 
+/** Absolute links in share previews (WhatsApp ignores relative ones). */
+const site = process.env.BETTER_AUTH_URL ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(site),
   title: "Pen & Paper",
   description: "Pen and paper, digitally: write anywhere, draw between your thoughts, or just say it.",
   // iPhone and iPad: "Add to Home Screen" opens it like an app.
