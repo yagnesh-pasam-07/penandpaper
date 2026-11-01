@@ -34,7 +34,7 @@ Now, if we stop for a second and think about it, why is all of this happening? W
 
 I’m an accidental arrangement of matter, right? I was born through an unintentional combination of circumstances. My existence wasn’t planned by me. I’m just a random human being who came into existence.
 
-Then people gave me a name. They told me to go to school. I made friends, grew up, and started living my life. And that’s it. It’s a cycle.
+Then people gave me a name and put me in the tunnel. School, a job, a family, the weekend escape. And that’s it. It’s a cycle.
 
 > Then, one fine day, I will die. Maybe on a happy day, surrounded by the people who love me. And that’s it. The chapter closes.
 
