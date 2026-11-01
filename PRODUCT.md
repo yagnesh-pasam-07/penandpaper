@@ -156,6 +156,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-01 21:30 IST · design · The tool page says one thing, in four parts
+Why: the writer couldn't tell what the tool was; nine sections below the gallery (two ways, pain points, highlight, fonts, everywhere, open source…) buried it. Now: "Your head is full. Put it down." + "One quiet paper for every thought you don't want to lose." + Start a paper; the scrolling screenshots; three steps (Drop it. See it. It comes back.); Try it, no account; one closing line and button, with "Also on Mac and in Chrome". Header: Stories, Sign in, theme. Unused sections deleted.
+Replaces: the long tool landing page (2026-10-31 13:30 and earlier sections).
+
 ### 2026-11-01 21:00 IST · product · The homepage is a story publication; the tool moves to /tool
 Why: Pen and Paper is becoming a brand about people ("Every person is a story. We write them down."), in the spirit of Humans of Bombay and The Marginalian; the thinking tool is a quiet room at the back, not the front door. The homepage: the tagline, the featured story (most loved this month, else newest) with its pull quote, cover, who and where, Read and Listen; "More stories" as a magazine grid (a story without a picture becomes a quote card); "Writers are witnesses."; a small tool section (A quiet place for your thoughts, a paper mock, Start a paper); a one-line footer. Signed-in people still land on their paper. The old landing page lives on at /tool. A short /about. Header: Stories, Tool, About.
 Not done from the brief, on purpose: no "Coming soon" waitlist (the tool is live), no "free notebook" promise (not decided), no placeholder stories on the live site, no Instagram/WhatsApp links (no handles yet).

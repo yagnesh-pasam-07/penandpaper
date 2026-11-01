@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { btn } from "@/components/btn";
 import { Logo, ThemeToggle } from "@/components/ui";
-import { Everywhere, Fonts, HeroGallery, Highlight } from "./everywhere";
-import { GitHubButton, OpenSource } from "./github";
-import { PainPoints } from "./pain-points";
-import { TwoWays } from "./two-ways";
+import { HeroGallery } from "./everywhere";
 import { TryIt } from "./try-it";
 
 const START = "/signup?next=/drop";
@@ -22,7 +19,7 @@ function LinkedInGlyph() {
   );
 }
 
-/** The public homepage: the problem, the fix, and almost nothing else. */
+/** The thinking tool's page: what it is, three steps, try it, one button. Nothing else. */
 export function Home({ supportEmail }: { supportEmail?: string }) {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
@@ -30,69 +27,70 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
         <Link href="/" aria-label="Pen & Paper home" className={link}>
           <Logo size="sm" />
         </Link>
-        <span className="ml-auto flex items-center gap-1.5">
-          <GitHubButton />
-          <ThemeToggle />
+        <span className="ml-auto flex items-center gap-1">
           <Link href="/stories" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
             Stories
-          </Link>
-          <Link href="/download" className="flex h-11 items-center rounded-xl px-3 max-sm:hidden text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
-            Download
           </Link>
           <Link href="/login" className="flex h-11 items-center rounded-xl px-3 text-[15px] font-medium text-mute hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text">
             Sign in
           </Link>
+          <ThemeToggle />
         </span>
       </nav>
 
       <main className="flex flex-col">
-        {/* Hero: one idea, one button */}
-        <section className="mx-auto flex min-h-[calc(100dvh-10rem)] w-full max-w-[1040px] flex-col items-center justify-center gap-8 px-4 pt-10 pb-16 text-center sm:px-8">
-          <h1 className="font-hand text-[60px] leading-[0.98] font-bold sm:text-[124px]">
+        {/* What it is, in one line, and one button. */}
+        <section className="mx-auto flex w-full max-w-[880px] flex-col items-center gap-7 px-5 pt-14 pb-12 text-center sm:px-8 sm:pt-20">
+          <h1 className="font-hand text-[56px] leading-[0.98] font-bold sm:text-[104px]">
             Your head is full.
             <br />
             <span className="highlight">Put it down.</span>
           </h1>
-          <p className="max-w-[520px] text-[18px] leading-normal text-mute sm:text-[21px]">Pen and paper, digitally. Write anywhere, draw between your thoughts, or just say it.</p>
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-6">
-            <Link href={START} className={`${btn.primary} h-[56px] px-8 text-[17px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text`}>
-              Start a paper
-            </Link>
-            <Link href="/login" className={`text-[16px] text-mute ${link}`}>
-              Sign in
-            </Link>
-          </div>
+          <p className="max-w-[460px] text-[18px] leading-normal text-mute sm:text-[20px]">One quiet paper for every thought you don&apos;t want to lose.</p>
+          <Link href={START} className={`${btn.primary} h-[56px] px-8 text-[17px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text`}>
+            Start a paper
+          </Link>
         </section>
-        <div className="mx-auto w-full max-w-[1320px] pb-8">
+
+        <div className="mx-auto w-full max-w-[1320px] pb-16">
           <HeroGallery />
         </div>
 
-        <TwoWays />
+        {/* How it works: three steps, nothing more. */}
+        <section aria-labelledby="how-title" className="mx-auto w-full max-w-[960px] px-5 pb-20 sm:px-8">
+          <h2 id="how-title" className="sr-only">
+            How it works
+          </h2>
+          <ol className="grid gap-10 sm:grid-cols-3 sm:gap-8">
+            {[
+              ["Drop it.", "A thought, a link, a picture. Type it, paste it, or just say it. It takes a second."],
+              ["See it.", "Everything lands on one paper. Move it, draw a line between two ideas, strike off what's done."],
+              ["It comes back.", "Each night, a minute to close the day. Each morning, one old thought returns when it matters."],
+            ].map(([title, line], i) => (
+              <li key={title} className="flex flex-col gap-2 text-center sm:text-left">
+                <span className="font-hand text-[22px] leading-none text-red-text">{i + 1}</span>
+                <span className="font-hand text-[32px] leading-none font-bold">{title}</span>
+                <span className="text-[16px] leading-relaxed text-mute">{line}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-
-        <PainPoints />
-
-        {/* Try it */}
-        <section id="try" aria-labelledby="try-title" className="mx-auto flex w-full max-w-[880px] scroll-mt-20 flex-col gap-6 px-4 pb-8 sm:px-8">
-          <h2 id="try-title" className="text-center font-hand text-[40px] leading-none font-bold sm:text-[48px]">
+        {/* Try it: understanding comes from doing. */}
+        <section id="try" aria-labelledby="try-title" className="mx-auto flex w-full max-w-[880px] scroll-mt-20 flex-col gap-6 px-5 pb-16 sm:px-8">
+          <h2 id="try-title" className="text-center font-hand text-[36px] leading-none font-bold sm:text-[44px]">
             Try it. No account.
           </h2>
           <TryIt />
         </section>
 
-        <Highlight />
-
-        <Fonts />
-
-        <Everywhere />
-
-        <OpenSource />
-
-        {/* Close */}
-        <section className="mx-auto flex w-full max-w-[1040px] flex-col items-center gap-8 px-4 pt-8 pb-28 text-center sm:px-8 sm:pb-36">
-          <p className="font-hand text-[56px] leading-none font-bold sm:text-[112px]">Empty your head.</p>
+        <section className="mx-auto flex w-full max-w-[880px] flex-col items-center gap-6 px-5 pt-6 pb-24 text-center sm:px-8 sm:pb-32">
+          <p className="font-hand text-[48px] leading-none font-bold sm:text-[80px]">Empty your head.</p>
           <Link href={START} className={`${btn.primary} h-[56px] px-8 text-[17px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text`}>
             Start a paper
+          </Link>
+          <Link href="/download" className={`text-[15px] text-mute ${link}`}>
+            Also on Mac and in Chrome
           </Link>
         </section>
       </main>
