@@ -101,12 +101,12 @@ function FounderNote() {
             Why Pen and Paper
           </h2>
           <p className="story-serif text-[20px] leading-[1.6] text-ink">
-            I&apos;m Yagnesh. I build software for a living, and I write because I believe writing is the one truly original thing we make. Everything else is a summary.
+            Hi, I&apos;m Yagnesh. I love making things, and nothing has shaped me more than a pen and paper. I believe writers are the original thinkers. Everything else is a summary.
           </p>
-          <p className="story-serif text-[20px] leading-[1.6] text-ink">Pen and Paper is where I keep both: the stories of people worth remembering, and a desk for the thoughts I don&apos;t want to lose.</p>
-          <a href="https://www.linkedin.com/in/yagneshpasam/" target="_blank" rel="noopener noreferrer" className={`font-sans text-[14px] font-medium text-mute ${link}`}>
-            Yagnesh Pasam, on LinkedIn →
-          </a>
+          <p className="story-serif text-[20px] leading-[1.6] text-ink">Pen and Paper is a quality space for writers and for thoughts. This is just the beginning.</p>
+          <Link href="/about" className={`font-sans text-[14px] font-medium text-mute ${link}`}>
+            Why I started Pen and Paper →
+          </Link>
         </div>
       </div>
     </section>
