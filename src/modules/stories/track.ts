@@ -5,7 +5,7 @@ import type { Channel, EventKind } from "./reach";
 const KEY = "pp-reader";
 
 /** A random id this browser keeps for counting readers; never sent anywhere else, no cookie. */
-function readerId(): string {
+export function readerId(): string {
   try {
     let id = localStorage.getItem(KEY);
     if (!id) {

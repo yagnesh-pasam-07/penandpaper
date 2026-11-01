@@ -23,6 +23,7 @@ export type StoryCard = {
   publishAt: string;
   series: string;
   language: string;
+  claps: number;
 };
 
 export type Story = StoryCard & {
@@ -59,9 +60,10 @@ const cardCols = {
   publishAt: stories.publishAt,
   series: stories.series,
   language: stories.language,
+  claps: stories.claps,
 };
 
-type CardRow = { id: string; slug: string; title: string; subtitle: string; hook: string; body: string; category: Category; readingMinutes: number; coverId: string | null; audioId: string | null; publishAt: Date | null; series: string; language: string };
+type CardRow = { id: string; slug: string; title: string; subtitle: string; hook: string; body: string; category: Category; readingMinutes: number; coverId: string | null; audioId: string | null; publishAt: Date | null; series: string; language: string; claps: number };
 
 const toCard = (r: CardRow): StoryCard => ({
   id: r.id,
@@ -76,6 +78,7 @@ const toCard = (r: CardRow): StoryCard => ({
   publishAt: (r.publishAt ?? new Date(0)).toISOString(),
   series: r.series,
   language: r.language,
+  claps: r.claps,
 });
 
 const live = (now: Date) => and(eq(stories.status, "published"), lte(stories.publishAt, now));
@@ -87,13 +90,18 @@ const live = (now: Date) => and(eq(stories.status, "published"), lte(stories.pub
  * A table that isn't there yet (before the migration) reads as no stories.
  */
 
-/** Published stories, newest first. */
-export async function publishedStories(limit = 60): Promise<StoryCard[]> {
+/** Published stories, newest first, or most loved (most claps) first. */
+export async function publishedStories(limit = 60, order: "new" | "loved" = "new"): Promise<StoryCard[]> {
   "use cache";
   cacheLife({ stale: 300, revalidate: 900, expire: 86400 });
   cacheTag(STORIES_TAG);
   try {
-    const rows = await httpDb.select(cardCols).from(stories).where(live(new Date())).orderBy(desc(stories.publishAt)).limit(limit);
+    const rows = await httpDb
+      .select(cardCols)
+      .from(stories)
+      .where(live(new Date()))
+      .orderBy(...(order === "loved" ? [desc(stories.claps), desc(stories.publishAt)] : [desc(stories.publishAt)]))
+      .limit(limit);
     return rows.map(toCard);
   } catch {
     return [];
@@ -227,11 +235,11 @@ export type StoryPatch = {
  * draft, and is fixed once published (links shared on WhatsApp keep working).
  */
 export async function saveStory(id: string, patch: StoryPatch): Promise<{ slug: string; readingMinutes: number } | null> {
-  const [cur] = await httpDb.select({ status: stories.status, slug: stories.slug, body: stories.body }).from(stories).where(eq(stories.id, id)).limit(1);
+  const [cur] = await httpDb.select({ status: stories.status, slug: stories.slug, body: stories.body, translationOf: stories.translationOf }).from(stories).where(eq(stories.id, id)).limit(1);
   if (!cur) return null;
   const set: Partial<typeof stories.$inferInsert> = { ...patch, updatedAt: new Date() };
   if (patch.body !== undefined) set.readingMinutes = readingMinutes(patch.body);
-  if (patch.title !== undefined && cur.status === "draft") set.slug = await freeSlug(patch.title, id);
+  if (patch.title !== undefined && cur.status === "draft" && !cur.translationOf) set.slug = await freeSlug(patch.title, id);
   const [row] = await httpDb.update(stories).set(set).where(eq(stories.id, id)).returning({ slug: stories.slug, readingMinutes: stories.readingMinutes });
   return row ?? null;
 }
@@ -242,6 +250,12 @@ export async function setPublished(id: string, at: Date | null): Promise<void> {
     .update(stories)
     .set(at ? { status: "published", publishAt: at, updatedAt: new Date() } : { status: "draft", updatedAt: new Date() })
     .where(eq(stories.id, id));
+  // Back to a draft, a translation takes the original's address plus its language again (a draft isn't public, so nothing breaks).
+  if (!at) {
+    const [t] = await httpDb.select({ of: stories.translationOf, language: stories.language }).from(stories).where(eq(stories.id, id)).limit(1);
+    const [src] = t?.of ? await httpDb.select({ slug: stories.slug }).from(stories).where(eq(stories.id, t.of)).limit(1) : [];
+    if (src) await httpDb.update(stories).set({ slug: await freeSlug(`${src.slug} ${t.language}`, id) }).where(eq(stories.id, id));
+  }
 }
 
 export async function deleteStory(id: string): Promise<void> {
@@ -378,7 +392,8 @@ export async function createTranslation(fromId: string, authorId: string, langua
   if (!src) return null;
   const [existing] = await httpDb.select({ id: stories.id }).from(stories).where(eq(stories.translationOf, fromId)).limit(1);
   if (existing) return existing.id;
-  const slug = await freeSlug(`${src.title} ${language}`);
+  // The original's address plus the language ("the-man-behind-the-words-te"): readable even when the title is all Telugu.
+  const slug = await freeSlug(`${src.slug} ${language}`);
   const [row] = await httpDb
     .insert(stories)
     .values({
@@ -410,4 +425,22 @@ export async function createTranslation(fromId: string, authorId: string, langua
 export async function seriesNames(): Promise<string[]> {
   const rows = await httpDb.selectDistinct({ series: stories.series }).from(stories).where(ne(stories.series, ""));
   return rows.map((r) => r.series).sort();
+}
+
+/** The most-clapped story published in the last 30 days, if any has claps: the homepage feature. */
+export async function lovedThisMonth(): Promise<StoryCard | null> {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 900, expire: 86400 });
+  cacheTag(STORIES_TAG);
+  try {
+    const [r] = await httpDb
+      .select(cardCols)
+      .from(stories)
+      .where(and(live(new Date()), sql`${stories.claps} > 0`, sql`${stories.publishAt} > now() - interval '30 days'`))
+      .orderBy(desc(stories.claps), desc(stories.publishAt))
+      .limit(1);
+    return r ? toCard(r) : null;
+  } catch {
+    return null;
+  }
 }

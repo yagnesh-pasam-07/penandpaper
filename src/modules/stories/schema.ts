@@ -27,6 +27,8 @@ export const stories = pgTable(
     /** For translations later (Telugu first); every story is one language. */
     language: text("language").notNull().default("en"),
     readingMinutes: integer("reading_minutes").notNull().default(1),
+    /** Total claps, kept in step with story_claps, for ranking "Most loved" without a sum on every page. */
+    claps: integer("claps").notNull().default(0),
     /** The writer's own voice, read aloud. No text-to-speech. */
     audioMediaId: uuid("audio_media_id"),
     audioDurationSec: integer("audio_duration_sec"),
@@ -119,4 +121,23 @@ export const storyEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("story_events_story_idx").on(t.storyId, t.kind), index("story_events_time_idx").on(t.createdAt)],
+);
+
+/**
+ * Claps: a reader taps as many times as a story moved them, up to 50 (like
+ * Medium). One row per reader per story, holding their count, so the total
+ * is a sum and nobody can clap a story to the top alone.
+ */
+export const storyClaps = pgTable(
+  "story_claps",
+  {
+    storyId: uuid("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    /** The same anonymous reader key as story_events. */
+    reader: text("reader").notNull(),
+    count: integer("count").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.storyId, t.reader], name: "story_claps_pk" })],
 );

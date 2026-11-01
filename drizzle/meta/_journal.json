@@ -148,6 +148,13 @@
       "when": 1793512728382,
       "tag": "0020_story_person_series",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793515061666,
+      "tag": "0021_story_claps",
+      "breakpoints": true
     }
   ]
 }

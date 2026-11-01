@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LeadCard, RowCard } from "@/modules/stories/cards";
 import { StoriesShell } from "@/modules/stories/chrome";
 import Link from "next/link";
+import { Suspense } from "react";
 import { allSeries, publishedStories } from "@/modules/stories/server";
 
 export const metadata: Metadata = {
@@ -12,8 +13,21 @@ export const metadata: Metadata = {
 };
 
 /** /stories: every published story, newest first. Cached; a new one appears within 15 minutes of its time. */
-export default async function StoriesPage() {
-  const [list, series] = await Promise.all([publishedStories(), allSeries()]);
+export default async function StoriesPage(props: PageProps<"/stories">) {
+  return (
+    <Suspense fallback={<StoriesShell>{null}</StoriesShell>}>
+      <Ordered searchParams={props.searchParams} />
+    </Suspense>
+  );
+}
+
+async function Ordered({ searchParams }: { searchParams: PageProps<"/stories">["searchParams"] }) {
+  const { sort } = await searchParams;
+  return <StoriesList order={sort === "loved" ? "loved" : "new"} />;
+}
+
+async function StoriesList({ order }: { order: "new" | "loved" }) {
+  const [list, series] = await Promise.all([publishedStories(60, order), allSeries()]);
   const [lead, ...rest] = list;
   return (
     <StoriesShell>
@@ -32,6 +46,18 @@ export default async function StoriesPage() {
             ))}
           </nav>
         )}
+        <nav aria-label="Order" className="-mt-4 flex gap-1 font-sans text-[14px]">
+          {(
+            [
+              ["new", "Newest", "/stories"],
+              ["loved", "Most loved", "/stories?sort=loved"],
+            ] as const
+          ).map(([k, label, href]) => (
+            <Link key={k} href={href} aria-current={order === k ? "page" : undefined} className={`rounded-full px-3.5 py-1.5 ${order === k ? "bg-ink text-bg" : "text-mute hover:bg-soft hover:text-ink"}`}>
+              {label}
+            </Link>
+          ))}
+        </nav>
         {lead ? (
           <>
             <LeadCard s={lead} />

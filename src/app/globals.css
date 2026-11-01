@@ -601,3 +601,11 @@ body {
 @media (prefers-reduced-motion: reduce) {
   #listen:target { animation: none; }
 }
+/* Clap: the hands give a little jump, and "+n" floats up and fades. */
+.story-clap-pop { animation: clap-pop 260ms cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes clap-pop { 0% { transform: scale(1); } 40% { transform: scale(1.28) rotate(-8deg); } 100% { transform: scale(1); } }
+.story-clap-plus { animation: clap-plus 900ms ease-out forwards; }
+@keyframes clap-plus { 0% { opacity: 0; transform: translate(-50%, 8px) scale(0.6); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -18px) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .story-clap-pop, .story-clap-plus { animation: none; } }
+/* While the Listen bar is open, the floating clap sits above it. */
+body:has([aria-label="Listening"]) .story-clap-float { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }

@@ -3,8 +3,8 @@ import { createHmac } from "node:crypto";
 import { and, count, countDistinct, desc, eq, gte, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { env } from "@/lib/env";
-import type { Channel, EventKind, Source, Totals } from "./reach";
-import { stories, storyEvents } from "./schema";
+import { MAX_CLAPS, type Channel, type EventKind, type Source, type Totals } from "./reach";
+import { stories, storyClaps, storyEvents } from "./schema";
 
 /**
  * A reader as Studio counts them: the browser's random id, keyed with the
@@ -113,4 +113,41 @@ export async function liveStoryId(slug: string): Promise<string | null> {
     .where(and(eq(stories.slug, slug), eq(stories.status, "published"), sql`${stories.publishAt} <= now()`))
     .limit(1);
   return s?.id ?? null;
+}
+
+/**
+ * Adds a reader's claps to a live story, at most MAX_CLAPS from one reader in
+ * all, and keeps the story's total in step, in one statement. Returns this
+ * reader's count and the story's total.
+ */
+export async function addClaps(storyId: string, reader: string, n: number): Promise<{ mine: number; total: number }> {
+  const add = Math.max(1, Math.min(Math.floor(n), MAX_CLAPS));
+  const rows = await httpDb.execute<{ mine: number; total: number }>(sql`
+    with prev as (
+      select coalesce((select ${storyClaps.count} from ${storyClaps} where ${storyClaps.storyId} = ${storyId}::uuid and ${storyClaps.reader} = ${reader}), 0) as c
+    ),
+    up as (
+      insert into ${storyClaps} (story_id, reader, count, updated_at)
+      values (${storyId}::uuid, ${reader}, least(${add}::int, ${MAX_CLAPS}::int), now())
+      on conflict (story_id, reader) do update set count = least(${storyClaps.count} + ${add}::int, ${MAX_CLAPS}::int), updated_at = now()
+      returning count
+    ),
+    tot as (
+      update ${stories} set claps = ${stories.claps} + ((select count from up) - (select c from prev))
+      where ${stories.id} = ${storyId}::uuid
+      returning claps
+    )
+    select (select count from up)::int as mine, (select claps from tot)::int as total
+  `);
+  const r = (rows as unknown as { rows?: { mine: number; total: number }[] }).rows?.[0] ?? (rows as unknown as { mine: number; total: number }[])[0];
+  return { mine: Number(r?.mine ?? 0), total: Number(r?.total ?? 0) };
+}
+
+/** A story's total, and this reader's own claps. */
+export async function clapsOf(storyId: string, reader: string): Promise<{ mine: number; total: number }> {
+  const [[s], [m]] = await Promise.all([
+    httpDb.select({ total: stories.claps }).from(stories).where(eq(stories.id, storyId)).limit(1),
+    httpDb.select({ mine: storyClaps.count }).from(storyClaps).where(and(eq(storyClaps.storyId, storyId), eq(storyClaps.reader, reader))).limit(1),
+  ]);
+  return { mine: m?.mine ?? 0, total: s?.total ?? 0 };
 }

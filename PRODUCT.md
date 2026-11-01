@@ -62,6 +62,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **Discovery:** "This week's story" on the homepage (the newest one), Stories in the homepage nav, WhatsApp-first share, a per-story share image (~45 KB JPEG), `sitemap.xml`, `robots.txt`, `/stories/rss.xml`.
 - **Real people, made trustworthy:** a story can name **the person** it is about (name, place, their real photo, never stock), with "✓ Shared with their permission" when they agreed; the byline then reads "Witnessed and written by <writer>". History gets a numbered **Sources** box at the end (one per line, a line ending in a link becomes one). Stories can belong to a **series** (by name; its page is `/stories/series/<slug>`, stories in the order they came out; "More from <series>" at the end of each; a strip of series on `/stories`).
 - **Telugu ⇄ English:** each story has a language; "Make a Telugu version" in Publish creates a draft copy (same pictures, person, series, sources) linked to the original. Once both are published, each shows a switch ("తెలుగులో చదవండి" / "Read in English") and declares the other with hreflang. Telugu is set in Noto Serif Telugu.
+- **Claps rank the stories:** a reader taps as many times as a story moved them, up to 50 per story (like Medium), so one person can't push a story to the top alone. Each tap: a soft pen tap and a chime that climbs a pentatonic note each time (made live in the browser, no file), a short buzz on phones, a "+n" that floats up. On a phone a round clap floats bottom-right under the thumb (with the total), moves above the Listen bar, and steps aside when the big clap at the story's end is on screen; both share one count. `/stories` has **Newest | Most loved**; the homepage features the **most-loved story of the last 30 days** (the newest when nothing has claps). Cards show the clap total. Anonymous (same reader key as Studio), live stories only, rate-limited; the total on the story is kept in step with the per-reader rows in one statement.
 - **Story Studio** (`/studio/stories`, like YouTube Studio, writer only): per story, views, readers, read to the end, shares (by WhatsApp, Instagram, copy, phone share), listens, where readers came from (WhatsApp, Instagram, Google, home, direct) and phone vs computer, with a 28-day chart (`/studio/stories/[id]/reach`); totals across all stories at the top of the list. **Readers never see any count.** Anonymous: a random id the browser keeps (no cookie, no IP), keyed on the server; a view, read or listen counts once a day per reader; link-preview bots and crawlers are ignored; only live stories are counted. A "read" is reaching the last line after at least 20 seconds. Share links carry `?s=wa|ig|link` (WhatsApp strips the referrer), removed from the address bar on arrival.
 - **Sharing:** WhatsApp sends a warm message ("I read this and thought of you." by default, the writer can change it per story), the title, the hook and the link; the preview picture is the cover or a picture the writer picks. **Instagram:** a 1080×1920 story card (`/stories/[slug]/card`) sent through the phone's share sheet, downloaded on a computer. Then Copy link and the phone's own share.
 - **Latest reads** on the homepage: the newest story large, the next three as cards.
@@ -140,6 +141,7 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 | Feature | State | Ticket |
 | --- | --- | --- |
+| Stories: claps (tap up to 50, a sound, mobile-first) and Most loved ranking | Shipped | [#38](https://github.com/yagnesh-pasam-07/penandpaper/issues/38) |
 | Stories: the person (name, place, photo, permission), series, sources box, Telugu ⇄ English | Shipped | [#37](https://github.com/yagnesh-pasam-07/penandpaper/issues/37) |
 | Story Studio (reads, reach, shares by channel), Latest reads on the homepage, Instagram story card, a custom WhatsApp message and picture | Shipped | [#36](https://github.com/yagnesh-pasam-07/penandpaper/issues/36) |
 | Stories: real human stories, history and art, written in Studio, read or heard at /stories; This week's story on the homepage | Shipped | [#35](https://github.com/yagnesh-pasam-07/penandpaper/issues/35) |
@@ -151,6 +153,15 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-01 17:00 IST · product · Claps rank the stories; the most-loved one is featured
+Why: the writer wants readers to say how much a story moved them, and the best-loved stories to rise. A clap you can give many times (up to 50) says "a lot", which a single like can't; the cap keeps one reader from deciding the ranking. A sound and a buzz make it feel human on a phone.
+Decision tree: (1) the stories, not the app. (2) One control for readers (the clap), placed where the thumb is on a phone; one ordering switch on /stories. (3) Doesn't change what a thought is. (4) Add-only migration 0021: story_claps, stories.claps. (5) Anonymous, rate-limited, bots and drafts refused. (6) Tests for the cap and short counts; checked against a real Postgres (30 → capped at 50 → no more; a second reader adds; total equals the sum; drafts 404; other sites ignored; ranking; homepage feature; 375 px, shared count, floating clap steps aside).
+Replaces: "No likes, comments, streaks or view counters in v1" from the 11:30 Stories entry: claps are the one count readers see, beside the clap button and on cards; views and shares stay in Studio.
+
+### 2026-11-01 16:30 IST · tech · A translation's address is the original's plus its language
+Why: a Telugu-only title has no Latin letters, so its address came out as "/stories/story". Now "the-man-behind-the-words-te". A published address never changes (shared links keep working); unpublishing a translation lets it take the right one again.
+Replaces: nothing.
 
 ### 2026-11-01 15:00 IST · product · Stories name the person, show their sources, come in series and in Telugu
 Why: what makes Humans of Bombay real is one named person, in their own words, with their real photo and their consent; what makes history trustworthy is its sources, stated neutrally where dates are contested (1 November vs 2 June). Series bring readers back; Telugu reaches the people these stories are about. The belief behind it: writing is the original; the rest is summary. A story names who witnessed it and who wrote it.

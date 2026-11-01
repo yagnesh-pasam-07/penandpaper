@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { CATEGORY_LABEL, parseSources, READ_IN, readLabel, seriesSlug, storyDate, type Category, type Language } from "./logic";
 import { parse, type Block, type Inline } from "./markdown";
 import { Listen } from "./listen";
+import { Clap } from "./clap";
 import { ReadingSignal } from "./reading-signal";
 import { ShareStory } from "./share";
 
@@ -254,10 +255,12 @@ export function StoryReader({ story, base, sizes, url, more, count = false, othe
             .
           </p>
         )}
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-sheet px-5 py-6 text-center">
+        <div className="flex flex-col items-center gap-5 rounded-2xl border border-line bg-sheet px-5 py-7 text-center">
+          {count && <Clap slug={story.slug} />}
           <p className="story-serif text-[20px] text-ink">If it stayed with you, send it to someone.</p>
           <ShareStory info={info} />
         </div>
+        {count && <Clap slug={story.slug} floating />}
         {more}
       </footer>
     </article>

@@ -67,3 +67,24 @@ describe("the writer's numbers", () => {
     ]);
   });
 });
+
+import { clapsToAdd, MAX_CLAPS, shortCount } from "./reach";
+
+describe("claps", () => {
+  it("adds what's asked, up to 50 per reader", () => {
+    expect(clapsToAdd(0, 3)).toBe(3);
+    expect(clapsToAdd(48, 5)).toBe(2);
+    expect(clapsToAdd(MAX_CLAPS, 1)).toBe(0);
+    expect(clapsToAdd(0, 500)).toBe(50);
+  });
+  it("never takes claps away", () => {
+    expect(clapsToAdd(10, -4)).toBe(0);
+    expect(clapsToAdd(10, 2.9)).toBe(2);
+  });
+  it("short counts", () => {
+    expect(shortCount(999)).toBe("999");
+    expect(shortCount(1200)).toBe("1.2K");
+    expect(shortCount(3000)).toBe("3K");
+    expect(shortCount(15400)).toBe("15K");
+  });
+});

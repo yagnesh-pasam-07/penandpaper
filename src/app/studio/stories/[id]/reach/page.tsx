@@ -101,11 +101,12 @@ async function Reach({ params }: { params: Promise<{ id: string }> }) {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Kpi label="Views" value={fmt(r.views)} note="opened, once a day per reader" />
         <Kpi label="Readers" value={fmt(r.readers)} note="different people" />
         <Kpi label="Read to the end" value={`${readThrough(r)}%`} note={`${fmt(r.reads)} finished it`} />
         <Kpi label="Shares" value={fmt(r.shares)} note={`${shareRate(r)} per 100 readers`} />
+        <Kpi label="Claps" value={fmt(s.claps)} note="up to 50 from each reader" />
         <Kpi label="Listens" value={fmt(r.listens)} note={s.audioId ? "pressed Listen" : "no recording yet"} />
       </div>
 

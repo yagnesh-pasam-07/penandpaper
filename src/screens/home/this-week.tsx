@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CATEGORY_LABEL, readLabel } from "@/modules/stories/logic";
 import { Picture } from "@/modules/stories/reader";
-import { publishedStories } from "@/modules/stories/server";
+import { lovedThisMonth, publishedStories } from "@/modules/stories/server";
 
 /**
  * "Latest reads" on the homepage: the newest story large, the next ones in a
@@ -9,8 +9,11 @@ import { publishedStories } from "@/modules/stories/server";
  * the first story is out. Cached with the stories.
  */
 export async function ThisWeeksStory() {
-  const [lead, ...rest] = await publishedStories(4);
+  // The feature: the most-clapped story of the last 30 days (the newest when nothing has claps yet); then the newest others.
+  const [loved, newest] = await Promise.all([lovedThisMonth(), publishedStories(4)]);
+  const lead = loved ?? newest[0];
   if (!lead) return null;
+  const rest = newest.filter((s) => s.id !== lead.id).slice(0, 3);
   const href = `/stories/${lead.slug}`;
   return (
     <section aria-labelledby="reads-title" className="mx-auto flex w-full max-w-[1040px] flex-col gap-6 px-4 py-12 sm:px-8 sm:py-20">
@@ -37,7 +40,9 @@ export async function ThisWeeksStory() {
           </div>
         )}
         <div className="flex flex-col gap-4 p-6 sm:p-10">
-          <p className="text-[12px] font-semibold tracking-[0.1em] text-red-text uppercase">New · {CATEGORY_LABEL[lead.category]}</p>
+          <p className="text-[12px] font-semibold tracking-[0.1em] text-red-text uppercase">
+            {loved ? "Most loved this month" : "New"} · {CATEGORY_LABEL[lead.category]}
+          </p>
           <h3 className="story-serif text-[30px] leading-[1.1] font-medium tracking-[-0.015em] text-balance sm:text-[38px]">
             <Link href={href} className="hover:underline hover:decoration-1 hover:underline-offset-4">
               {lead.title}

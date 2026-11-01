@@ -61,6 +61,12 @@ function Foot({ s }: { s: StoryCard }) {
       <span>{storyDate(s.publishAt)}</span>
       <span aria-hidden="true">·</span>
       <span>{readLabel(s.readingMinutes)}</span>
+      {s.claps > 0 && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span title={`${s.claps} claps`}>👏 {s.claps >= 1000 ? `${(s.claps / 1000).toFixed(1).replace(/\.0$/, "")}K` : s.claps}</span>
+        </>
+      )}
       {s.hasAudio && (
         <>
           <span aria-hidden="true">·</span>

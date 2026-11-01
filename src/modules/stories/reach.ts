@@ -101,3 +101,20 @@ export function daily(rows: { day: string; views: number }[], days: number, toda
   }
   return out;
 }
+
+/** Most claps one reader can give one story (like Medium): enough to say "a lot", not enough to rig the ranking. */
+export const MAX_CLAPS = 50;
+
+/** How many of `asked` new claps count, given what this reader already gave. Never negative. */
+export function clapsToAdd(already: number, asked: number): number {
+  const a = Math.max(0, Math.floor(already));
+  const n = Math.max(0, Math.min(Math.floor(asked), MAX_CLAPS));
+  return Math.max(0, Math.min(n, MAX_CLAPS - a));
+}
+
+/** "1.2K" for big numbers, the way people read counts on a phone. */
+export function shortCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
+  return `${Math.round(n / 1000)}K`;
+}
