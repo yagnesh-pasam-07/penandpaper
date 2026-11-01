@@ -2,23 +2,25 @@ Since I was a kid, one question has followed me everywhere: *What is going on? W
 
 Nobody answered it. They just put me in a tunnel.
 
-At the start, life is two things. Eat. Sleep. Then you learn to walk on the floor, you start talking to Amma and Nanna, and the world gets a little bigger.
+At the start, life is two things. Eat. Sleep. Then you learn to walk, you start talking to Amma and Nanna, and the world gets a little bigger.
 
-Then one morning, someone puts a bag on your back and sends you to school. You make friends. That's the good part. Now life is eat, sleep, play. Then one more thing gets added: study.
+Then one morning, someone puts a bag on your back and sends you to school. You make friends. That’s the good part. Eat, sleep, play. Then one more thing gets added: study. And things get hard.
 
-And that's when the race begins.
+The race begins. Good marks. Better marks. Somewhere in there, you fall in love for the first time. It fails. First love always does.
 
-Good marks. Better marks. Rank. Plus one, plus two. Entrance exams. Engineering. CS, because everyone says CS. You keep running and tell yourself: *once I get the job, it's done.*
+Plus one, plus two. Entrance exams. Engineering. Four more levels: first year, second, third, fourth. One goal now: get the job.
 
 You get the job.
 
 And it feels exactly like first grade again. Junior. Senior. Lead. Manager. CTO. Ten more levels. A new tunnel inside the old one.
 
-Somewhere in between, you're told it's time to get married. You have kids. You put a bag on their backs. And the tunnel starts again.
+Now the list gets longer. Fancy CTC. A bike. An iPhone in your pocket. A Rare Rabbit shirt. Cool photos on Instagram. Weekends at a mid-tier pub, drinking enough to forget the week. Then Monday comes, and it starts again.
 
-I know where it ends. Everyone does.
+Your 30s arrive. A few grey hairs. You’re told it’s time to get married, so you do. Kids come next.
 
-And then, one day, we die.
+And one day you notice: you’ve become your father. Your child has become you. Same tunnel, different timeline.
+
+Then you’re 70. And one day, without warning, everything goes dark. Like falling asleep. Funny part? You don’t even know you’re dead.
 
 > Our friends die. Our children die. Our grandchildren die.
 
@@ -38,7 +40,7 @@ So why was I born? Just to die? To give birth to someone who is also going to di
 
 ![Humans, flowers, greenery, the sky, and mountains. We need to protect this frame as it is, so that someone in the year 3079 can experience the same feeling you’re experiencing now, right?](media:0f9c0077-2295-4d28-a511-d8cac7b0a43c)
 
-The funny part is that you don’t know when you will die. You don’t know when your life will end. It’s almost like the transition between being awake and falling asleep, except you never wake up again. I would call it permanent sleep. And that’s okay.
+The funny part is that you don’t know when you will die.
 
 We spend our lives worrying about money, even though we know we won’t take any of it with us when we die.
 
