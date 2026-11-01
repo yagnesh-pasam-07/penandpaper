@@ -20,7 +20,7 @@ Your 30s arrive. A few grey hairs. You’re told it’s time to get married, so 
 
 And one day you notice: you’ve become your father. Your child has become you. Same tunnel, different timeline.
 
-![You play. You wait for the green signal at 8:40 a.m. You become your father. And then, slowly, you grow old.](media:98f136b3-2fe7-45f3-80d6-8835ae0fbb9a)
+![You play. You wait for the green signal at 8:40 a.m. You become your father. And then, slowly, you grow old.](media:3659494e-895a-4353-9063-af755b3ea1ec)
 
 Then you’re 70. And one day, without warning, everything goes dark. Like falling asleep. Funny part? You don’t even know you’re dead.
 
@@ -55,6 +55,8 @@ What will people think if I get married in a less fancy convention hall and serv
 ![I think the sky is in a bad mood. Looks like a scene before a cyclone… or is it just blushing?](media:75846e86-54d1-494c-b6f7-34b1d691b999)
 
 There are so many situations in which we consciously or unconsciously worry about other people’s opinions, forgetting one simple truth: I’m going to die one day.
+
+![An empty bench. No one is watching. At every stage of life, the people around you change, and some disappear. The only one who walks through every stage is you. So live it for yourself.](media:d5664854-583a-44e8-b039-3eaa4397b933)
 
 Just hold back for a moment. Close your eyes and say it slowly.
 
