@@ -74,19 +74,29 @@ export default function AboutPage() {
             <Link href="/stories" className="font-semibold underline decoration-1 underline-offset-4">
               Pen and Paper Stories
             </Link>
-            : original stories of real people. Not content. Truths that people carry, written down so they aren&apos;t lost.
+            : original stories of real people. Not content. The truths people carry, written down so they aren&apos;t lost. My observations, my photos, what I see and what I think.
           </p>
 
           <p>
             <Link href="/desk" className="font-semibold underline decoration-1 underline-offset-4">
               Pen and Paper Desk
             </Link>
-            : a quiet place for your own thoughts. Drop one in a second, and it comes back when it matters.
+            : a small place for your own thoughts. Drop one in, in a second. It comes back when it matters.
           </p>
 
-          <p>Maybe one day there will be books. I honestly don&apos;t know where this goes. This is just the beginning.</p>
+          <h2 className="pt-4 font-sans text-[22px] font-semibold tracking-[-0.01em] text-ink">Why</h2>
 
-          <p>Let&apos;s see where it takes us.</p>
+          <p>Technology keeps changing. We went from Homo sapiens to the AI era. The tools change, the jobs change, what we work on changes.</p>
+
+          <p>But a few things never change. We eat. We work: back then it was hunting, now it&apos;s a job. We sleep. We feel. Human emotions are the same as they always were.</p>
+
+          <p>I want to write about those constant things, in this AI era. Born in the 17th century, I might have written about war, and how to fight it better. Born in 5000 BC, maybe about how to reach Krishna. I was born now, so I&apos;m writing about now.</p>
+
+          <p>Stories and a desk for thoughts look like two different things. I feel the dots will connect.</p>
+
+          <p>Maybe one day there will be books. I honestly don&apos;t know where this goes. I&apos;m still figuring it out. Don&apos;t judge it yet.</p>
+
+          <p>This is just the beginning. Let&apos;s see where it takes us.</p>
 
           <p className="flex flex-col gap-1 pt-2">
             <span>Yagnesh</span>
