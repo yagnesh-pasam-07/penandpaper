@@ -105,7 +105,8 @@ export async function renderCard(c: CardInput): Promise<Response> {
   const textWidth = c.picture ? 600 : 1000;
   const [titleNode, lineNode] = await Promise.all([
     cardText(title, size, INK, textWidth, TELUGU.test(title) ? 1.02 : 1.12, { letterSpacing: -1, maxHeight: size * 1.12 * 3, overflow: "hidden" }, { lines: title.length <= 24 ? 1 : 2, min: 44 }),
-    c.line ? cardText(clip(c.line, 110), 30, MUTE, textWidth, 1.35, {}) : Promise.resolve(null),
+    // At most two lines under the title (a long first paragraph is clipped, never crowds the footer).
+    c.line ? cardText(clip(c.line, c.picture ? 80 : 110), 30, MUTE, textWidth, 1.35, {}) : Promise.resolve(null),
   ]);
   const png = new ImageResponse(
     (
