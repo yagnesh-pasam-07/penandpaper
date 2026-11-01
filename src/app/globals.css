@@ -525,3 +525,79 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .today-in, .today-use, .today-later { animation: none; }
 }
+
+/* ---------- Stories: a quiet page made for reading ---------- */
+.story-serif {
+  font-family: var(--font-story), var(--font-story-te), Georgia, "Times New Roman", serif;
+  font-optical-sizing: auto;
+}
+.story-serif :where(.font-sans) {
+  font-family: var(--font-instrument), system-ui, sans-serif;
+}
+.story-body {
+  hanging-punctuation: first;
+  text-wrap: pretty;
+}
+.story-body p + p {
+  margin-top: -0.25rem;
+}
+/* The first letter, large and red, like the first page of a book. */
+.story-dropcap::first-letter {
+  float: left;
+  margin: 0.08em 0.1em 0 0;
+  font-size: 3.6em;
+  line-height: 0.82;
+  font-weight: 500;
+  color: var(--red-text);
+}
+.story-scrub {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.story-scrub::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--ink) var(--p, 0%), var(--line) var(--p, 0%));
+}
+.story-scrub::-moz-range-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--ink) var(--p, 0%), var(--line) var(--p, 0%));
+}
+.story-scrub::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.story-scrub::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+}
+/* The editor: no boxes, no borders; it looks like the page it makes. */
+.story-edit :where(textarea, input) {
+  background: transparent;
+  outline: none;
+  resize: none;
+}
+.story-edit :where(textarea, input)::placeholder {
+  color: color-mix(in srgb, var(--mute) 70%, transparent);
+}
+/* Arriving from "Listen" on the homepage: the button says "here I am" (browsers won't autoplay). */
+#listen:target {
+  scroll-margin-top: 96px;
+  animation: listen-here 1.6s ease-out 2;
+}
+@keyframes listen-here {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--red) 55%, transparent); }
+  100% { box-shadow: 0 0 0 16px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #listen:target { animation: none; }
+}
