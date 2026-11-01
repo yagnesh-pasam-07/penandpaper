@@ -3,6 +3,7 @@
  * nothing a writer types can run on a reader's page):
  *
  *   ## A heading            > a pull quote          ---  (a quiet break)
+ *   - a list item (each line that starts with "- ")
  *   ![caption](media:<id> "artist")  a picture on its own line, its caption and who made it
  *   *italic*  **bold**  [a link](https://…)
  *
@@ -16,6 +17,7 @@ export type Block =
   | { t: "h"; c: Inline[] }
   | { t: "quote"; c: Inline[] }
   | { t: "hr" }
+  | { t: "list"; items: Inline[][] }
   | { t: "img"; id: string; caption: string; credit: string };
 
 const IMG = /^!\[([^\]]*)\]\(media:([0-9a-f-]{36})(?:\s+"([^"]*)")?\)\s*$/i;
@@ -102,6 +104,7 @@ export function parse(body: string): Block[] {
       if (/^(-{3,}|\*{3,})$/.test(text)) blocks.push({ t: "hr" });
       else if (/^#{1,3}\s/.test(text)) blocks.push({ t: "h", c: inline(text.replace(/^#{1,3}\s+/, "").replace(/\n/g, " ")) });
       else if (text.startsWith(">")) blocks.push({ t: "quote", c: inline(text.replace(/^>\s?/gm, "")) });
+      else if (text.split("\n").every((l) => /^[-•]\s+/.test(l))) blocks.push({ t: "list", items: text.split("\n").map((l) => inline(l.replace(/^[-•]\s+/, ""))) });
       else blocks.push({ t: "p", c: inline(text) });
     };
     for (const line of lines) {

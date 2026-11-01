@@ -68,6 +68,16 @@ function BlockView({ b, base, sizes, first }: { b: Block; base: MediaBase; sizes
           <Inlines c={b.c} />
         </blockquote>
       );
+    case "list":
+      return (
+        <ul className="flex list-disc flex-col gap-2 pl-6 text-[17px] leading-[1.55] marker:text-red-text sm:text-[18px]">
+          {b.items.map((c, i) => (
+            <li key={i}>
+              <Inlines c={c} />
+            </li>
+          ))}
+        </ul>
+      );
     case "hr":
       return (
         <div role="separator" aria-hidden="true" className="flex justify-center gap-4 py-4 text-[20px] tracking-[0.6em] text-mute">
@@ -213,7 +223,7 @@ export function StoryReader({ story, base, sizes, url, more, count = false, othe
               {story.author.trim().charAt(0).toUpperCase() || "P"}
             </span>
             <span className="flex flex-col leading-tight">
-              <span className="font-medium text-ink">{story.personName ? `Witnessed and written by ${story.author}` : story.author}</span>
+              <span className="font-medium text-ink">{story.personName ? `Written by ${story.author}` : story.author}</span>
               <span>
                 {readLabel(story.readingMinutes)}
                 {story.publishAt ? ` · ${storyDate(story.publishAt)}` : ""}

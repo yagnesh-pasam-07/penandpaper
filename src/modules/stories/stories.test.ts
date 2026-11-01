@@ -79,6 +79,11 @@ describe("markdown", () => {
     expect(inline("[x](javascript:alert(1))")).toEqual([{ t: "text", v: "[x](javascript:alert(1))" }]);
     expect(inline("[x](https://a.b)")).toEqual([{ t: "link", href: "https://a.b", c: [{ t: "text", v: "x" }] }]);
   });
+  it("reads a list of lines starting with a dash", () => {
+    expect(parse("- **1901**: born\n- [a](https://a.b)")).toEqual([
+      { t: "list", items: [[{ t: "strong", c: [{ t: "text", v: "1901" }] }, { t: "text", v: ": born" }], [{ t: "link", href: "https://a.b", c: [{ t: "text", v: "a" }] }]] },
+    ]);
+  });
   it("italics on each of two lines", () => {
     expect(inline("*one*\n*two*")).toEqual([{ t: "em", c: [{ t: "text", v: "one" }] }, { t: "br" }, { t: "em", c: [{ t: "text", v: "two" }] }]);
   });
@@ -99,6 +104,11 @@ describe("editor blocks", () => {
       { key: "b", t: "p", text: "# not a heading" },
     ]);
     expect(parse(md).map((b) => b.t)).toEqual(["p"]);
+  });
+  it("keeps a list as one block through the editor", () => {
+    const md = "Before.\n\n- one\n- two\n\nAfter.";
+    let k = 0;
+    expect(toMarkdown(toBlocks(md, () => `k${k++}`))).toBe(md);
   });
   it("an empty story is one empty paragraph", () => {
     expect(toBlocks("")).toHaveLength(1);
