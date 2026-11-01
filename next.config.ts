@@ -10,6 +10,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // The share-card fonts are read from disk at request time: ship them with every function that draws a card.
+  outputFileTracingIncludes: { "/**/*": ["./src/assets/og-fonts/*.ttf"] },
   partialPrefetching: true,
   turbopack: {
     rules: {

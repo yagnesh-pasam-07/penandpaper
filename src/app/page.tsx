@@ -7,13 +7,14 @@ import { StoryHome } from "@/screens/story-home";
 import { currentUser } from "@/server/session";
 
 export const metadata: Metadata = {
-  title: "Pen and Paper: every person is a story",
-  description: "Real people, written down. Short stories of ordinary lives, history and art, to read on the way or listen to. And a quiet place for your own thoughts.",
+  title: "Pen and Paper: your thoughts deserve to be written down",
+  description: "Real stories of real people, to read on the way or listen to. And a quiet desk for your own thoughts.",
   openGraph: {
-    title: "Pen and Paper: every person is a story",
-    description: "Real people, written down. Read a story on the way, or listen.",
+    title: "Pen and Paper: your thoughts deserve to be written down",
+    description: "Real stories of real people. And a quiet desk for your own thoughts.",
     type: "website",
   },
+  twitter: { card: "summary_large_image" },
 };
 
 /** Someone already signed in goes straight to their paper. */
