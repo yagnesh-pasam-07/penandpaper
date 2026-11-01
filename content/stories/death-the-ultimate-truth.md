@@ -92,7 +92,7 @@ One thing is certain: it doesn’t make sense to stop working simply because we�
 
 Not necessarily.
 
-Having money makes certain things easier. Without it, life becomes difficult. You need food, shelter, and other necessities. Banks will come asking for their payments. Your house owner will ask for rent. Your manager will call you about your work. You might lose your job. Your customers will ask why your business hasn’t opened for days. Your mother might ask why you’re not attending family events. You father will thgk a lot abut you why you not acive lieke beforek
+Having money makes certain things easier. Without it, life becomes difficult. You need food, shelter, and other necessities. Banks will come asking for their payments. Your house owner will ask for rent. Your manager will call you about your work. You might lose your job. Your customers will ask why your business hasn’t opened for days. Your mother might ask why you’re not attending family events. Your father will worry about you and wonder why you're not as active as before.
 
 Whether we like it or not, we are already part of this cycle. We have responsibilities, needs, and expectations to deal with.
 
