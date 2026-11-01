@@ -20,7 +20,7 @@ Your 30s arrive. A few grey hairs. You’re told it’s time to get married, so 
 
 And one day you notice: you’ve become your father. Your child has become you. Same tunnel, different timeline.
 
-![You play. You wait for the green signal at 8:40 a.m. You become your father. And then, slowly, you grow old.](media:03d7caed-3105-496b-960c-4fbfd5372df6)
+![You play. You wait for the green signal at 8:40 a.m. You become your father. And then, slowly, you grow old.](media:98f136b3-2fe7-45f3-80d6-8835ae0fbb9a)
 
 Then you’re 70. And one day, without warning, everything goes dark. Like falling asleep. Funny part? You don’t even know you’re dead.
 
