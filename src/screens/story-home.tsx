@@ -135,7 +135,7 @@ function PaperMock() {
           book the bus
           <span className="absolute inset-x-3 top-1/2 h-[3px] -rotate-2 rounded-full bg-red" />
         </span>
-        <span className={`${note} ml-4 -rotate-1 bg-t2`}>write the tea-shop man's story</span>
+        <span className={`${note} ml-4 -rotate-1 bg-t2`}>write the tea-shop man&apos;s story</span>
       </div>
     </div>
   );
