@@ -12,7 +12,7 @@ export function ImportForm() {
         Bring a story from Medium
       </label>
       <div className="flex gap-2 max-sm:flex-col">
-        <input id="medium-url" name="url" type="url" required placeholder="https://medium.com/@you/your-story-…" className="h-11 flex-1 rounded-xl border border-line bg-sheet px-3.5 text-[15px] outline-none focus:border-ink" />
+        <input id="medium-url" name="url" type="url" required placeholder="https://medium.com/@you/your-story-…" className="h-11 flex-1 rounded-xl border border-line-strong bg-sheet px-3.5 text-[15px] outline-none focus:border-ink" />
         <button type="submit" disabled={pending} className="h-11 rounded-xl border border-ink px-5 text-[15px] font-semibold disabled:opacity-60">
           {pending ? "Bringing it in…" : "Import as a draft"}
         </button>

@@ -3,34 +3,41 @@
 /* Paper (light) and Ink (dark) tokens, taken from the design canvas. */
 :root,
 [data-theme="light"] {
-  --bg: #faf8f3;
-  --sheet: #ffffff;
-  --line: #e6e1d7;
-  --soft: #f3f0ea;
-  /* Ink, not pixels: a deep blue-black, like a fountain pen. */
-  --ink: #1f2433;
-  --mute: #5f5b54;
-  --graphite: #6e6c68;
-  --red: #c8382f;
-  --red-text: #c8382f;
-  --on-red: #ffffff;
-  --red-soft: #fbe6e2;
-  --green: #2f7a4f;
-  --green-soft: #ddf0e3;
-  --amber: #9a5414;
-  --amber-soft: #fbebd9;
-  --track: #ece8e0;
+  /* Paper by day: warm off-white, never pure white (glare); warm near-black ink, never pure black. */
+  --bg: #f6f3ec;
+  --sheet: #fbf9f4;
+  --raised: #fefdfa;
+  --sunken: #efebe2;
+  --line: #e5e0d4;
+  --line-strong: #8f8879;
+  --soft: #f0ece3;
+  --ink: #22201c;
+  --mute: #57534b;
+  --graphite: #6c675e;
+  /* One accent, a touch deeper by day so it weighs the same as the softer red at night. */
+  --red: #b23a2c;
+  --red-text: #b23a2c;
+  --on-red: #fffaf5;
+  --red-soft: #f6e1db;
+  --selection: #f1d9c8;
+  --highlight: #fbe7a6;
+  --brand-green: #1f7a4d;
+  --green: #2f6f4a;
+  --green-soft: #dcebe0;
+  --amber: #8f5016;
+  --amber-soft: #f6e8d6;
+  --track: #e9e4d9;
   --t1: #fff1bf;
   --t2: #d9f0df;
   --t3: #d8e8fa;
   --t4: #fadcd6;
   --t5: #e8def8;
-  --shadow: rgba(30, 29, 26, 0.1);
-  --scrim: rgba(30, 29, 26, 0.28);
+  --shadow: rgba(34, 32, 28, 0.09);
+  --scrim: rgba(34, 32, 28, 0.28);
   /* Canvas tokens. Dotted keeps today's dots; Grid is squares; Ruled is warm paper with thin vertical lines. */
   --canvas-dotted-dot: var(--line);
   --canvas-grid-line: color-mix(in srgb, var(--mute) 12%, transparent);
-  --canvas-ruled-bg: color-mix(in srgb, var(--bg) 60%, white);
+  --canvas-ruled-bg: var(--raised);
   --canvas-ruled-line: color-mix(in srgb, var(--mute) 8%, transparent);
   /* Paper grain: fine noise, a few percent, tiling without a visible repeat. */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.12 0 0 0 0 0.11 0 0 0 0 0.1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -38,18 +45,24 @@
 }
 
 [data-theme="dark"] {
-  --bg: #151412;
-  --sheet: #1e1d1a;
-  --line: #2f2d29;
-  --soft: #242320;
-  /* Warm chalk. */
-  --ink: #ece6da;
-  --mute: #a6a096;
-  --graphite: #9c978e;
-  --red: #d4483d;
-  --red-text: #f0786d;
-  --on-red: #ffffff;
-  --red-soft: #3a201c;
+  /* A lamp at night: warm charcoal, never pure black; soft chalk text (about 14:1, not glaring). */
+  --bg: #171614;
+  --sheet: #1f1d1a;
+  --raised: #292724;
+  --sunken: #121110;
+  --line: #312e2a;
+  --line-strong: #77716a;
+  --soft: #26241f;
+  --ink: #e9e4da;
+  --mute: #b0aa9f;
+  --graphite: #938d82;
+  --red: #b8402f;
+  --red-text: #ec8a72;
+  --on-red: #fffaf5;
+  --red-soft: #3a211c;
+  --selection: #4a2c24;
+  --highlight: #5a4a1e;
+  --brand-green: #237a4f;
   --green: #6cc892;
   --green-soft: #1c3125;
   --amber: #e2a65e;
@@ -74,6 +87,11 @@
   --color-bg: var(--bg);
   --color-sheet: var(--sheet);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-highlight: var(--highlight);
+  --color-brand-green: var(--brand-green);
   --color-soft: var(--soft);
   --color-ink: var(--ink);
   --color-mute: var(--mute);
@@ -108,6 +126,39 @@ body {
   background-image: var(--grain);
   color: var(--ink);
   font-family: var(--font-sans);
+}
+
+/* Reading comfort, both themes (see THEME.md). */
+::selection {
+  background: var(--selection);
+  color: var(--ink);
+}
+/* Theme changes ease in quickly, colours only (never layout). */
+html.theme-ease,
+html.theme-ease * {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease !important;
+}
+/* At night, light text on dark looks heavier than it is: a hair more air, a touch less weight, and pictures a touch dimmer so they don't glare. */
+[data-theme="dark"] .story-body,
+[data-theme="dark"] .story-serif {
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+[data-theme="dark"] .story-body p {
+  font-weight: 380;
+}
+[data-theme="dark"] img:not([src$=".svg"]) {
+  filter: brightness(0.92);
+}
+/* Links inside reading text: a quiet underline that warms up on hover. */
+.story-body a {
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+}
+.story-body a:hover {
+  text-decoration-color: currentColor;
 }
 
 /* How thoughts are written (Settings). "Handwritten" is Kalam, for loose thinking.
@@ -358,13 +409,12 @@ body {
 
 /* A highlighter swipe behind a handwritten word, drawn once, left to right. */
 .highlight {
-  background-image: linear-gradient(100deg, transparent 1%, var(--hl, #fde58a) 3%, var(--hl, #fde58a) 96%, transparent 99%);
+  background-image: linear-gradient(100deg, transparent 1%, var(--highlight) 3%, var(--highlight) 96%, transparent 99%);
   background-repeat: no-repeat;
   background-size: 100% 46%;
   background-position: 0 82%;
   animation: highlight 900ms 250ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
 }
-[data-theme="dark"] .highlight { --hl: #6b5a1f; }
 @keyframes highlight {
   from { background-size: 0% 46%; }
 }

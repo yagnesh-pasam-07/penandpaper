@@ -52,6 +52,11 @@ export function applyAppearance(next: { canvas?: CanvasId; mode?: ThemeMode }) {
     localStorage.setItem(CANVAS_KEY, canvas);
     localStorage.setItem(THEME_KEY, mode);
   } catch {}
+  // A quick fade between paper and lamp, only while switching (never on load).
+  if (next.mode) {
+    root().classList.add("theme-ease");
+    setTimeout(() => root().classList.remove("theme-ease"), 220);
+  }
   paint(canvas, mode);
 }
 

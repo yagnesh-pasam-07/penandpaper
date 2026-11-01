@@ -25,7 +25,7 @@ export function TabbedChart({ series, height = 220 }: { series: Series[]; height
             role="tab"
             aria-selected={i === tab}
             onClick={() => setTab(i)}
-            className={`h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors ${i === tab ? "bg-[var(--studio-blue)] text-white" : "text-mute hover:bg-soft hover:text-ink"}`}
+            className={`h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors ${i === tab ? "bg-[#2a6bc4] text-on-red" : "text-mute hover:bg-soft hover:text-ink"}`}
           >
             {x.label}
           </button>

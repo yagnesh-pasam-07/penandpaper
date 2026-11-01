@@ -156,6 +156,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-01 23:00 IST · design · Paper by day, a lamp at night: one warm palette in two lights
+Why: light mode felt off-brand and glaring (pure white cards on cream, a cool blue-black ink on warm paper), while dark mode felt right. Now both themes are the same warm hue family: warm off-white paper (`#f6f3ec`, cards `#fbf9f4`, never pure white) with warm near-black ink (`#22201c`) by day; warm charcoal (`#171614`) with soft chalk (`#e9e4da`, ~14:1, not glaring) at night. One red, deeper by day (`#b23a2c`) and softer at night (`#ec8a72`). New tokens: raised, sunken, line-strong (control borders ≥ 3:1), selection, highlight, brand-green. Every text pair measured (body ≥ 7:1, muted and small print ≥ 4.5:1, buttons ≥ 4.5:1); two old failures fixed (dark buttons were 4.4:1, control borders 1.3:1). Dark reading text gets a hair more letter spacing and less weight; pictures are dimmed a touch at night. The homepage now follows the system theme (it used to force light). Rules for future screens: THEME.md.
+Replaces: the original Paper/Ink tokens (design canvas) for colour values only; names are unchanged.
+
 ### 2026-11-01 22:00 IST · product · One brand, two named products: Pen and Paper Stories and Pen and Paper Desk
 Why: a story site with an app underneath felt like two unrelated things and cost trust. A parent with a belief and two named children feels intentional (like Google with Gmail and Maps). The homepage: "Pen and Paper" and the belief "Your thoughts deserve to be written down." (other people's, in our stories; your own, on your desk); two equal doors, *pen & paper* **stories** ("Real people, written down." → /stories) and *pen & paper* **desk** ("A quiet place for your own thoughts." → /desk); a short founder note with the founder's photo, in his words. Each product carries its name in its own header. The tool is "Desk": /tool redirects (308) to /desk. Desk is live, so its door says "Open your desk", not a waitlist.
 Replaces: the story-first homepage (21:00) and the name "the tool".

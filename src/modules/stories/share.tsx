@@ -86,7 +86,7 @@ export function ShareStory({ info, compact = false }: { info: ShareInfo; compact
   return (
     <div className="flex flex-col items-center gap-2 font-sans">
       <div className="flex flex-wrap items-center justify-center gap-2.5">
-        <a href={wa} target="_blank" rel="noopener noreferrer" onClick={() => count("whatsapp")} className={`${pill} bg-[#1f7a4d] font-semibold text-white hover:brightness-105`}>
+        <a href={wa} target="_blank" rel="noopener noreferrer" onClick={() => count("whatsapp")} className={`${pill} bg-brand-green font-semibold text-on-red hover:brightness-105`}>
           <WhatsAppGlyph />
           WhatsApp
         </a>

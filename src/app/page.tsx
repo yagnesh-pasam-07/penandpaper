@@ -23,13 +23,10 @@ async function SignedInGoesToPaper() {
   return null;
 }
 
-// The homepage is light paper unless the visitor has picked a theme themselves.
-const lightByDefault = `(function(){try{if(!localStorage.getItem("pp-theme"))document.documentElement.setAttribute("data-theme","light")}catch(e){}})()`;
 
 export default function Page() {
   return (
     <>
-      <script dangerouslySetInnerHTML={{ __html: lightByDefault }} />
       <Suspense fallback={null}>
         <SignedInGoesToPaper />
       </Suspense>

@@ -392,7 +392,7 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
             <Link href={`/studio/stories/${s.id}/preview`} target="_blank" onClick={() => void flush()} className="flex h-9 items-center rounded-full px-4 text-[14px] font-medium text-ink hover:bg-soft">
               Preview
             </Link>
-            <button type="button" onClick={() => setPanel((p) => !p)} aria-expanded={panel} className="flex h-9 items-center rounded-full bg-[#1f7a4d] px-4 text-[14px] font-semibold text-white hover:brightness-105">
+            <button type="button" onClick={() => setPanel((p) => !p)} aria-expanded={panel} className="flex h-9 items-center rounded-full bg-brand-green px-4 text-[14px] font-semibold text-on-red hover:brightness-105">
               {s.state === "draft" ? "Publish…" : "Published ▾"}
             </button>
           </span>
@@ -620,7 +620,7 @@ function PublishPanel({
   onRemoveAudio: () => void;
 }) {
   const label = "text-[12px] font-semibold tracking-[0.06em] text-mute uppercase";
-  const input = "w-full rounded-xl border border-line bg-sheet px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-ink";
+  const input = "w-full rounded-xl border border-line-strong bg-sheet px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-ink";
   const missing = [!s.title.trim() && "a title", words < 30 && "the story"].filter(Boolean) as string[];
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-[var(--scrim)] font-sans" onClick={onClose}>
@@ -667,7 +667,7 @@ function PublishPanel({
             </div>
           </div>
           <label className="flex items-center gap-2 text-[14px] text-ink">
-            <input type="checkbox" checked={s.personConsent} onChange={(e) => onSet({ personConsent: e.target.checked })} className="size-4 accent-[#1f7a4d]" />
+            <input type="checkbox" checked={s.personConsent} onChange={(e) => onSet({ personConsent: e.target.checked })} className="size-4 accent-[var(--brand-green)]" />
             They agreed to be featured (shows “Shared with their permission”)
           </label>
           <span className="text-[12px] text-mute">Their real photo, never a stock picture. Leave empty for a story about you or about history.</span>
@@ -782,7 +782,7 @@ function PublishPanel({
         <div className="mt-auto flex flex-col gap-3 border-t border-line pt-5">
           {missing.length > 0 && <p className="text-[13px] text-red-text">Add {missing.join(" and ")} first.</p>}
           {s.state !== "published" && (
-            <button type="button" disabled={missing.length > 0} onClick={() => onPublish("now")} className="h-12 rounded-xl bg-[#1f7a4d] text-[15px] font-semibold text-white hover:brightness-105 disabled:opacity-50">
+            <button type="button" disabled={missing.length > 0} onClick={() => onPublish("now")} className="h-12 rounded-xl bg-brand-green text-[15px] font-semibold text-on-red hover:brightness-105 disabled:opacity-50">
               Publish now
             </button>
           )}
