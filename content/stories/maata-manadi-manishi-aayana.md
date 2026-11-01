@@ -1,7 +1,7 @@
 ---
 title: మాట మనది. మనిషి ఆయన.
-subtitle: The words are ours. The man was him. Everything my tatayya told me about Potti Sriramulu, and everything I checked since.
-hook: My tatayya was a boy in 1952. He followed the fast on the radio. Years later, on a veranda in Vijayawada, he told me everything. Now I'm telling you.
+subtitle: The words are ours. The man was him.
+hook: Before you post today's status, give me a few minutes. Let me take you back to the man who gave his life so this state could exist.
 category: history
 language: en
 series: The man behind the words
@@ -9,151 +9,145 @@ series: The man behind the words
 
 Today you'll post a status. *Happy Formation Day.* A flag, a song.
 
-Before you do, let me tell you what my tatayya told me.
+Before you do, give me a few minutes. Let me take you back to a time when this state didn't exist, and to the man who gave his life so that it would.
 
-He was a boy of about twelve in 1952. He lived near Vijayawada. Years later, when I was the one who was twelve, he would sit on our veranda in the evenings with a steel tumbler of filter coffee, the rain coming down on the tin roof of the shop across the road, and tell me about a man he never met but never forgot.
-
-I didn't listen properly then. I do now. Tatayya isn't here anymore, so I went back and checked everything he told me against the record. Where his memory and the history books agree, I've written it as he said it. Where they don't, I've gone with the books and said so.
-
-This is the whole story. You won't need to read anything else.
+You won't need to read anything else after this. I've tried to put it all here, checked, in one place.
 
 ---
 
 ## 1. Before the man
 
-Tatayya always started earlier than I wanted him to.
+To understand him, you first have to understand why people were angry.
 
-"You can't understand Sriramulu garu," he'd say, "unless you understand why we were angry."
+For most of the British years, the Telugu districts of the coast and Rayalaseema were part of the Madras Presidency, governed from Madras city. The Telangana districts were somewhere else entirely, inside the Nizam's Hyderabad State. Millions of people spoke Telugu across both. In neither place was it the language of power.
 
-Here is what he meant. For most of the British period, the Telugu districts on the coast and in Rayalaseema were part of the Madras Presidency, governed from Madras. The Telangana districts were part of a different place altogether, the Nizam's Hyderabad State. Telugu was spoken across both, by millions of people, but in neither was it the language of power.
+Inside the Presidency, a lot of Telugu people felt they came second. In government jobs, in college seats, in where the money went. Historians still argue about how true that was in every case. The feeling, though, was real. You could hear it in the way people talked about Madras: as a city that ruled them, not a city that was theirs.
 
-Inside the Presidency, many Telugu people felt they came second. In government jobs, in college seats, in where the money went. Whether that was always true is something historians still argue about. But the feeling was real, and it grew.
+So people started asking for a province of their own.
 
-So did the movement. On 26 May 1913, around 800 delegates gathered in Bapatla for the first Andhra Mahasabha, the first big meeting to ask for a Telugu province. Konda Venkatappayya was there. So was Bhogaraju Pattabhi Sitaramayya. So was Pingali Venkayya, the man who would later design India's flag.
+On 26 May 1913, around 800 delegates came to Bapatla for the first Andhra Mahasabha. Konda Venkatappayya was there. So was Bhogaraju Pattabhi Sitaramayya. So was Pingali Venkayya, who would later design India's flag. Five years before that, in 1908, Kasinathuni Nageswara Rao had started a newspaper called Andhra Patrika. In those days it travelled by train and by hand, read aloud on verandas to people who couldn't read, carrying one idea from town to town: we are one people, and our భాష deserves a home.
 
-The newspaper Andhra Patrika, started by Kasinathuni Nageswara Rao in 1908, carried the cause in Telugu to towns and villages. Tatayya's father read it aloud on the veranda. That's how tatayya learned to read, he said, sounding out headlines about a state that didn't exist yet.
+Leaders like Tanguturi Prakasam made the demand louder through the 1920s and 30s.
 
-Leaders like Tanguturi Prakasam, who later became the first chief minister of Andhra, made the demand louder.
+Before independence, the Congress party had promised that once India was free, provinces would be redrawn by language. Telugu people believed that promise.
 
-<figure>
+Then 1947 came, and with it, Partition.
 
-![Konda Venkatappayya, one of the leaders of the early Andhra movement.](https://upload.wikimedia.org/wikipedia/commons/a/a9/Konda_Venkatappayya2.jpg "Source: Wikimedia Commons, public domain")
-
-</figure>
-
-The Congress party had promised, before independence, that provinces would be redrawn by language once India was free. Telugu people believed that promise.
-
-Then 1947 came. And with it, Partition.
-
-The country had just been cut into two along lines of religion, with terrible bloodshed. Many leaders became afraid that cutting provinces along lines of language would break India again. In December 1948 the Congress set up a committee of three: Jawaharlal Nehru, Vallabhbhai Patel and Pattabhi Sitaramayya. People called it the JVP Committee, after their initials. In April 1949 it reported that language should not be the basis for redrawing states. But it left one door open. An Andhra province could be formed, it said, if the Andhras gave up their claim to the city of Madras.
+The country had just been torn in two, with terrible bloodshed. Many leaders became afraid that redrawing provinces by language would break India again. In December 1948 the Congress set up a committee of three: Jawaharlal Nehru, Vallabhbhai Patel and Pattabhi Sitaramayya. People called it the JVP Committee, after their initials. In April 1949 it reported that language should not be the basis for redrawing states. It left one door open. An Andhra province could be formed, it said, if the Andhras gave up their claim to the city of Madras.
 
 That condition sat badly with a lot of people. Madras had been built partly by Telugu hands. Many felt it was theirs too.
 
-In 1951, a man named Swami Sitaram from Guntur district fasted for a separate Andhra state. He began on 15 August. After 35 days, on 20 September 1951, he broke his fast when Acharya Vinoba Bhave asked him to.
+In 1951, Swami Sitaram from Guntur district fasted for a separate Andhra state. He began on 15 August. After 35 days, on 20 September, he stopped when Acharya Vinoba Bhave asked him to.
 
-"Nothing happened after that," tatayya said. "Promises. Nothing."
+Then nothing happened. Promises, and nothing.
 
-He would stop there, every time, and drink his coffee. I learned later that the pause was the point.
+That is the India our man walked into in 1952. Five years free, and still waiting.
 
 ---
 
 ## 2. The ordinary man
 
-Potti Sriramulu was born on 16 March 1901. Most accounts say he was born in Madras, to Guravayya and Mahalakshmamma. His family's roots were in Padamatipalli, a village in the Nellore region. (A few sources name Padamatipalli itself as his birthplace. The record isn't settled. Either way, he was a Telugu boy of the Nellore country, raised in Madras.)
+Potti Sriramulu was born on 16 March 1901. Most accounts say he was born in Madras, to Guravayya and Mahalakshmamma, in a Telugu family whose roots were in Padamatipalli, in the Nellore region. A few sources name Padamatipalli itself as his birthplace. The record isn't settled. Either way, he was a Telugu boy of the Nellore country who grew up in Madras.
 
-He studied sanitary engineering in Bombay and got a job with the Great Indian Peninsula Railway. A good, steady job. The kind of job that made a family proud.
+He studied sanitary engineering in Bombay and got a job with the Great Indian Peninsula Railway.
 
-"He could have stayed there his whole life," tatayya said. "Retired. Pension. Grandchildren. Like me."
+In those days, a railway job was a settled life. A salary every month. A quarters to live in. Respect when you went home for festivals. He could have kept that job until he retired, and nobody would have remembered his name. That's not an insult. That's most of us.
 
 <figure>
 
-![Potti Sriramulu, around the 1930s or 40s. The only photographs that survive show him already thin.](https://upload.wikimedia.org/wikipedia/commons/b/b6/Potti_Sreeramulu.png "Source: Wikimedia Commons, public domain")
+![The only photographs of him that survive show a man already thin. He was a railway engineer once, with a different life ahead of him.](https://upload.wikimedia.org/wikipedia/commons/b/b6/Potti_Sreeramulu.png "Source: Wikimedia Commons, public domain")
 
 </figure>
 
 In 1928, when he was 27, his wife died giving birth. A few days later, their baby died too.
 
-Tatayya didn't say much about this part. He'd just look at the road. I think he'd lost people too, and didn't need to explain.
+I don't know what that week was like for him. Nobody wrote it down. I only know what he did after.
 
-Two years later, after his mother also died, Sriramulu gave up his railway job. He walked away from the salary, the security, the future that had been laid out for him.
+Two years later, after his mother also died, he resigned from the railway. He gave up the salary, the quarters, the settled life. He walked away from all of it.
 
 ---
 
 ## 3. The disciple
 
-He went to Gandhiji's Sabarmati Ashram in Ahmedabad. It was a place of hard, simple living. Spinning, cleaning, prayer, little food, a mat on the floor.
+He went to Gandhiji's Sabarmati Ashram in Ahmedabad. Picture it: a few low buildings by the river, people spinning cotton in the morning light, everyone sweeping their own floors and washing their own vessels. Very little food. A mat to sleep on. Silence a lot of the time.
 
 <figure>
 
-![Sabarmati Ashram in Ahmedabad, where Sriramulu went after he left the railway. It still stands.](https://upload.wikimedia.org/wikipedia/commons/9/9a/GANDHI_ASHRAM_03.jpg "Source: Wikimedia Commons, Umar, CC BY-SA 3.0")
+![Sabarmati Ashram, where he went after he left the railway. A man with a good job chose a mat on the floor.](https://upload.wikimedia.org/wikipedia/commons/9/9a/GANDHI_ASHRAM_03.jpg "Source: Wikimedia Commons, Umar, CC BY-SA 3.0")
 
 </figure>
 
-In 1930 he joined the Salt Satyagraha and was jailed for it. In 1941 and 1942 he joined the individual satyagraha and the Quit India movement. All told, he was imprisoned three times.
+In 1930 he joined the Salt Satyagraha and was jailed for it. In 1941 and 1942 he joined the individual satyagraha and the Quit India movement. All told, he went to jail three times.
 
 <figure>
 
-![Gandhiji on the Salt March, March 1930. Sriramulu was jailed for joining the Salt Satyagraha that year.](https://upload.wikimedia.org/wikipedia/commons/7/7c/Marche_sel.jpg "Source: Wikimedia Commons, public domain")
+![The Salt March, March 1930. He was one of thousands who broke the salt law that year, and went to prison for it.](https://upload.wikimedia.org/wikipedia/commons/7/7c/Marche_sel.jpg "Source: Wikimedia Commons, public domain")
 
 </figure>
 
-Gandhiji is said to have remarked that if he had eleven more followers like Sriramulu, he could win freedom in a year. That line appears in many accounts, though I couldn't find it in Gandhiji's own written words, so I'm passing it on as it has been passed to me: as something he is said to have said.
+Many accounts say Gandhiji once remarked that with eleven more followers like Sriramulu, he could win freedom in a year. I couldn't find those words in Gandhiji's own writing, so I'll pass them on the way they've reached me: as something he is said to have said.
 
-What tatayya talked about most was what Sriramulu did back home in Nellore.
+What tells you most about the man, though, is what he did back home in Nellore.
 
-For generations, Dalits (Gandhiji called them Harijans) were kept outside the doors of many temples. Between 1946 and 1948, Sriramulu fasted three times for their right to enter temples in Nellore, including the Venugopala Swami temple. He worked for Dalit welfare and for khadi, the hand-spun cloth of the freedom movement.
+For generations, Dalits, whom Gandhiji called Harijans, were kept outside the doors of many temples. Between 1946 and 1948, Sriramulu fasted three times for their right to enter temples in Nellore, among them the Venugopala Swami temple. He worked for Dalit welfare and for khadi, the hand-spun cloth of the freedom movement.
 
-And he protested in his own strange, stubborn way. He'd hang placards on his body with slogans about Dalit rights and walk through the streets in the summer heat. No slippers. No umbrella. Alone.
+And he protested in his own lonely way. He'd hang placards on his body with slogans about Dalit rights and walk through the streets in the middle of summer. No slippers. No umbrella. Nobody beside him.
 
-"People laughed at him," tatayya said. "Some called him mad."
+Imagine seeing that from a shop doorway in the afternoon heat. A thin man in khadi, walking alone, a board hanging from his neck. Some people laughed. Some called him mad.
 
-"Was he?"
+He kept walking.
 
-Tatayya thought about it for a long time.
-
-"He was serious. When most people are not serious, a serious man looks mad."
-
-So when Sriramulu stopped eating in 1952, it wasn't a stunt. Fasting was how he had lived for years. It was the only weapon he trusted.
+So when he stopped eating in 1952, it wasn't a stunt. Fasting was how he had lived for years. It was the one weapon he trusted.
 
 ---
 
 ## 4. The vow
 
-On 19 October 1952, Potti Sriramulu began a fast unto death in Madras. He would not eat until a separate state was promised for the Telugu people.
+Picture Madras in October 1952. Trams on Mount Road. The smell of the sea. Bicycles and hand-pulled rickshaws, bullock carts carrying vegetables in from the edges of the city.
 
-He fasted in the house of Bulusu Sambamurthy, a freedom fighter who offered him a room when few others did. The address was 126 Royapettah High Road, in Mylapore.
+On 19 October, in a house in Mylapore, Potti Sriramulu began a fast unto death. He would not eat until a separate state was promised for the Telugu people.
+
+The house belonged to Bulusu Sambamurthy, a freedom fighter. The address was 126 Royapettah High Road. Not many people were willing to give him a room for this. Sambamurthy did.
 
 <figure>
 
-![Bulusu Sambamurthy, on a 2008 India Post stamp. He gave Sriramulu the room where he fasted, and where he died.](https://upload.wikimedia.org/wikipedia/commons/7/75/Bulusu_Sambamurti_2008_stamp_of_India.jpg "Source: India Post, via Wikimedia Commons, GODL-India")
+![Bulusu Sambamurthy, on a 2008 India Post stamp. When few would give the fast a roof, he gave his own house.](https://upload.wikimedia.org/wikipedia/commons/7/75/Bulusu_Sambamurti_2008_stamp_of_India.jpg "Source: India Post, via Wikimedia Commons, GODL-India")
 
 </figure>
 
-Why did the government wait? Tatayya's answer was one word: "Madras."
+Why did the government wait?
 
-The question of who would get the city of Madras was the knot nobody wanted to untie. Telugu leaders wanted it, or at least a share. Tamil leaders would not give it up. Delhi didn't want to choose. So Delhi waited.
+Because of one city. Madras.
+
+Telugu leaders wanted it, or at least a share of it. Tamil leaders would not give it up. Delhi didn't want to choose between them. So Delhi did the easiest thing a government can do. It waited.
 
 ---
 
 ## 5. The days
 
-This is the part tatayya told slowly.
+In those days, news came slowly.
 
-There was one radio in their street, in the tea shop. Every evening the men gathered, and the boys pushed in between their legs to listen. Andhra Patrika came a day late, and it was passed from hand to hand until the paper went soft.
+Most streets didn't have a radio in every house. There was one in the tea shop, maybe, crackling on a shelf above the stove, and in the evenings men stood around it holding glasses of tea that had gone cold. The newspaper came in the morning and went from hand to hand until the paper went soft.
 
-"First week, nobody worried," tatayya said. "We thought, he'll stop. They always stop."
+The first week, people weren't worried. Fasts end. Someone promises something, someone offers a glass of juice, a photograph is taken. That's how these things go.
 
-Second week, his name was on everyone's lips. Third week, students started talking about it in school. Somebody's mother started lighting a lamp for him every evening.
+By the second week, his name was everywhere.
 
-By the fourth week, he was too weak to sit up for long. Doctors came and went. Telegrams flew between Madras and Delhi. Nothing came back that anyone could hold.
+By the third, students were talking about it in college corridors. People were lighting lamps for him in temples and at home. Somebody's అమ్మ, somewhere, was praying for a man she would never meet.
 
-"Fifth week," tatayya said, "my father stopped laughing at dinner."
+By the fourth week, he could no longer sit up for long. Doctors came and went from the house in Mylapore. Telegrams went between Madras and Delhi. Nothing came back that anyone could hold on to.
 
-Day forty. Day fifty.
+Day forty.
 
-People stood outside the house in Mylapore, quietly, all day. People in towns across the Telugu districts asked each other the same questions every morning. What day is it? How is he? Any word from Delhi?
+Day fifty.
 
-The government did not move.
+If you had walked past that house at night, you'd have seen people standing outside in the dark. Not shouting. Just standing. Waiting to hear.
+
+Across the Telugu districts, it was the first question every morning. What day is it now? How is he? Any word from Delhi?
+
+Delhi said nothing.
+
+I get angry when I read about these weeks, and I think I'm allowed to. A man was dying slowly, in public, over a question everyone already knew the answer to.
 
 ---
 
@@ -163,37 +157,35 @@ On 15 December 1952, on the fifty-eighth day of his fast, Potti Sriramulu died.
 
 He was 51.
 
-(A few sources give the date as 16 December or count the fast differently. The government of Andhra Pradesh and most historians use 15 December and 58 days, and so do I.)
+A few sources give the date as 16 December, or count the days differently. The government of Andhra Pradesh and most historians use 15 December and 58 days, and so do I.
 
-"I was at the tea shop," tatayya said. "The radio said it. Nobody said anything. The owner turned it off. Then he started pulling down the shutter."
+There was no speech at the end. Just a quiet room in a borrowed house.
 
-Tatayya never told this part twice the same way. Sometimes it was the shutter he remembered. Sometimes it was his father, who didn't come home until late. I think all of it was true.
+ఆత్మార్పణ. The offering of oneself.
 
-ఆత్మార్పణ. Atmarpana. The offering of oneself.
+I keep coming back to one question. Why would a man give up his comfort, his future, every ordinary thing he might have wanted, and finally his life, for people he would never meet? For children who weren't born yet?
 
-I've thought about it a lot, since tatayya told me. Why would a man give up his comfort, his desires, his future, and finally his life, for millions of people he would never meet? For children who weren't born yet? For me?
-
-I don't think there's a clean answer. I think he simply believed a language deserves a home, and that people shouldn't have to beg for it. And he was willing to pay the whole price himself.
+I don't think there's a tidy answer. I think he simply believed that a language deserves a home, and that people shouldn't have to beg for one. And he was willing to pay the whole price himself, so that nobody else would have to.
 
 ---
 
 ## 7. The storm
 
-His funeral procession moved through Madras. The singer Ghantasala, who would later become the voice of Telugu cinema, sang songs for him along the way. Telugu students from Presidency College joined, and then crowds of Telugu people from across the city. The procession turned into an uprising on Mount Road, and the unrest lasted for days.
+His body was carried through the streets of Madras. Ghantasala, the singer who would later become the voice of Telugu cinema, sang for him along the way. Telugu students from Presidency College joined the procession, then Telugu people from across the city. By the time it reached Mount Road, the mourning had turned into anger, and the city was in turmoil for days.
 
-Across the Telugu districts, it was worse. Shops shut. Offices emptied. Trains were stopped. There was rioting, and in Anakapalle and Vijayawada the police opened fire. Seven people were killed.
+Across the Telugu districts, the news came down the railway lines and across the radio. Shop shutters came down. Offices emptied. Trains were stopped at platforms by crowds. There was rioting, and in Anakapalle and Vijayawada the police opened fire. Seven people were killed.
 
-"We didn't go to school for a week," tatayya said. "My mother wouldn't let us out of the house."
+People had started calling him అమరజీవి. *Amarajeevi.* The one who lives forever.
 
-On 19 December 1952, four days after Sriramulu died, Prime Minister Nehru announced in Parliament that a separate Andhra State would be formed.
+On 19 December 1952, four days after he died, Prime Minister Nehru announced in Parliament that a separate Andhra State would be formed.
 
-After decades of asking, it took four days.
+Decades of asking. Then four days.
 
 ---
 
-## 8. The birth of a state, then a nation redrawn
+## 8. A state, and then a whole map redrawn
 
-Andhra State was formed on 1 October 1953, carved out of Madras State. Its capital was Kurnool. Its first chief minister was Tanguturi Prakasam. The city of Madras stayed with Madras State, which would later become Tamil Nadu.
+Andhra State was formed on 1 October 1953, carved out of Madras State. Kurnool was its capital. Tanguturi Prakasam was its first chief minister. The city of Madras stayed with Madras State, which would later be renamed Tamil Nadu.
 
 <figure>
 
@@ -203,59 +195,57 @@ Andhra State was formed on 1 October 1953, carved out of Madras State. Its capit
 
 <figure>
 
-![Andhra State on the map of India in 1953, the first state of independent India formed around a language.](https://upload.wikimedia.org/wikipedia/commons/f/f8/Andhra-India_1953.svg "Source: Wikimedia Commons, Furfur, CC BY-SA 4.0")
+![Andhra State on India's map in 1953. The first state of independent India drawn around a language.](https://upload.wikimedia.org/wikipedia/commons/f/f8/Andhra-India_1953.svg "Source: Wikimedia Commons, Furfur, CC BY-SA 4.0")
 
 </figure>
 
-Tatayya's family went to Kurnool once, in 1954, just to see the capital. He remembered the heat more than anything. "Hot like a frying pan," he said. "But it was ours."
-
-And then the question Sriramulu forced came for the whole country. If the Telugu people could have a state for their language, why not the Kannada people? The Malayalis? The Marathis? The Gujaratis?
+And then the question he had forced travelled across the whole country. If the Telugu people could have a state for their language, why not the Kannada people? The Malayalis? The Marathis?
 
 On 29 December 1953, the central government set up the States Reorganisation Commission, chaired by Justice Fazl Ali. It submitted its report on 30 September 1955.
 
 <figure>
 
-![Justice Saiyid Fazl Ali, who chaired the States Reorganisation Commission.](https://upload.wikimedia.org/wikipedia/commons/4/4d/Saiyid_Fazl_Ali.jpg "Source: Odisha Legislative Assembly, via Wikimedia Commons, GODL-India")
+![Justice Saiyid Fazl Ali, who led the commission that redrew India by language.](https://upload.wikimedia.org/wikipedia/commons/4/4d/Saiyid_Fazl_Ali.jpg "Source: Odisha Legislative Assembly, via Wikimedia Commons, GODL-India")
 
 </figure>
 
-Meanwhile, many Telugu people wanted one big Telugu state, *Visalandhra*, joining Andhra with the Telugu districts of Hyderabad State. Others in Telangana worried that they would be treated unfairly by the larger, richer Andhra. On 20 February 1956, leaders from both sides signed what came to be called the Gentlemen's Agreement, with safeguards meant to protect Telangana's interests.
+Meanwhile, many Telugu people wanted one large Telugu state, *Visalandhra*, joining Andhra with the Telugu districts of Hyderabad State. Others in Telangana worried that the bigger, richer Andhra would not treat them fairly. On 20 February 1956, leaders from both regions signed what came to be called the Gentlemen's Agreement, with safeguards meant to protect Telangana's interests.
 
-On 1 November 1956, Andhra State and the Telugu-speaking districts of Hyderabad State were joined to form Andhra Pradesh, with Hyderabad as its capital. The same day, under the States Reorganisation Act, India's map was redrawn by language across the country: Mysore (later Karnataka), Kerala and others. Bombay State was later split into Maharashtra and Gujarat in 1960.
+On 1 November 1956, Andhra State and the Telugu-speaking districts of Hyderabad State were joined to form Andhra Pradesh, with Hyderabad as its capital. On the same day, under the States Reorganisation Act, the map was redrawn by language across the country, creating Kerala, the larger Mysore state that later became Karnataka, and others. Bombay State was later divided into Maharashtra and Gujarat, in 1960.
 
-One man's death in a borrowed room in Mylapore had redrawn the whole map of India.
+Think about that for a second. A man died on a mat in a borrowed room in Mylapore, and the map of an entire country changed.
 
-Tatayya lived through what came next too, and I'll tell it the way the record does, without taking sides. Over the following decades, many in Telangana felt the 1956 safeguards had not been kept. The demand for a separate Telangana returned more than once. On 2 June 2014, Telangana became a state of its own, with Hyderabad as its capital.
+What came next, I'll tell the way the record does, without taking sides. Over the following decades, many in Telangana felt the 1956 safeguards were not kept. The demand for a separate state came back more than once. On 2 June 2014, Telangana became a state of its own, with Hyderabad as its capital.
 
-After that, Andhra Pradesh had to decide which day to celebrate. From 2014 to 2018 the state government did not mark 1 November as Formation Day, and observed 2 June instead. In 2019 the next government restored 1 November. More recently, the government directed that 15 December, the day Sriramulu died, be observed every year as Atmarpana Dinam, the Day of Sacrifice. Different governments have made different choices. The dates have moved. His story hasn't.
+After that, Andhra Pradesh had to decide which day to celebrate. From 2014 to 2018 the state government did not mark 1 November as Formation Day, and observed 2 June instead. In 2019 the next government brought back 1 November. The state has also directed that 15 December, the day he died, be observed every year as Atmarpana Dinam, the Day of Sacrifice. Governments have made different choices. The dates have moved.
+
+He hasn't.
 
 ---
 
 ## 9. The ache
 
-And here is the part tatayya couldn't say without his voice going.
+And here is the part I find hardest.
 
 He never saw any of it.
 
-He never saw Andhra State formed. He never saw the map redrawn. He never saw a child in Nellore or Kakinada or Kurnool go to school in their own language, in their own state. He never knew people would call him *Amarajeevi*, the one who lives forever.
+He never saw Andhra State born. He never saw the map change. He never saw a child in Nellore or Kakinada or Kurnool sit in a classroom in their own state and read in their own language. He never knew people would call him అమరజీవి.
 
 He gave everything, and he never got to know what it became.
 
-"If he could see it now," I asked once, "would he be happy?"
+If he could see it today, the signboards, the films, the voice notes you send your amma in Telugu without a second thought, would he smile?
 
-Tatayya didn't answer for a long time. The rain had stopped.
-
-"He'd want to know if we remember why," he said.
+I hope so. I think he'd also want to know whether we remember why.
 
 ---
 
-## 10. After him: how we remember
+## 10. How we remember him
 
-Here is what's been done in his name, as far as I can check it.
+Here is what has been done in his name, as far as I could check it.
 
-**The house in Mylapore.** The house at 126 Royapettah High Road, where he fasted and died, was preserved as a memorial by the Andhra government. It's still there in Chennai.
+**The house in Mylapore.** The house at 126 Royapettah High Road, where he fasted and died, was preserved as a memorial by the Andhra government. It still stands in Chennai.
 
-**His native place.** The Andhra Pradesh government has announced that his family house at Padamatipalli will become a museum, along with a health centre and a school building for the village.
+**His family's village.** The Andhra Pradesh government has announced that his native house at Padamatipalli will become a museum, along with a health centre and a school building for the village.
 
 **His district.** On 4 June 2008, Nellore district was renamed Sri Potti Sriramulu Nellore district.
 
@@ -263,21 +253,21 @@ Here is what's been done in his name, as far as I can check it.
 
 <figure>
 
-![The 2000 India Post stamp. Tatayya bought a sheet of them the day they came out.](https://upload.wikimedia.org/wikipedia/commons/c/c5/Potti_Sreeramulu_2000_stamp_of_India.jpg "Source: India Post, via Wikimedia Commons, GODL-India")
+![The 2000 India Post stamp. Small enough to fit on an envelope. It carried his face to every corner of the country.](https://upload.wikimedia.org/wikipedia/commons/c/c5/Potti_Sreeramulu_2000_stamp_of_India.jpg "Source: India Post, via Wikimedia Commons, GODL-India")
 
 </figure>
 
-**His university.** The Telugu University in Hyderabad was founded on 2 December 1985 and renamed Potti Sreeramulu Telugu University in 1998. In 2025 the Telangana Assembly passed a bill renaming it after Suravaram Pratap Reddy, a writer and freedom fighter from Telangana. The Telangana chief minister said this was not meant as disrespect to Sriramulu, and that two universities in two states shouldn't share one name. He also asked the central government to name the new Cherlapally railway terminal in Hyderabad after Sriramulu. Andhra Pradesh has announced its own Telugu university to be named after him.
+**His university.** The Telugu University in Hyderabad was founded on 2 December 1985 and renamed Potti Sreeramulu Telugu University in 1998. In 2025 the Telangana Assembly passed a bill renaming it after Suravaram Pratap Reddy, a writer and freedom fighter from Telangana. The Telangana chief minister said this was not meant as disrespect to Sriramulu, and that two universities in two states shouldn't share one name. He also asked the central government to name the new Cherlapally railway terminal in Hyderabad after Sriramulu. Andhra Pradesh, for its part, has announced its own Telugu university in his name.
 
-**His statue in Amaravati.** On 16 March 2026, his 125th birth anniversary, a bronze statue 58 feet tall, one foot for every day of the fast, was unveiled at Shakhamuru Park in Amaravati. It was built by the Potti Sriramulu Memorial Trust in six months, with 26 tonnes of bronze. A museum, a photo gallery and an auditorium are planned at the site. The state also announced a year of celebrations from that day.
+**His statue in Amaravati.** On 16 March 2026, his 125th birth anniversary, a bronze statue 58 feet tall, one foot for every day of the fast, was unveiled at Shakhamuru Park in Amaravati. The Potti Sriramulu Memorial Trust built it in six months with 26 tonnes of bronze. A museum, a photo gallery and an auditorium are planned around it. The state also announced a year of celebrations starting that day.
 
-**His days.** 16 March is his jayanti. 15 December is Atmarpana Dinam. And on 1 November, people across the state garland his statues.
+**His days.** 16 March is his jayanti. 15 December is Atmarpana Dinam, ఆత్మార్పణ దినం. On 1 November, his statues are garlanded across the state.
 
 There are statues of him in nearly every town. Roads, bus stands, schools and colleges carry his name.
 
 <figure>
 
-![His statue on RK Beach, Visakhapatnam, one of hundreds across the Telugu states.](https://upload.wikimedia.org/wikipedia/commons/8/8c/Potti_Sreeramulu_Statues_at_RK_Beach_Visakhapatnam_07.jpg "Source: Wikimedia Commons, Kasyap, CC0")
+![His statue on RK Beach, Visakhapatnam. One of hundreds. Most people walk past them every day.](https://upload.wikimedia.org/wikipedia/commons/8/8c/Potti_Sreeramulu_Statues_at_RK_Beach_Visakhapatnam_07.jpg "Source: Wikimedia Commons, Kasyap, CC0")
 
 </figure>
 
@@ -285,21 +275,19 @@ We garland them every year.
 
 But do we know them?
 
-I didn't, until tatayya told me.
-
 ---
 
 ## 11. Back to your phone
 
 So. The status.
 
-Post it. It's a birthday. Celebrate.
+Post it. It's a birthday, celebrate it.
 
-But maybe, this year, post his story instead. Or with it. Tell someone younger than you who he was. Tell them about the room in Mylapore, the tea-shop radio, the shutters coming down.
+But this year, post his story too. Not just the flag. Him. Tell someone younger than you about the room in Mylapore, the radio in the tea shop, the fifty-eight days.
 
-Tatayya isn't here to tell it anymore.
+Tyagaraja once sang *ఎందరో మహానుభావులు, అందరికీ వందనములు*. So many great souls; salutations to all of them.
 
-So I am.
+Today, our salutation goes to this one.
 
 *మాట మనది. మనిషి ఆయన.*
 *The words are ours. The man was him.*
@@ -333,7 +321,7 @@ So I am.
 - **2014, 2 June**: Telangana becomes a separate state.
 - **2014–2018**: Andhra Pradesh observes 2 June instead of 1 November.
 - **2019**: 1 November restored as Formation Day.
-- **2024, December**: 15 December directed to be observed as Atmarpana Dinam; Andhra Pradesh announces a Telugu university in his name.
+- **2024, December**: 15 December to be observed as Atmarpana Dinam; Andhra Pradesh announces a Telugu university in his name.
 - **2025**: Telangana renames the Hyderabad Telugu University after Suravaram Pratap Reddy.
 - **2026, 16 March**: 58-foot statue unveiled in Amaravati on his 125th jayanti.
 
@@ -366,3 +354,5 @@ So I am.
 - [AP Telugu university in his name, Deccan Chronicle](https://www.deccanchronicle.com/southern-states/andhra-pradesh/naidu-promises-telugu-university-named-after-potti-sriramulu-1847099)
 - [58-foot statue unveiled, ThePrint](https://theprint.in/india/andhra-cm-unveils-58-foot-bronze-statue-of-potti-sriramulu-in-amaravati/2880126/)
 - [Padamatipalli museum plan, The News Minute](https://www.thenewsminute.com/andhra-pradesh/andhra-govt-to-install-58-foot-statue-of-potti-sriramulu-in-amaravati)
+
+**Meta description (SEO):** Potti Sriramulu fasted for 58 days and died on 15 December 1952 so that Telugu people could have a state of their own. The full story of the man behind Andhra Pradesh Formation Day, and how he is remembered today.
