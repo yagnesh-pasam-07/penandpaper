@@ -51,7 +51,7 @@ export function WritingJourney() {
           <span className={label}>105 CE</span>
         </div>
       </div>
-      <figcaption className="text-center font-sans text-[13px] text-mute">Walls, clay, leaves, paper. Each one was someone deciding a thought was worth keeping.</figcaption>
+      <figcaption className="text-center font-sans text-[13px] text-mute">Walls, clay, leaves, paper.</figcaption>
     </figure>
   );
 }

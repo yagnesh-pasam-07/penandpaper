@@ -28,7 +28,7 @@ export default function AboutPage() {
 
           <p>Since I was a child, nothing has shaped me more than a pen and a sheet of paper. Exams. Drawings. Ideas at midnight. Even code, which I still sketch on paper before I type it. Almost everything that mattered to me started there.</p>
 
-          <p>And it&apos;s an old love. Long before paper, people scratched marks on cave walls, just to say: we were here, this happened. About 5,000 years ago, in Mesopotamia, people pressed the first writing into wet clay. In India, scribes wrote on dried palm leaves and tied them with string. Then, around 105 CE, a court official in China named Cai Lun made paper, and thoughts could finally travel.</p>
+          <p>It&apos;s an old love, older than any of us. First people drew on cave walls. Then they wrote on clay, then on palm leaves, and then came paper. Every time, it was the same wish: don&apos;t let this thought be lost.</p>
 
           <WritingJourney />
 
