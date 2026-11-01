@@ -141,6 +141,13 @@
       "when": 1793511839797,
       "tag": "0019_story_studio",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793512728382,
+      "tag": "0020_story_person_series",
+      "breakpoints": true
     }
   ]
 }

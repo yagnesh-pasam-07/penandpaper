@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { StoryEditor } from "@/modules/stories/editor";
 import { storyFonts } from "@/modules/stories/fonts";
-import { storyForWriter } from "@/modules/stories/server";
+import { seriesNames, storyForWriter } from "@/modules/stories/server";
 import { writerOrPage } from "@/modules/stories/studio-gate";
 
 export const metadata: Metadata = { title: "Writing · Studio", robots: { index: false, follow: false } };
@@ -16,10 +16,16 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
   const writer = await writerOrPage(`/studio/stories/${id}`);
   if (!writer || typeof writer !== "object" || !("id" in writer)) return writer;
   if (!z.uuid().safeParse(id).success) notFound();
-  const s = await storyForWriter(id);
+  const [s, names] = await Promise.all([storyForWriter(id), seriesNames().catch(() => [])]);
   if (!s) notFound();
   return (
-    <StoryEditor
+    <>
+      <datalist id="series-names">
+        {names.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <StoryEditor
       initial={{
         id: s.id,
         slug: s.slug,
@@ -35,11 +41,20 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
         originalUrl: s.originalUrl,
         shareText: s.shareText,
         shareMediaId: s.shareMediaId,
+        personName: s.personName,
+        personPlace: s.personPlace,
+        personPhotoId: s.personPhotoId,
+        personConsent: s.personConsent,
+        series: s.series,
+        sources: s.sources,
+        language: s.language,
+        translationOf: s.translationOf,
         readingMinutes: s.readingMinutes,
         state: s.state,
         publishAt: s.publishAtRaw?.toISOString() ?? null,
       }}
-    />
+      />
+    </>
   );
 }
 

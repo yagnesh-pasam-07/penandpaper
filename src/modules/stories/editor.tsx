@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition, type ClipboardEvent, type KeyboardEvent } from "react";
-import { publish, remove, save } from "@/app/studio/stories/actions";
+import { publish, remove, save, translate } from "@/app/studio/stories/actions";
 import { newKey, toBlocks, toMarkdown, type EditBlock } from "./blocks";
 import { CATEGORIES, CATEGORY_LABEL, clock, readLabel, type Category, type StoryState } from "./logic";
 import { uploadAudio, uploadImage } from "./upload";
@@ -22,6 +22,14 @@ export type EditorStory = {
   originalUrl: string | null;
   shareText: string;
   shareMediaId: string | null;
+  personName: string;
+  personPlace: string;
+  personPhotoId: string | null;
+  personConsent: boolean;
+  series: string;
+  sources: string;
+  language: string;
+  translationOf: string | null;
   readingMinutes: number;
   state: StoryState;
   publishAt: string | null;
@@ -109,6 +117,13 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
       originalUrl: patch.originalUrl === "" ? null : patch.originalUrl,
       shareText: patch.shareText,
       shareMediaId: patch.shareMediaId,
+      personName: patch.personName,
+      personPlace: patch.personPlace,
+      personPhotoId: patch.personPhotoId,
+      personConsent: patch.personConsent,
+      series: patch.series,
+      sources: patch.sources,
+      language: patch.language as "en" | "te" | undefined,
     }).catch(() => ({ error: "Not saved. Check your connection." }));
     if ("error" in res) {
       setSaved("error");
@@ -154,7 +169,7 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
     el.setSelectionRange(at, at);
   }, [blocks]);
 
-  const field = (k: "title" | "subtitle" | "hook" | "coverCaption" | "originalUrl" | "shareText", v: string) => {
+  const field = (k: "title" | "subtitle" | "hook" | "coverCaption" | "originalUrl" | "shareText" | "personName" | "personPlace" | "series" | "sources", v: string) => {
     setS((cur) => ({ ...cur, [k]: v }));
     queue({ [k]: v });
   };
@@ -306,6 +321,19 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
     }
   };
 
+  const setPersonPhoto = async (file: File) => {
+    setBusy("Adding their photo…");
+    try {
+      const { id } = await uploadImage(s.id, file);
+      setS((cur) => ({ ...cur, personPhotoId: id }));
+      queue({ personPhotoId: id });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That picture couldn't be added.");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const setSharePic = async (file: File) => {
     setBusy("Adding the WhatsApp picture…");
     try {
@@ -405,6 +433,11 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
             queue({ audioId: null, audioDurationSec: null });
           }}
           onSharePic={(f) => void setSharePic(f)}
+          onSet={(patch) => {
+            setS((cur) => ({ ...cur, ...patch }));
+            queue(patch);
+          }}
+          onPersonPhoto={(f) => void setPersonPhoto(f)}
           onRemoveSharePic={() => {
             setS((cur) => ({ ...cur, shareMediaId: null }));
             queue({ shareMediaId: null });
@@ -566,6 +599,8 @@ function PublishPanel({
   onRemoveAudio,
   onSharePic,
   onRemoveSharePic,
+  onSet,
+  onPersonPhoto,
 }: {
   s: EditorStory;
   words: number;
@@ -573,7 +608,9 @@ function PublishPanel({
   setSchedule: (v: string) => void;
   onPublish: (when: "now" | "unpublish" | string) => void;
   onClose: () => void;
-  onField: (k: "hook" | "originalUrl" | "shareText", v: string) => void;
+  onField: (k: "hook" | "originalUrl" | "shareText" | "personName" | "personPlace" | "series" | "sources", v: string) => void;
+  onSet: (patch: Partial<EditorStory>) => void;
+  onPersonPhoto: (f: File) => void;
   onSharePic: (f: File) => void;
   onRemoveSharePic: () => void;
   onCategory: (c: Category) => void;
@@ -609,6 +646,64 @@ function PublishPanel({
               </button>
             ))}
           </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className={`${label} pb-2`}>The person in this story</legend>
+          <div className="flex items-center gap-3">
+            {s.personPhotoId ? (
+              <button type="button" onClick={() => onSet({ personPhotoId: null })} title="Remove the photo" className="shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element -- the writer's own upload */}
+                <img src={`${MEDIA}${s.personPhotoId}?w=480`} alt="" className="size-14 rounded-full object-cover" />
+              </button>
+            ) : (
+              <FileButton accept="image/*" onFile={onPersonPhoto} className="flex size-14 shrink-0 items-center justify-center rounded-full border border-dashed border-line text-[11px] text-mute hover:text-ink">
+                Photo
+              </FileButton>
+            )}
+            <div className="flex flex-1 flex-col gap-2">
+              <input value={s.personName} onChange={(e) => onField("personName", e.target.value)} placeholder="Their name" aria-label="Their name" maxLength={120} className={input} />
+              <input value={s.personPlace} onChange={(e) => onField("personPlace", e.target.value)} placeholder="Where (e.g. Vijayawada)" aria-label="Where they are" maxLength={120} className={input} />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-[14px] text-ink">
+            <input type="checkbox" checked={s.personConsent} onChange={(e) => onSet({ personConsent: e.target.checked })} className="size-4 accent-[#1f7a4d]" />
+            They agreed to be featured (shows “Shared with their permission”)
+          </label>
+          <span className="text-[12px] text-mute">Their real photo, never a stock picture. Leave empty for a story about you or about history.</span>
+        </fieldset>
+
+        <label className="flex flex-col gap-2">
+          <span className={label}>Series (optional)</span>
+          <input value={s.series} onChange={(e) => onField("series", e.target.value)} placeholder="The man behind the words" maxLength={120} list="series-names" className={input} />
+          <span className="text-[12px] text-mute">Stories with the same series name are grouped, with their own page.</span>
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <span className={label}>Sources (optional, one a line)</span>
+          <textarea rows={4} value={s.sources} onChange={(e) => onField("sources", e.target.value)} placeholder={"Andhra Pradesh Day — https://en.wikipedia.org/wiki/Andhra_Pradesh_Day\nThe Hindu, 16 December 1952"} className={`${input} font-mono text-[13px]`} />
+          <span className="text-[12px] text-mute">For history: dates and references, shown in a box at the end. End a line with a link to make it one.</span>
+        </label>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className={`${label} pb-2`}>Language</legend>
+          <div className="flex gap-2">
+            {(["en", "te"] as const).map((l) => (
+              <button key={l} type="button" onClick={() => onSet({ language: l })} aria-pressed={s.language === l} className={`h-9 rounded-full border px-4 text-[14px] ${s.language === l ? "border-ink bg-ink text-bg" : "border-line text-ink hover:bg-soft"}`}>
+                {l === "en" ? "English" : "తెలుగు"}
+              </button>
+            ))}
+          </div>
+          {s.translationOf ? (
+            <span className="text-[12px] text-mute">This is a translation. Readers of either version get a button to switch.</span>
+          ) : (
+            <form action={translate.bind(null, s.id, s.language === "te" ? "en" : "te")}>
+              <button type="submit" className="text-[13px] text-ink underline underline-offset-2">
+                {s.language === "te" ? "Make an English version →" : "Make a Telugu version (తెలుగు) →"}
+              </button>
+              <span className="block text-[12px] text-mute">A draft copy with the same pictures, person and sources, to translate. Readers get a switch once both are published.</span>
+            </form>
+          )}
         </fieldset>
 
         <div className="flex flex-col gap-2">

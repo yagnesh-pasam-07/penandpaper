@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toBlocks, toMarkdown } from "./blocks";
-import { isLive, isSlug, readingMinutes, slugify, storyState, uniqueSlug } from "./logic";
+import { isLive, isSlug, parseSources, readingMinutes, seriesSlug, slugify, storyState, uniqueSlug } from "./logic";
 import { firstLine, imageLine, inline, parse, safeHref } from "./markdown";
 import { htmlToMarkdown, mediumFeedUrl, mediumPostId, postFromFeed } from "./medium";
 
@@ -125,5 +125,23 @@ describe("Medium import", () => {
       { src: "https://cdn-images-1.medium.com/max/1024/1*a.jpeg", caption: "One sunrise, one sunset." },
       { src: "https://cdn-images-1.medium.com/max/1024/1*b.jpeg", caption: "Line one / line two" },
     ]);
+  });
+});
+
+describe("sources and series", () => {
+  it("reads one source a line, with or without a link", () => {
+    expect(
+      parseSources("- Andhra Pradesh Day — https://en.wikipedia.org/wiki/Andhra_Pradesh_Day\n\nThe Hindu archives, 16 Dec 1952\nhttps://thenewsminute.com/x"),
+    ).toEqual([
+      { text: "Andhra Pradesh Day", href: "https://en.wikipedia.org/wiki/Andhra_Pradesh_Day" },
+      { text: "The Hindu archives, 16 Dec 1952", href: null },
+      { text: "thenewsminute.com", href: "https://thenewsminute.com/x" },
+    ]);
+  });
+  it("never links anything but http(s)", () => {
+    expect(parseSources("Bad javascript:alert(1)")).toEqual([{ text: "Bad javascript:alert(1)", href: null }]);
+  });
+  it("a series has a readable address", () => {
+    expect(seriesSlug("The man behind the words")).toBe("the-man-behind-the-words");
   });
 });

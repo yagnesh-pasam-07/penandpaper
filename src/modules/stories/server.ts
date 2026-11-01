@@ -21,12 +21,19 @@ export type StoryCard = {
   coverId: string | null;
   hasAudio: boolean;
   publishAt: string;
+  series: string;
+  language: string;
 };
 
 export type Story = StoryCard & {
   body: string;
   coverCaption: string;
-  language: string;
+  personName: string;
+  personPlace: string;
+  personPhotoId: string | null;
+  personConsent: boolean;
+  sources: string;
+  translationOf: string | null;
   audioId: string | null;
   audioDurationSec: number | null;
   originalUrl: string | null;
@@ -50,9 +57,11 @@ const cardCols = {
   coverId: stories.coverMediaId,
   audioId: stories.audioMediaId,
   publishAt: stories.publishAt,
+  series: stories.series,
+  language: stories.language,
 };
 
-type CardRow = { id: string; slug: string; title: string; subtitle: string; hook: string; body: string; category: Category; readingMinutes: number; coverId: string | null; audioId: string | null; publishAt: Date | null };
+type CardRow = { id: string; slug: string; title: string; subtitle: string; hook: string; body: string; category: Category; readingMinutes: number; coverId: string | null; audioId: string | null; publishAt: Date | null; series: string; language: string };
 
 const toCard = (r: CardRow): StoryCard => ({
   id: r.id,
@@ -65,6 +74,8 @@ const toCard = (r: CardRow): StoryCard => ({
   coverId: r.coverId,
   hasAudio: !!r.audioId,
   publishAt: (r.publishAt ?? new Date(0)).toISOString(),
+  series: r.series,
+  language: r.language,
 });
 
 const live = (now: Date) => and(eq(stories.status, "published"), lte(stories.publishAt, now));
@@ -99,7 +110,7 @@ export async function latestStory(): Promise<StoryCard | null> {
 
 async function loadStory(where: ReturnType<typeof eq>): Promise<(Story & { status: "draft" | "published"; publishAtRaw: Date | null }) | null> {
   const [r] = await httpDb
-    .select({ ...cardCols, coverCaption: stories.coverCaption, language: stories.language, audioDurationSec: stories.audioDurationSec, originalUrl: stories.originalUrl, shareText: stories.shareText, shareMediaId: stories.shareMediaId, status: stories.status, updatedAt: stories.updatedAt, author: users.name })
+    .select({ ...cardCols, coverCaption: stories.coverCaption, personName: stories.personName, personPlace: stories.personPlace, personPhotoId: stories.personPhotoId, personConsent: stories.personConsent, sources: stories.sources, translationOf: stories.translationOf, audioDurationSec: stories.audioDurationSec, originalUrl: stories.originalUrl, shareText: stories.shareText, shareMediaId: stories.shareMediaId, status: stories.status, updatedAt: stories.updatedAt, author: users.name })
     .from(stories)
     .innerJoin(users, eq(users.id, stories.authorId))
     .where(where)
@@ -109,7 +120,12 @@ async function loadStory(where: ReturnType<typeof eq>): Promise<(Story & { statu
     ...toCard(r),
     body: r.body,
     coverCaption: r.coverCaption,
-    language: r.language,
+    personName: r.personName,
+    personPlace: r.personPlace,
+    personPhotoId: r.personPhotoId,
+    personConsent: r.personConsent,
+    sources: r.sources,
+    translationOf: r.translationOf,
     audioId: r.audioId,
     audioDurationSec: r.audioDurationSec,
     originalUrl: r.originalUrl,
@@ -197,6 +213,13 @@ export type StoryPatch = {
   originalUrl?: string | null;
   shareText?: string;
   shareMediaId?: string | null;
+  personName?: string;
+  personPlace?: string;
+  personPhotoId?: string | null;
+  personConsent?: boolean;
+  series?: string;
+  sources?: string;
+  language?: string;
 };
 
 /**
@@ -284,7 +307,107 @@ export async function mediaBytes(id: string, from = 0, to?: number): Promise<Buf
 }
 
 /** Whether the public may fetch this file: it belongs to a story that is live now. */
-export async function mediaIsPublic(storyId: string): Promise<boolean> {
+export async function mediaIsPublic(storyId: string, mediaId?: string): Promise<boolean> {
   const [s] = await httpDb.select({ status: stories.status, publishAt: stories.publishAt }).from(stories).where(eq(stories.id, storyId)).limit(1);
-  return !!s && isLive(s.status, s.publishAt);
+  if (s && isLive(s.status, s.publishAt)) return true;
+  if (!mediaId) return false;
+  // A translation shares the original's cover and photos: public while a live story shows it.
+  const [user] = await httpDb
+    .select({ id: stories.id })
+    .from(stories)
+    .where(
+      and(
+        live(new Date()),
+        sql`(${stories.coverMediaId} = ${mediaId} or ${stories.personPhotoId} = ${mediaId} or ${stories.shareMediaId} = ${mediaId} or ${stories.audioMediaId} = ${mediaId} or ${stories.body} like ${`%media:${mediaId}%`})`,
+      ),
+    )
+    .limit(1);
+  return !!user;
+}
+
+/** Published stories in one series (by its address), oldest first: a series reads in order. */
+export async function seriesStories(slug: string): Promise<{ name: string; stories: StoryCard[] }> {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 900, expire: 86400 });
+  cacheTag(STORIES_TAG);
+  try {
+    const rows = await httpDb.select(cardCols).from(stories).where(and(live(new Date()), ne(stories.series, ""))).orderBy(asc(stories.publishAt));
+    const inSeries = rows.filter((r) => slugify(r.series) === slug);
+    return { name: inSeries[0]?.series ?? "", stories: inSeries.map(toCard) };
+  } catch {
+    return { name: "", stories: [] };
+  }
+}
+
+/** Every series with at least one published story, for the stories page. */
+export async function allSeries(): Promise<{ name: string; slug: string; count: number }[]> {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 900, expire: 86400 });
+  cacheTag(STORIES_TAG);
+  try {
+    const rows = await httpDb.select({ series: stories.series, n: sql<number>`count(*)::int` }).from(stories).where(and(live(new Date()), ne(stories.series, ""))).groupBy(stories.series);
+    return rows.map((r) => ({ name: r.series, slug: slugify(r.series), count: r.n }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The same story in the other language, if it is published: either this
+ * story is a translation of it, or it is a translation of this one.
+ */
+export async function translationOf(storyId: string, ofId: string | null): Promise<{ slug: string; language: string } | null> {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 900, expire: 86400 });
+  cacheTag(STORIES_TAG);
+  try {
+    const [r] = await httpDb
+      .select({ slug: stories.slug, language: stories.language })
+      .from(stories)
+      .where(and(live(new Date()), ofId ? eq(stories.id, ofId) : eq(stories.translationOf, storyId)))
+      .limit(1);
+    return r ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Makes a draft translation of a story: same picture, person, series and sources; text to be translated. */
+export async function createTranslation(fromId: string, authorId: string, language: string): Promise<string | null> {
+  const [src] = await httpDb.select().from(stories).where(eq(stories.id, fromId)).limit(1);
+  if (!src) return null;
+  const [existing] = await httpDb.select({ id: stories.id }).from(stories).where(eq(stories.translationOf, fromId)).limit(1);
+  if (existing) return existing.id;
+  const slug = await freeSlug(`${src.title} ${language}`);
+  const [row] = await httpDb
+    .insert(stories)
+    .values({
+      slug,
+      authorId,
+      title: src.title,
+      subtitle: src.subtitle,
+      hook: src.hook,
+      body: src.body,
+      category: src.category,
+      language,
+      coverMediaId: src.coverMediaId,
+      coverCaption: src.coverCaption,
+      personName: src.personName,
+      personPlace: src.personPlace,
+      personPhotoId: src.personPhotoId,
+      personConsent: src.personConsent,
+      series: src.series,
+      sources: src.sources,
+      originalUrl: src.originalUrl,
+      translationOf: fromId,
+      readingMinutes: src.readingMinutes,
+    })
+    .returning({ id: stories.id });
+  return row.id;
+}
+
+/** Every series name used so far (drafts too), for the editor's suggestions. */
+export async function seriesNames(): Promise<string[]> {
+  const rows = await httpDb.selectDistinct({ series: stories.series }).from(stories).where(ne(stories.series, ""));
+  return rows.map((r) => r.series).sort();
 }

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { LeadCard, RowCard } from "@/modules/stories/cards";
 import { StoriesShell } from "@/modules/stories/chrome";
-import { publishedStories } from "@/modules/stories/server";
+import Link from "next/link";
+import { allSeries, publishedStories } from "@/modules/stories/server";
 
 export const metadata: Metadata = {
   title: "Stories · Pen & Paper",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 
 /** /stories: every published story, newest first. Cached; a new one appears within 15 minutes of its time. */
 export default async function StoriesPage() {
-  const list = await publishedStories();
+  const [list, series] = await Promise.all([publishedStories(), allSeries()]);
   const [lead, ...rest] = list;
   return (
     <StoriesShell>
@@ -21,6 +22,16 @@ export default async function StoriesPage() {
           <h1 className="story-serif text-[44px] leading-none font-medium tracking-[-0.02em] text-ink italic sm:text-[64px]">Stories</h1>
           <p className="story-serif max-w-[560px] text-[19px] leading-[1.5] text-mute sm:text-[21px]">Real people, history and art. A few minutes each: read it on the way, or listen with your eyes closed.</p>
         </header>
+        {series.length > 0 && (
+          <nav aria-label="Series" className="-mt-4 flex flex-wrap items-center gap-2 font-sans">
+            <span className="text-[12px] font-semibold tracking-[0.08em] text-mute uppercase">Series</span>
+            {series.map((x) => (
+              <Link key={x.slug} href={`/stories/series/${x.slug}`} className="rounded-full border border-line px-3.5 py-1.5 text-[14px] text-ink hover:bg-soft">
+                {x.name} <span className="text-mute">· {x.count}</span>
+              </Link>
+            ))}
+          </nav>
+        )}
         {lead ? (
           <>
             <LeadCard s={lead} />

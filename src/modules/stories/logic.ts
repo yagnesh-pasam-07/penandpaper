@@ -80,3 +80,39 @@ export function clock(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+
+export const LANGUAGES = ["en", "te"] as const;
+export type Language = (typeof LANGUAGES)[number];
+/** What the switch says, written in the language it switches to. */
+export const READ_IN: Record<Language, string> = { en: "Read in English", te: "తెలుగులో చదవండి" };
+
+export type Source = { text: string; href: string | null };
+
+/**
+ * The sources box: one per line. A line may end with a web address
+ * ("Andhra Pradesh Day — https://en.wikipedia.org/…"), which becomes the link;
+ * a line that is only an address shows its site. Blank lines are skipped.
+ */
+export function parseSources(raw: string): Source[] {
+  return raw
+    .split("\n")
+    .map((l) => l.trim().replace(/^[-•*]\s+/, ""))
+    .filter(Boolean)
+    .slice(0, 30)
+    .map((line) => {
+      const m = /(https?:\/\/\S+)\s*$/.exec(line);
+      if (!m) return { text: line, href: null };
+      const href = m[1];
+      const text = line.slice(0, m.index).replace(/[\s—–:-]+$/, "").trim();
+      let site = href;
+      try {
+        site = new URL(href).hostname.replace(/^www\./, "");
+      } catch {
+        return { text: line, href: null };
+      }
+      return { text: text || site, href };
+    });
+}
+
+/** The series page's address part: "The man behind the words" → "the-man-behind-the-words". */
+export const seriesSlug = (name: string) => slugify(name);

@@ -60,6 +60,8 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **Writing** (`/studio/stories`): behind Studio's two locks (admin role + passcode), checked on the server for every save and upload. A Medium-style editor: you type on a page that looks like the published one (Enter = paragraph, `## ` heading, `> ` quote, ⌘B/⌘I, + for a picture or break), it saves itself, Preview shows the real page, Publish is "now" or "schedule" (default next Sunday 9 AM). The address follows the title until first published, then never changes. A Medium post can be imported as a draft, pictures copied in.
 - **Scheduling:** "scheduled" is a published story with `publish_at` ahead. Public pages are cached and re-checked every 15 minutes, so a scheduled story appears within 15 minutes of its time; publishing in Studio shows at once.
 - **Discovery:** "This week's story" on the homepage (the newest one), Stories in the homepage nav, WhatsApp-first share, a per-story share image (~45 KB JPEG), `sitemap.xml`, `robots.txt`, `/stories/rss.xml`.
+- **Real people, made trustworthy:** a story can name **the person** it is about (name, place, their real photo, never stock), with "✓ Shared with their permission" when they agreed; the byline then reads "Witnessed and written by <writer>". History gets a numbered **Sources** box at the end (one per line, a line ending in a link becomes one). Stories can belong to a **series** (by name; its page is `/stories/series/<slug>`, stories in the order they came out; "More from <series>" at the end of each; a strip of series on `/stories`).
+- **Telugu ⇄ English:** each story has a language; "Make a Telugu version" in Publish creates a draft copy (same pictures, person, series, sources) linked to the original. Once both are published, each shows a switch ("తెలుగులో చదవండి" / "Read in English") and declares the other with hreflang. Telugu is set in Noto Serif Telugu.
 - **Story Studio** (`/studio/stories`, like YouTube Studio, writer only): per story, views, readers, read to the end, shares (by WhatsApp, Instagram, copy, phone share), listens, where readers came from (WhatsApp, Instagram, Google, home, direct) and phone vs computer, with a 28-day chart (`/studio/stories/[id]/reach`); totals across all stories at the top of the list. **Readers never see any count.** Anonymous: a random id the browser keeps (no cookie, no IP), keyed on the server; a view, read or listen counts once a day per reader; link-preview bots and crawlers are ignored; only live stories are counted. A "read" is reaching the last line after at least 20 seconds. Share links carry `?s=wa|ig|link` (WhatsApp strips the referrer), removed from the address bar on arrival.
 - **Sharing:** WhatsApp sends a warm message ("I read this and thought of you." by default, the writer can change it per story), the title, the hook and the link; the preview picture is the cover or a picture the writer picks. **Instagram:** a 1080×1920 story card (`/stories/[slug]/card`) sent through the phone's share sheet, downloaded on a computer. Then Copy link and the phone's own share.
 - **Latest reads** on the homepage: the newest story large, the next three as cards.
@@ -88,7 +90,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - The server fetches pictures and link previews only from public addresses, never with the visitor's cookies.
 
 ### Open questions
-- Stories: Telugu translations (the `language` column is there), more writers (`author_id` is there), a newsletter, and a weekly reminder to readers. Out of v1.
+- Stories: more writers (`author_id` is there), "Submit a human" (readers nominate a person), a Sunday-morning newsletter, and a "Write it on paper" loop back into the app. Not built yet.
 - Story audio up to 40 MB lives in Postgres today; move to object storage (Vercel Blob) once there are more than a handful of recordings.
 - Move pictures out of the database into object storage (the biggest cost and speed risk as usage grows).
 - Sharing a paper (read-only link) and connecting thoughts: proposed, not built.
@@ -138,6 +140,7 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 | Feature | State | Ticket |
 | --- | --- | --- |
+| Stories: the person (name, place, photo, permission), series, sources box, Telugu ⇄ English | Shipped | [#37](https://github.com/yagnesh-pasam-07/penandpaper/issues/37) |
 | Story Studio (reads, reach, shares by channel), Latest reads on the homepage, Instagram story card, a custom WhatsApp message and picture | Shipped | [#36](https://github.com/yagnesh-pasam-07/penandpaper/issues/36) |
 | Stories: real human stories, history and art, written in Studio, read or heard at /stories; This week's story on the homepage | Shipped | [#35](https://github.com/yagnesh-pasam-07/penandpaper/issues/35) |
 | Thought of the Day: one past thought a day, full screen, signature sound, recall time, notifications on every device | Shipped | [#34](https://github.com/yagnesh-pasam-07/penandpaper/issues/34) |
@@ -148,6 +151,11 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-01 15:00 IST · product · Stories name the person, show their sources, come in series and in Telugu
+Why: what makes Humans of Bombay real is one named person, in their own words, with their real photo and their consent; what makes history trustworthy is its sources, stated neutrally where dates are contested (1 November vs 2 June). Series bring readers back; Telugu reaches the people these stories are about. The belief behind it: writing is the original; the rest is summary. A story names who witnessed it and who wrote it.
+Decision tree: (1) the stories, not the app's loop. (2) No new reader controls except the language switch, shown only when a translation exists; the writer's fields live in Publish. (3) Doesn't change what a thought is. (4) Add-only migration 0020 (person_name, person_place, person_photo_id, person_consent, series, sources, translation_of). (5) A person is shown only as the writer enters them; their photo is public only while a live story shows it (a translation can share the original's pictures). (6) Tests for sources and series; checked against a real Postgres (person card, byline, switch both ways, hreflang, sources, series page, shared cover, 375 px).
+Replaces: nothing.
 
 ### 2026-11-01 13:45 IST · product · Story Studio: the writer sees reach; readers see no numbers
 Why: to know which stories move people, and where they travel (WhatsApp first here), without turning the reading page into a scoreboard. Like YouTube Studio for the writer; calm and count-free for the reader.

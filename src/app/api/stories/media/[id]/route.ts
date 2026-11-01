@@ -10,6 +10,6 @@ import { mediaIsPublic } from "@/modules/stories/server";
 export async function GET(request: Request, ctx: RouteContext<"/api/stories/media/[id]">) {
   const meta = await findMedia((await ctx.params).id);
   if (meta instanceof Response) return meta;
-  if (!(await mediaIsPublic(meta.storyId))) return new Response("Not found", { status: 404 });
+  if (!(await mediaIsPublic(meta.storyId, meta.id))) return new Response("Not found", { status: 404 });
   return sendMedia(request, meta, "public, max-age=31536000, immutable");
 }

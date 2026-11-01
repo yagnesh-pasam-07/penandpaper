@@ -5,7 +5,8 @@ import { StoriesShell } from "@/modules/stories/chrome";
 import { CATEGORY_LABEL } from "@/modules/stories/logic";
 import { mediaIds } from "@/modules/stories/markdown";
 import { StoryReader } from "@/modules/stories/reader";
-import { mediaSizes, publishedSlugs, publishedStories, publishedStory } from "@/modules/stories/server";
+import { mediaSizes, publishedSlugs, publishedStories, publishedStory, seriesStories, translationOf } from "@/modules/stories/server";
+import { seriesSlug } from "@/modules/stories/logic";
 import { siteUrl } from "@/modules/stories/site";
 
 /** Every published story is prerendered; a new one is rendered on its first visit, then cached. */
@@ -24,7 +25,7 @@ export async function generateMetadata(props: PageProps<"/stories/[slug]">): Pro
     title: `${s.title} · Pen & Paper Stories`,
     description,
     authors: [{ name: s.author }],
-    alternates: { canonical: `/stories/${s.slug}` },
+    alternates: { canonical: `/stories/${s.slug}`, languages: await translationOf(s.id, s.translationOf).then((o) => (o ? { [s.language]: `/stories/${s.slug}`, [o.language]: `/stories/${o.slug}` } : undefined)) },
     openGraph: {
       type: "article",
       title: s.title,
@@ -46,8 +47,15 @@ export default async function StoryPage(props: PageProps<"/stories/[slug]">) {
   const story = await publishedStory(slug);
   if (!story) notFound();
   const ids = [story.coverId, ...mediaIds(story.body)].filter((x): x is string => !!x);
-  const [sizes, all] = await Promise.all([mediaSizes(ids).catch(() => ({})), publishedStories(4)]);
-  const next = all.filter((s) => s.id !== story.id).slice(0, 2);
+  const [sizes, all, other, inSeries] = await Promise.all([
+    mediaSizes(ids).catch(() => ({})),
+    publishedStories(6),
+    translationOf(story.id, story.translationOf),
+    story.series ? seriesStories(seriesSlug(story.series)) : Promise.resolve(null),
+  ]);
+  // Read next: the rest of the series first, then the newest others; never the same story in the other language.
+  const fromSeries = (inSeries?.stories ?? []).filter((s) => s.id !== story.id && s.slug !== other?.slug);
+  const next = [...fromSeries, ...all.filter((s) => s.id !== story.id && s.slug !== other?.slug && !fromSeries.some((x) => x.id === s.id))].slice(0, 3);
   const url = `${siteUrl()}/stories/${story.slug}`;
   const jsonLd = {
     "@context": "https://schema.org",
@@ -70,10 +78,11 @@ export default async function StoryPage(props: PageProps<"/stories/[slug]">) {
         sizes={sizes}
         url={url}
         count
+        other={other}
         more={
           next.length > 0 && (
             <section aria-label="More stories" className="flex flex-col pt-6">
-              <h2 className="text-[13px] font-semibold tracking-[0.08em] text-mute uppercase">Read next</h2>
+              <h2 className="text-[13px] font-semibold tracking-[0.08em] text-mute uppercase">{fromSeries.length ? `More from ${story.series}` : "Read next"}</h2>
               <div className="flex flex-col divide-y divide-line">
                 {next.map((s) => (
                   <RowCard key={s.id} s={s} />

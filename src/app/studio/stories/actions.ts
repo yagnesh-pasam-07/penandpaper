@@ -4,8 +4,8 @@ import { revalidateTag, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireWriter } from "@/modules/stories/guard";
-import { CATEGORIES } from "@/modules/stories/logic";
-import { createStory, deleteStory, saveStory, setPublished, STORIES_TAG } from "@/modules/stories/server";
+import { CATEGORIES, LANGUAGES } from "@/modules/stories/logic";
+import { createStory, createTranslation, deleteStory, saveStory, setPublished, STORIES_TAG } from "@/modules/stories/server";
 
 /*
  * Every action checks the writer first (admin role + Studio passcode), on the
@@ -36,6 +36,13 @@ const patch = z.object({
   originalUrl: z.url().max(500).nullable().optional(),
   shareText: z.string().max(160).optional(),
   shareMediaId: z.uuid().nullable().optional(),
+  personName: z.string().max(120).optional(),
+  personPlace: z.string().max(120).optional(),
+  personPhotoId: z.uuid().nullable().optional(),
+  personConsent: z.boolean().optional(),
+  series: z.string().max(120).optional(),
+  sources: z.string().max(6000).optional(),
+  language: z.enum(LANGUAGES).optional(),
 });
 
 /** Autosave. Returns the address and reading time as they are now. */
@@ -79,4 +86,12 @@ export async function importFromMedium(_prev: { error: string }, form: FormData)
   const res = await importMedium(writer.id, url);
   if ("error" in res) return res;
   redirect(`/studio/stories/${res.id}`);
+}
+
+/** Makes (or opens) the Telugu or English version of a story as a draft to translate. */
+export async function translate(id: string, language: (typeof LANGUAGES)[number]): Promise<void> {
+  const writer = await requireWriter();
+  if (!z.uuid().safeParse(id).success || !(LANGUAGES as readonly string[]).includes(language)) return;
+  const draft = await createTranslation(id, writer.id, language);
+  if (draft) redirect(`/studio/stories/${draft}`);
 }

@@ -36,6 +36,18 @@ export const stories = pgTable(
     shareText: text("share_text").notNull().default(""),
     /** A picture for link previews, if not the cover. */
     shareMediaId: uuid("share_media_id"),
+    /** The person the story is about: their name, where they are, and their real photo (never stock). */
+    personName: text("person_name").notNull().default(""),
+    personPlace: text("person_place").notNull().default(""),
+    personPhotoId: uuid("person_photo_id"),
+    /** They agreed to be featured: shows "Shared with their permission". */
+    personConsent: boolean("person_consent").notNull().default(false),
+    /** A series it belongs to, by name ("The man behind the words"); its page is /stories/series/<slugify(name)>. */
+    series: text("series").notNull().default(""),
+    /** Sources and references, one per line ("Title — https://…" or plain text). */
+    sources: text("sources").notNull().default(""),
+    /** The same story in the other language (Telugu ⇄ English): the other story's id. */
+    translationOf: uuid("translation_of"),
     /** Where it first appeared (e.g. Medium), for "First published on …" and the canonical link. */
     originalUrl: text("original_url"),
     /** One author today; the column is here so more writers need no rewrite. */
@@ -45,7 +57,7 @@ export const stories = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("stories_live_idx").on(t.status, t.publishAt)],
+  (t) => [index("stories_live_idx").on(t.status, t.publishAt), index("stories_series_idx").on(t.series)],
 );
 
 /**

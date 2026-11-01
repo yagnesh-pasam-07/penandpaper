@@ -46,7 +46,13 @@ export function RowCard({ s }: { s: StoryCard }) {
 }
 
 function Meta({ s }: { s: StoryCard }) {
-  return <p className="text-[12px] font-semibold tracking-[0.08em] text-red-text uppercase">{CATEGORY_LABEL[s.category]}</p>;
+  return (
+    <p className="flex items-center gap-2 text-[12px] font-semibold tracking-[0.08em] uppercase">
+      <span className="text-red-text">{CATEGORY_LABEL[s.category]}</span>
+      {s.series && <span className="truncate text-mute normal-case tracking-normal">· {s.series}</span>}
+      {s.language === "te" && <span className="rounded bg-soft px-1.5 py-0.5 text-[11px] tracking-normal text-ink normal-case">తెలుగు</span>}
+    </p>
+  );
 }
 
 function Foot({ s }: { s: StoryCard }) {
