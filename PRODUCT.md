@@ -76,7 +76,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - The paper header sits above the canvas; notes slide under it, never over it.
 - Keys are shown in the visitor's own system (⌥ on Mac, Alt on Windows).
 - Logo: a ruled sheet with the red fountain-pen nib, in `public/brand/` (see its README). The favicon is the nib alone.
-- Homepage only: behind the headline, a faint strip of everything that changes (fire to the galaxy, 19 freely licensed pictures in `public/timeline/`), black and white, blurred, ~10% opacity, drifting one loop every 90 s, still for reduced motion. Faith images sit together, away from war. Credits at `/credits`.
+- Homepage only: behind the headline, a faint strip of everything that changes (fire to the galaxy, 25 freely licensed pictures in `public/timeline/`, including the makers the founder looks up to: da Vinci, Shakespeare, Nolan, Rajamouli, Keeravani, Naval Ravikant), black and white, blurred, ~10% opacity, drifting one loop every 90 s, still for reduced motion. Faith images sit together, away from war. Credits at `/credits`.
 
 ### Tech
 - Next.js 16 on Vercel (`sin1`), Neon Postgres, Drizzle, Better Auth.
@@ -157,6 +157,11 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-02 06:00 IST · design · The homepage strip now includes the makers: da Vinci, Shakespeare, Nolan, Rajamouli, Keeravani, Naval Ravikant
+Why: the brand admires the people behind the work (directors, writers, composers, thinkers) more than the faces on screen. Da Vinci and Shakespeare sit with history (after the Great Wall); Nolan, Rajamouli, Keeravani and Naval Ravikant after the first flight, as makers of the modern age. Same treatment (black and white, blurred, faint); portraits cropped to show the face. Credits on /credits. The founder will update this list.
+Replaces: the 19-picture strip (2026-11-02 05:45), for its contents only.
+Commit: (this commit)
 
 ### 2026-11-02 05:45 IST · design · Behind the homepage headline, a faint timeline of everything that changes
 Why: the brand's belief is that a few things are constant (food, work, sleep, emotion) while everything else changes. Fire, cave painting, a hunter, palm leaf, a dhow, Krishna, Christ, Jama Masjid, the Great Wall, Darwin, the Somme, first flight, Mumbai and Dharavi, a full thali and an empty plate, a laptop, a phone and Andromeda drift slowly behind a still headline: the change moves, the belief stays. Kept as texture, not pictures (black and white, blurred, ~10% opacity, faded at the edges) so the headline reads first; real, freely licensed photographs and paintings, not drawings, because the brand is about real people; faith images placed together, never beside war. Tiles are 4–53 KB WebP (about 0.5 MB in all), decorative and hidden from screen readers; reduced motion stops the drift. Homepage only; story and Desk pages stay clean. Decision tree: 1 serves the homepage's job of saying what we believe; 2 adds no control (one footer link, Photo credits); 3–5 no.

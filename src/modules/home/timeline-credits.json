@@ -72,6 +72,22 @@
   "url": "https://commons.wikimedia.org/wiki/File:Great_Wall_of_China_July_2006.JPG"
  },
  {
+  "slug": "da-vinci",
+  "alt": "Leonardo da Vinci",
+  "title": "Leonardo da Vinci - presumed self-portrait - WGA12798.jpg",
+  "author": "Leonardo da Vinci",
+  "license": "Public domain",
+  "url": "https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_-_presumed_self-portrait_-_WGA12798.jpg"
+ },
+ {
+  "slug": "shakespeare",
+  "alt": "William Shakespeare",
+  "title": "William Shakespeare Chandos.jpg",
+  "author": "Henry Thew Stephenson",
+  "license": "Public domain",
+  "url": "https://commons.wikimedia.org/wiki/File:William_Shakespeare_Chandos.jpg"
+ },
+ {
   "slug": "darwin",
   "alt": "Charles Darwin, 1880",
   "title": "Charles Darwin 1880.jpg",
@@ -94,6 +110,38 @@
   "author": "John T. Daniels",
   "license": "Public domain",
   "url": "https://commons.wikimedia.org/wiki/File:First_flight2.jpg"
+ },
+ {
+  "slug": "nolan",
+  "alt": "Christopher Nolan",
+  "title": "Christopher Nolan Cannes 2018.jpg",
+  "author": "Georges Biard",
+  "license": "CC BY-SA 4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Christopher_Nolan_Cannes_2018.jpg"
+ },
+ {
+  "slug": "rajamouli",
+  "alt": "S. S. Rajamouli",
+  "title": "S. S. Rajamouli.jpg",
+  "author": "Bollywood Hungama",
+  "license": "CC BY 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:S._S._Rajamouli.jpg"
+ },
+ {
+  "slug": "keeravani",
+  "alt": "M. M. Keeravani",
+  "title": "M. M. Keeravani at Inji Iduppazhagi Audio Launch (cropped).jpg",
+  "author": "Silverscreen Media Inc. (https://silverscreen.in)",
+  "license": "CC BY-SA 3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:M._M._Keeravani_at_Inji_Iduppazhagi_Audio_Launch_(cropped).jpg"
+ },
+ {
+  "slug": "naval",
+  "alt": "Naval Ravikant",
+  "title": "Naval Ravikant in 2011 (cropped)1.jpg",
+  "author": "kris krüg",
+  "license": "CC BY-SA 2.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Naval_Ravikant_in_2011_(cropped)1.jpg"
  },
  {
   "slug": "mumbai",
