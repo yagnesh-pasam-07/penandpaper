@@ -4,21 +4,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Fly } from "@/components/canvas/fly";
-import { FreeCanvas, type Placement } from "@/components/canvas/free-canvas";
+import { FreeCanvas, type CanvasApi, type Offset, type Placement } from "@/components/canvas/free-canvas";
 import { InkLayer, type InkStroke } from "@/components/canvas/ink-layer";
+import { insidePolygon, isLoop, shapeOutline, shift, type Pt } from "@/components/canvas/ink";
 import { PaperText } from "@/components/canvas/paper-text";
 import { PaperSurface } from "@/components/canvas/paper-surface";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { uid } from "@/lib/mutations";
 import { viewKey } from "@/components/canvas/view";
 import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from "./chrome";
-import { isDrop, paperTitle, type DropPaper, type PaperMeta, type Stroke, type Thought, type ThoughtKind } from "./logic";
+import { isDrop, isInk, mentionedEmails, paperTitle, type DropPaper, type InkName, type PaperMeta, type ShapeKind, type Stroke, type Thought, type ThoughtKind } from "./logic";
+import { DueChip, DuePicker } from "./due";
+import { ShareButton } from "./share-ui";
+import { useReminders } from "./use-reminders";
 import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { PaperBar, SearchButton, UNDO_PAPER_KEY } from "./papers-ui";
 import { TodayThought } from "./today";
 import { TonightButton } from "./tonight-button";
 import { importTryPaper } from "./try-import";
-import { Toolbar, type Tool } from "./tools";
+import { Toolbar, TOOL_ORDER, type Tool } from "./tools";
 import { useCanvasView, ViewControls } from "./use-view";
 import { useVoice } from "./use-voice";
 import { PenButton, Writer } from "./writer";
@@ -42,6 +46,16 @@ function readDraft(key: string): string {
     return localStorage.getItem(key) ?? "";
   } catch {
     return "";
+  }
+}
+
+const DEFAULT_PEN: { color: InkName; shape: ShapeKind } = { color: "ink", shape: "rect" };
+function readPen(): { color: InkName; shape: ShapeKind } {
+  try {
+    const saved = JSON.parse(localStorage.getItem("pp-pen") ?? "{}") as { color?: unknown; shape?: unknown };
+    return { color: isInk(saved.color) ? saved.color : "ink", shape: saved.shape === "ellipse" ? "ellipse" : "rect" };
+  } catch {
+    return DEFAULT_PEN;
   }
 }
 
@@ -107,6 +121,38 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   // Text placed but not written in yet: never sent until it has words.
   const unsaved = useRef(new Set<string>());
   const strokes = paper.strokes ?? [];
+  // The shape the Shape tool draws, and the ink in the pen (both remembered on this device).
+  // Read from this device once mounted (the server can't know it), kept once chosen.
+  const [pen, setPen] = useState<{ color: InkName; shape: ShapeKind } | null>(null);
+  const penNow = pen ?? (mounted ? readPen() : DEFAULT_PEN);
+  const shapeKind = penNow.shape;
+  const inkColor = penNow.color;
+  const setShapeKind = (f: ShapeKind | ((k: ShapeKind) => ShapeKind)) => setPen((p) => {
+    const base = p ?? readPen();
+    return { ...base, shape: typeof f === "function" ? f(base.shape) : f };
+  });
+  const setInkColor = (color: InkName) => setPen((p) => ({ ...(p ?? readPen()), color }));
+  useEffect(() => {
+    if (!pen) return;
+    try {
+      localStorage.setItem("pp-pen", JSON.stringify(pen));
+    } catch {}
+  }, [pen]);
+  // Select: what's picked (written text, or a line / shape / loop).
+  const [picked, setPicked] = useState<{ kind: "text" | "ink"; id: string } | null>(null);
+  // A loop or shape being carried, with everything inside it.
+  const [carry, setCarry] = useState<{ strokeIds: Set<string>; noteIds: Set<string>; dx: number; dy: number } | null>(null);
+  const [labelling, setLabelling] = useState<string | null>(null);
+  const [dueFor, setDueFor] = useState<string | null>(null);
+  const canvasApi = useRef<CanvasApi | null>(null);
+  const boxesRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  // A tool change puts down whatever was picked.
+  const [toolSeen, setToolSeen] = useState(tool);
+  if (toolSeen !== tool) {
+    setToolSeen(tool);
+    setPicked(null);
+    setLabelling(null);
+  }
 
   /** Queues a save in the background; on failure, undoes it on screen and says so. */
   const save = useCallback((work: () => Promise<unknown>, onFail?: () => void) => {
@@ -241,6 +287,12 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
 
+  const pickedRef = useRef(picked);
+  const eraseRef = useRef<(id: string) => void>(() => {});
+  useEffect(() => {
+    pickedRef.current = picked;
+  });
+
   // Hold Space to speak: the words land as text on the paper, where the pointer
   // is (or into the text being written). A tap of Space still opens the writer.
   const voiceAt = useRef<{ x: number; y: number } | null>(null);
@@ -268,14 +320,27 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       if (el?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
       if (e.key === "Escape") {
         setTool("select");
+        setPicked(null);
+        return;
+      }
+      // A picked line or shape: Delete rubs it out (with Undo).
+      if ((e.key === "Delete" || e.key === "Backspace") && pickedRef.current?.kind === "ink") {
+        e.preventDefault();
+        eraseRef.current(pickedRef.current.id);
+        setPicked(null);
         return;
       }
       // A selected thought keeps its own keys (Enter edit, Delete crumple).
       if (el?.closest("[data-keys]") && ["delete", "backspace"].includes(e.key.toLowerCase())) return;
-      const pick = ["1", "2", "3", "4"].indexOf(e.key);
+      const pick = ["1", "2", "3", "4", "5"].indexOf(e.key);
       if (pick >= 0 && window.matchMedia("(min-width: 640px)").matches) {
         e.preventDefault();
-        setTool((["select", "text", "draw", "erase"] as Tool[])[pick]);
+        const next = TOOL_ORDER[pick];
+        // Shape again switches rectangle ⇄ ellipse.
+        setTool((t) => {
+          if (t === "shape" && next === "shape") setShapeKind((k) => (k === "rect" ? "ellipse" : "rect"));
+          return next;
+        });
         return;
       }
       if (e.key === " ") {
@@ -358,6 +423,29 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     }, ms);
   };
 
+  // People already offered for this paper (so a mention asks once).
+  const offered = useRef(new Set<string>());
+  /** Words with "@name@company.com": offer to share the paper with them (never shares on its own). */
+  const offerMentions = (text: string) => {
+    const fresh = mentionedEmails(text).filter((e) => !offered.current.has(e) && e !== me.email.toLowerCase());
+    if (!fresh.length) return;
+    fresh.forEach((e) => offered.current.add(e));
+    const who = fresh.length === 1 ? fresh[0] : `${fresh.length} people`;
+    setToast({
+      text: `You mentioned ${who}. Share this paper with ${fresh.length === 1 ? "them" : "them all"}? (view only)`,
+      action: {
+        label: "Share",
+        run: () => {
+          for (const email of fresh) {
+            void call(`/api/drop/papers/${paperId}/share`, { method: "POST", body: JSON.stringify({ invite: email }) })
+              .then(() => setToast({ text: `Shared with ${email}: they'll get an email` }))
+              .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+          }
+        },
+      },
+    });
+  };
+
   /** Puts a new thought on the paper and saves it; a picture and a spot are optional. */
   const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number }; kind?: ThoughtKind; id?: string }) => {
     const thought: Thought = {
@@ -374,6 +462,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     };
     update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setFresh((f) => new Set(f).add(thought.id));
+    if (value.includes("@")) offerMentions(value);
     if (extra.from) setFlights((m) => new Map(m).set(thought.id, extra.from!));
     void save(
       () =>
@@ -473,10 +562,17 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     };
   }, []);
 
-  const patch = (id: string, change: Partial<Pick<Thought, "text" | "status">>) => {
+  const patch = (id: string, change: Partial<Pick<Thought, "text" | "status" | "size" | "color">> & { due?: { at: string; hasTime: boolean } | null }) => {
     const before = live.current.thoughts.find((t) => t.id === id);
     if (!before) return;
-    const after = { ...before, ...change, doneAt: change.status === "done" ? new Date().toISOString() : change.status === "open" ? null : before.doneAt };
+    const { due, ...rest } = change;
+    if (change.text?.includes("@")) offerMentions(change.text);
+    const after: Thought = {
+      ...before,
+      ...rest,
+      ...(due !== undefined ? { dueAt: due?.at ?? null, dueHasTime: due?.hasTime ?? false } : {}),
+      doneAt: change.status === "done" ? new Date().toISOString() : change.status === "open" ? null : before.doneAt,
+    };
     update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? after : t)) }));
     void save(
       () => call(`/api/drop/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ ...change, paperId }) }),
@@ -546,7 +642,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     if (!at) return;
     const id = uid();
     // Shown at once and saved when the first words are written (an empty one is never saved).
-    const thought: Thought = { id, text: "", status: "open", shape: 0, createdAt: new Date().toISOString(), doneAt: null, x: at.x, y: at.y, image: null, kind: "text" };
+    const thought: Thought = { id, text: "", status: "open", shape: 0, createdAt: new Date().toISOString(), doneAt: null, x: at.x, y: at.y, image: null, kind: "text", color: inkColor };
     unsaved.current.add(id);
     update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setWritingText(id);
@@ -560,6 +656,8 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       unsaved.current.delete(id);
       update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) }));
       add(value, { kind: "text", x: t.x, y: t.y, id });
+      // Its colour and size go with it once it has words.
+      if ((t.color && t.color !== "ink") || (t.size && t.size !== 1)) patch(id, { ...(t.color && t.color !== "ink" ? { color: t.color } : {}), ...(t.size && t.size !== 1 ? { size: t.size } : {}) });
       return;
     }
     patch(id, { text: value });
@@ -611,6 +709,67 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     });
   };
 
+  useEffect(() => {
+    eraseRef.current = erase;
+  });
+
+  /** Changes a line or shape (moved, reshaped, re-coloured, words inside), with a rollback. */
+  const editStroke = (id: string, change: Partial<Pick<Stroke, "points" | "color" | "label" | "fromId" | "toId">>) => {
+    const before = (live.current.strokes ?? []).find((x) => x.id === id);
+    if (!before) return;
+    update((p) => ({ ...p, strokes: (p.strokes ?? []).map((x) => (x.id === id ? { ...x, ...change } : x)) }));
+    void save(
+      () => call(`/api/drop/strokes/${id}`, { method: "PATCH", body: JSON.stringify({ paperId, ...change }) }),
+      () => update((p) => ({ ...p, strokes: (p.strokes ?? []).map((x) => (x.id === id ? before : x)) })),
+    );
+  };
+
+  /**
+   * What a loop or shape holds: every note whose centre is inside it, and every
+   * line or shape lying wholly inside it. Carrying it carries all of them; each
+   * can still be picked and moved on its own.
+   */
+  const contentsOf = (id: string) => {
+    const all = live.current.strokes ?? [];
+    const s = all.find((x) => x.id === id);
+    const noteIds = new Set<string>();
+    const strokeIds = new Set<string>([id]);
+    if (!s) return { noteIds, strokeIds };
+    const ring: Pt[] | null = s.shape ? shapeOutline(s.shape, s.points) : isLoop(s.points) ? s.points : null;
+    if (!ring) return { noteIds, strokeIds };
+    for (const [nid, b] of boxesRef.current) if (insidePolygon({ x: b.x, y: b.y }, ring)) noteIds.add(nid);
+    for (const o of all) {
+      if (o.id === id) continue;
+      const pts = o.shape ? shapeOutline(o.shape, o.points) : o.points;
+      // A connector whose both ends are tied to things inside follows them anyway; a free line moves if it sits inside.
+      if (o.fromId || o.toId) continue;
+      if (pts.every(([x, y]) => insidePolygon({ x, y }, ring))) strokeIds.add(o.id);
+    }
+    return { noteIds, strokeIds };
+  };
+
+  /** Select carried a line or shape: live, then saved when let go (with everything inside it). */
+  // What's being carried is worked out once, when the carry starts (before anything has moved).
+  const carryGroup = useRef<{ id: string; noteIds: Set<string>; strokeIds: Set<string> } | null>(null);
+  const carryInk = (id: string, dx: number, dy: number, done: boolean) => {
+    if (carryGroup.current?.id !== id) carryGroup.current = { id, ...contentsOf(id) };
+    const group = carryGroup.current;
+    if (!done) {
+      setCarry({ noteIds: group.noteIds, strokeIds: group.strokeIds, dx, dy });
+      return;
+    }
+    carryGroup.current = null;
+    setCarry(null);
+    if (!dx && !dy) return;
+    const all = live.current.strokes ?? [];
+    for (const sid of group.strokeIds) {
+      const s = all.find((x) => x.id === sid);
+      // A tied connector follows its notes; only free lines and shapes move by their points.
+      if (s && (s.shape || (!s.fromId && !s.toId))) editStroke(sid, { points: shift(s.points, dx, dy) });
+    }
+    if (group.noteIds.size) canvasApi.current?.moveBy([...group.noteIds], dx, dy);
+  };
+
   const handlers = (t: Thought) => ({
     onEdit: (v: string) => patch(t.id, { text: v }),
     // A drop (a picture) isn't a to-do: no strike, so a stray double-click or tick can't cross it out.
@@ -618,9 +777,13 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     onDelete: () => crumple(t.id),
   });
 
+  const pickedColor =
+    picked?.kind === "ink" ? ((paper.strokes ?? []).find((x) => x.id === picked.id)?.color ?? "ink") : picked?.kind === "text" ? (paper.thoughts.find((x) => x.id === picked.id)?.color ?? "ink") : null;
+  useReminders(paper.thoughts, (t) => setToast({ text: `Reminder: ${t.text.length > 60 ? `${t.text.slice(0, 59)}…` : t.text}`, action: { label: "Show", run: () => router.push(`/drop/${paperId}?note=${encodeURIComponent(t.id)}`) } }));
   const items = sheetItems(paper);
   const onSheet = items;
 
+  const todo = (t: Thought) => !isDrop(t);
   const bubble = (t: Thought, extra: { stream?: boolean; movable?: boolean } = {}) => (
     <ThoughtBubble
       {...bubbleProps(t, tz, fresh.has(t.id))}
@@ -630,6 +793,23 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       returning={returning.has(t.id)}
       {...extra}
       {...handlers(t)}
+      onDue={todo(t) ? () => setDueFor(t.id) : undefined}
+      footer={t.dueAt && todo(t) ? <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} /> : undefined}
+      popover={
+        dueFor === t.id ? (
+          <DuePicker
+            dueAt={t.dueAt ?? null}
+            hasTime={!!t.dueHasTime}
+            tz={tz}
+            onClose={() => setDueFor(null)}
+            onSave={(due) => {
+              setDueFor(null);
+              patch(t.id, { due });
+              if (due?.hasTime) setToast({ text: "I'll remind you then" });
+            }}
+          />
+        ) : undefined
+      }
     />
   );
 
@@ -644,6 +824,12 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       onEdit={(v) => writeText(t.id, v)}
       onDelete={() => rubText(t.id)}
       onDone={() => setWritingText((w) => (w === t.id ? null : w))}
+      size={t.size ?? 1}
+      color={t.color ?? "ink"}
+      selectable={!stream && tool === "select"}
+      selected={!stream && picked?.kind === "text" && picked.id === t.id}
+      onSelect={() => setPicked({ kind: "text", id: t.id })}
+      onResize={(size) => (unsaved.current.has(t.id) ? update((p) => ({ ...p, thoughts: p.thoughts.map((x) => (x.id === t.id ? { ...x, size } : x)) })) : patch(t.id, { size }))}
     />
   );
 
@@ -656,6 +842,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
         right={
           <>
             <TonightButton />
+            <ShareButton paperId={paperId} />
             <SearchButton />
             <Link href="/drop/library" className="rounded-lg px-2.5 py-2 text-sm font-medium text-mute hover:bg-soft hover:text-ink">
               Library
@@ -663,7 +850,24 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
           </>
         }
       />
-      <Toolbar tool={tool} onTool={setTool} listening={voice.state.kind === "recording"} />
+      <Toolbar
+        tool={tool}
+        onTool={setTool}
+        listening={voice.state.kind === "recording"}
+        shape={shapeKind}
+        onShape={(k) => {
+          setShapeKind(k);
+          setTool("shape");
+        }}
+        color={pickedColor ?? inkColor}
+        onColor={(c) => {
+          setInkColor(c);
+          // Something picked takes the colour too.
+          if (picked?.kind === "ink") editStroke(picked.id, { color: c });
+          else if (picked?.kind === "text") patch(picked.id, { color: c });
+        }}
+        showColors={tool === "draw" || tool === "shape" || tool === "text" || !!picked}
+      />
       <main className="flex w-full flex-1 flex-col gap-4 px-4 pt-[72px] pb-28 sm:px-8 sm:pt-[76px]">
         {/* On a phone: a vertical stream of the notes. */}
         {onSheet.length === 0 ? (
@@ -686,6 +890,8 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
         <div
           ref={origin}
           onPointerDown={(e) => {
+            // Select: a press on bare paper puts down whatever was picked.
+            if (tool === "select" && !(e.target as HTMLElement).closest("[data-note], [data-ink-hit], button, textarea")) setPicked(null);
             // Text tool: a click on bare paper puts the pen down right there.
             if (tool !== "text" || e.button !== 0 || (e.target as HTMLElement).closest("[data-note], button, a, textarea")) return;
             e.preventDefault();
@@ -693,7 +899,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
           }}
           // Text, Draw and the eraser keep a left press for themselves (the middle button or a scroll still pans).
           data-no-pan={tool === "select" ? undefined : ""}
-          className={`relative -mx-4 flex-1 max-sm:hidden sm:-mx-8 ${tool === "text" ? "tool-text" : tool === "draw" ? "tool-draw" : tool === "erase" ? "tool-erase" : ""}`}
+          className={`relative -mx-4 flex-1 max-sm:hidden sm:-mx-8 ${tool === "text" ? "tool-text" : tool === "draw" ? "tool-draw" : tool === "erase" ? "tool-erase" : tool === "shape" ? "tool-shape" : ""}`}
         >
           <div className="pointer-events-none absolute inset-x-0 top-2 z-10 px-4 sm:px-8">
             <span className="mx-auto flex w-full max-w-[1056px] items-center justify-end gap-1 px-2">
@@ -711,7 +917,9 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
                 {tool === "text"
                   ? "Click anywhere and write. Hold Space to speak."
                   : tool === "draw"
-                    ? "Draw anything. A line from one thought to another ties them."
+                    ? "Draw anything. A line from one thought to another ties them. A ring round things holds them together."
+                    : tool === "shape"
+                      ? "Drag a box or an ellipse. Shift for a square or circle."
                     : "Press Space to write, hold it to speak, or pick a tool above."}
               </span>
             </span>
@@ -726,17 +934,36 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
             onArrange={onArrange}
             spotRef={spot}
             dragEnabled={tool === "select" || tool === "text"}
-            overlay={({ boxes, zoom }) => (
-              <InkLayer
-                strokes={strokes}
-                boxes={boxes}
-                zoom={zoom}
-                mode={tool === "draw" ? "draw" : tool === "erase" ? "erase" : null}
-                fresh={freshInk}
-                onDraw={draw}
-                onErase={erase}
-              />
-            )}
+            apiRef={canvasApi}
+            offset={carry ? ({ ids: carry.noteIds, dx: carry.dx, dy: carry.dy } satisfies Offset) : null}
+            overlay={({ boxes, zoom }) => {
+              boxesRef.current = boxes;
+              return (
+                <InkLayer
+                  strokes={strokes}
+                  boxes={boxes}
+                  zoom={zoom}
+                  mode={tool === "draw" ? "draw" : tool === "erase" ? "erase" : tool === "shape" ? "shape" : tool === "select" ? "select" : null}
+                  shapeKind={shapeKind}
+                  color={inkColor}
+                  fresh={freshInk}
+                  selectedId={picked?.kind === "ink" ? picked.id : null}
+                  carry={carry ? { ids: carry.strokeIds, dx: carry.dx, dy: carry.dy } : null}
+                  labelling={labelling}
+                  onDraw={draw}
+                  onErase={erase}
+                  onPick={(id) => setPicked(id ? { kind: "ink", id } : null)}
+                  onCarry={carryInk}
+                  onReshape={(id, corners) => editStroke(id, { points: corners })}
+                  onLabelStart={(id) => setLabelling(id)}
+                  onLabel={(id, text) => {
+                    setLabelling(null);
+                    const s = (live.current.strokes ?? []).find((x) => x.id === id);
+                    if (s && (s.label ?? "") !== text) editStroke(id, { label: text || null });
+                  }}
+                />
+              );
+            }}
             render={(it) => (
               <Fly from={flights.get(it.id)}>
                 <div data-item={it.id}>{it.thought.kind === "text" ? textItem(it.thought) : bubble(it.thought, { movable: true })}</div>

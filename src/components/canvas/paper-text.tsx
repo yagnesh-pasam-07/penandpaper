@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { clampSize, type InkName } from "@/modules/drop/logic";
 import { MicIcon } from "@/components/icons";
 import { useHoldToTalk } from "@/modules/drop/use-hold-to-talk";
 import { useVoice } from "@/modules/drop/use-voice";
@@ -9,12 +10,15 @@ import { HandText } from "./thought-bubble";
 
 /** How wide written text may run before it wraps, like a hand reaching the edge of a page. */
 const WRAP = 420;
+/** The base size of written text (size 1). */
+const BASE = 22;
 
 /**
  * Words written straight on the paper with the Text tool: no card, no tape,
- * just ink. Click to edit in place; empty on save rubs it out. A blank one
- * opens already editing, so a click with the Text tool goes straight to typing.
- * Never a to-do: there is nothing to strike.
+ * just ink. With Select in hand, a click picks it (an outline and a corner to
+ * drag bigger or smaller) and a double-click (or Enter) edits; with the Text
+ * tool a click edits. Empty on save rubs it out. A blank one opens already
+ * editing. Never a to-do: there is nothing to strike.
  */
 export function PaperText({
   text,
@@ -26,6 +30,12 @@ export function PaperText({
   onEdit,
   onDelete,
   onDone,
+  size = 1,
+  color = "ink",
+  selectable = false,
+  selected = false,
+  onSelect,
+  onResize,
 }: {
   text: string;
   seed: string;
@@ -40,7 +50,21 @@ export function PaperText({
   onDelete: () => void;
   /** The editor closed (saved or not). */
   onDone?: () => void;
+  size?: number;
+  color?: InkName;
+  /** Select is in hand: a click picks it instead of editing. */
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+  /** A corner was dragged: the new size. */
+  onResize?: (size: number) => void;
 }) {
+  const [live, setLive] = useState<number | null>(null);
+  const shown = live ?? size;
+  const self = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected) self.current?.focus({ preventScroll: true });
+  }, [selected]);
   const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState(text);
   // Asked to open again (a new one placed, or speech arriving): adjust while rendering, not in an effect.
@@ -60,7 +84,44 @@ export function PaperText({
     else if (next !== text) onEdit(next);
   };
 
-  const ink: CSSProperties = { maxWidth: WRAP };
+  const ink: CSSProperties = { maxWidth: WRAP * Math.max(1, shown), fontSize: BASE * shown, color: `var(--ink-${color})` };
+  const open = () => {
+    setDraft(text);
+    setEditing(true);
+  };
+
+  /** The corner handle: drag away from the text to grow it, towards it to shrink. */
+  const resize = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = self.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const startDiag = Math.hypot(r.width, r.height) || 1;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let next = size;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      const grow = (Math.hypot(r.width + (ev.clientX - sx), r.height + (ev.clientY - sy)) * Math.sign(r.width + (ev.clientX - sx))) / startDiag;
+      // Steps of 2 px, unless Shift is held.
+      const raw = clampSize(size * grow);
+      next = ev.shiftKey ? raw : clampSize(Math.round((raw * BASE) / 2) * 2 / BASE);
+      setLive(next);
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      setLive(null);
+      if (ev.type === "pointerup" && next !== size) onResize?.(next);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  };
   const motion = leaving === "crumple" ? "fade-away" : fresh && !startEditing ? "drop-in" : "";
 
   if (editing) {
@@ -71,36 +132,53 @@ export function PaperText({
         interim={interim}
         style={ink}
         onFinish={finish}
+        // The hint shows only on fresh text just placed, never when editing words already written.
+        hint={!text}
       />
     );
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      data-paper-text=""
-      data-keys=""
-      aria-label={`Written: ${text}. Enter to edit, Delete to rub out.`}
-      style={ink}
-      onClick={() => {
-        setDraft(text);
-        setEditing(true);
-      }}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter") {
-          e.preventDefault();
-          setDraft(text);
-          setEditing(true);
-        } else if (e.key === "Delete" || e.key === "Backspace") {
-          e.preventDefault();
-          onDelete();
-        }
-      }}
-      className={`paper-text hand font-note text-[22px] leading-snug break-words whitespace-pre-wrap text-ink ${motion} ${fresh ? "write-on" : ""}`}
-    >
-      <HandText text={text} seed={seed} />
+    <div className="relative">
+      <div
+        ref={self}
+        role="button"
+        tabIndex={0}
+        data-paper-text=""
+        data-keys=""
+        aria-label={`Written: ${text}. ${selectable ? "Double-click or Enter to edit" : "Enter to edit"}, Delete to rub out.`}
+        aria-pressed={selectable ? selected : undefined}
+        style={ink}
+        onClick={() => (selectable ? onSelect?.() : open())}
+        onDoubleClick={() => selectable && open()}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter") {
+            e.preventDefault();
+            open();
+          } else if (e.key === "Delete" || e.key === "Backspace") {
+            e.preventDefault();
+            onDelete();
+          }
+        }}
+        className={`paper-text hand font-note leading-snug break-words whitespace-pre-wrap outline-none ${motion} ${fresh ? "write-on" : ""} ${
+          selected ? "rounded-md ring-1 ring-red-text/70 ring-offset-4 ring-offset-transparent" : ""
+        }`}
+      >
+        <HandText text={text} seed={seed} />
+      </div>
+      {selected && onResize && (
+        <button
+          type="button"
+          aria-label="Drag to resize the text"
+          title="Drag to resize · Shift for any size"
+          onPointerDown={resize}
+          className="absolute -right-2.5 -bottom-2.5 size-3 cursor-nwse-resize rounded-[3px] border border-red-text bg-sheet"
+        />
+      )}
+      {live !== null && (
+        <span className="pointer-events-none absolute -top-7 left-0 rounded-md bg-ink px-1.5 py-0.5 font-mono text-[11px] text-bg">{Math.round(live * BASE)} px</span>
+      )}
     </div>
   );
 }
@@ -116,12 +194,14 @@ function TextEditor({
   interim: outside,
   style,
   onFinish,
+  hint,
 }: {
   draft: string;
   setDraft: (fn: (d: string) => string) => void;
   interim: string;
   style: CSSProperties;
   onFinish: () => void;
+  hint: boolean;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const id = useId();
@@ -190,7 +270,7 @@ function TextEditor({
         ref={area}
         value={draft}
         rows={1}
-        placeholder="Write, or hold Space to talk…"
+        placeholder={hint ? "Write, or hold Space to talk…" : undefined}
         readOnly={listening}
         onChange={(e) => setDraft(() => e.target.value)}
         onBlur={(e) => {
@@ -215,9 +295,10 @@ function TextEditor({
           e.stopPropagation();
           talk.onKeyUp(e);
         }}
-        className="hand block w-[min(420px,80vw)] resize-none overflow-hidden bg-transparent p-0 pr-10 font-note text-[22px] leading-snug text-ink caret-red-text outline-none placeholder:font-sans placeholder:text-[15px] placeholder:text-mute/70"
+        style={{ fontSize: style.fontSize, color: style.color, width: `min(${style.maxWidth}px, 80vw)` }}
+        className="hand block resize-none overflow-hidden bg-transparent p-0 pr-10 font-note leading-snug caret-red-text outline-none placeholder:font-sans placeholder:text-[15px] placeholder:text-mute/70"
       />
-      {heard && <span className="pointer-events-none block font-note text-[22px] leading-snug text-mute/70">{heard}</span>}
+      {heard && <span style={{ fontSize: style.fontSize }} className="pointer-events-none block font-note leading-snug text-mute/70">{heard}</span>}
       {voice.supported && (
         <button
           type="button"

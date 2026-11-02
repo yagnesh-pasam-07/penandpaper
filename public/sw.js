@@ -1,5 +1,5 @@
-// Pen & Paper's service worker: only the daily Thought of the Day
-// notification. It caches nothing (every page is signed-in and live).
+// Pen & Paper's service worker: the daily Thought of the Day notification,
+// and reminders for to-dos with a date (tag "pp-remind-…"). It caches nothing (every page is signed-in and live).
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
@@ -17,7 +17,8 @@ self.addEventListener("push", (event) => {
       // Open on screen already: let the page greet with the card and the signature sound instead.
       const open = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const visible = open.find((c) => c.visibilityState === "visible");
-      if (visible) {
+      const reminder = String(data.tag || "").startsWith("pp-remind-");
+      if (visible && !reminder) {
         visible.postMessage({ type: "pp-today" });
         return;
       }
@@ -38,10 +39,16 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = new URL((event.notification.data && event.notification.data.url) || "/drop?today=1", self.location.origin).href;
+  const reminder = String(event.notification.tag || "").startsWith("pp-remind-");
   event.waitUntil(
     (async () => {
       const open = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const same = open.find((c) => new URL(c.url).origin === self.location.origin);
+      if (same && reminder) {
+        await same.focus();
+        await same.navigate(url);
+        return;
+      }
       if (same) {
         await same.focus();
         same.postMessage({ type: "pp-today" });

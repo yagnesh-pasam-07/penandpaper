@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_STROKE_POINTS, STROKE_LIMIT } from "@/modules/drop/logic";
+import { INKS, MAX_LABEL, MAX_STROKE_POINTS, SHAPES, STROKE_LIMIT } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
 import { addStroke, PaperNotFound } from "@/modules/drop/server";
 
@@ -14,7 +14,11 @@ const body = z.object({
   /** The thoughts its ends are tied to (a connector), or null. */
   fromId: thoughtId.nullable(),
   toId: thoughtId.nullable(),
-});
+  color: z.enum(INKS).optional(),
+  /** A shape: `points` is then its two opposite corners. */
+  shape: z.enum(SHAPES).nullable().optional(),
+  label: z.string().trim().max(MAX_LABEL).nullable().optional(),
+}).refine((s) => !s.shape || s.points.length === 2, "A shape is two corners.");
 
 /** Draws a line (or a connector) on a paper. Signed in from this site. */
 export async function POST(request: Request) {

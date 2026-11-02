@@ -19,8 +19,10 @@ export const dropPapers = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     /** Deleted: hidden everywhere, removed for good a week later (like a crumpled thought). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /** Anyone with /p/<token> can view it, read-only. Null = the link is off. Random, never the paper id. */
+    publicToken: text("public_token"),
   },
-  (t) => [index("drop_papers_user_idx").on(t.userId)],
+  (t) => [index("drop_papers_user_idx").on(t.userId), uniqueIndex("drop_papers_public_token_idx").on(t.publicToken)],
 );
 
 /** Small per-person settings and one-time hints for Drop. */
@@ -107,6 +109,16 @@ export const dropThoughts = pgTable(
     resurfaceDone: boolean("resurface_done").notNull().default(false),
     /** When it was last the thought of the day: never twice within a day. */
     recallShownAt: timestamp("recall_shown_at", { withTimezone: true, mode: "string" }),
+    /** Text size as a multiple of the base (resized by dragging a corner). */
+    size: real("size").notNull().default(1),
+    /** One of the five inks (see INKS in logic.ts) for written text. */
+    color: text("color").notNull().default("ink"),
+    /** A to-do's day (and time): it shows on the note and comes back on that day. */
+    dueAt: timestamp("due_at", { withTimezone: true, mode: "string" }),
+    /** Whether `dueAt` has a time of day (a reminder) or is just a day. */
+    dueHasTime: boolean("due_has_time").notNull().default(false),
+    /** When the reminder for `dueAt` went out; null until sent (cleared when the date changes). */
+    remindedAt: timestamp("reminded_at", { withTimezone: true, mode: "string" }),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );
@@ -132,11 +144,35 @@ export const dropStrokes = pgTable(
     /** The thought each end is tied to, or null for a free end. */
     fromId: text("from_id"),
     toId: text("to_id"),
+    /** One of the five inks (see INKS in logic.ts). */
+    color: text("color").notNull().default("ink"),
+    /** Null: freehand. "rect" or "ellipse": a shape, `points` holding two opposite corners. */
+    shape: text("shape"),
+    /** Words written inside a shape. */
+    label: text("label"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
     /** Erased: hidden at once, swept up a week later like a crumpled thought. */
     erasedAt: timestamp("erased_at", { withTimezone: true, mode: "string" }),
   },
   (t) => [index("drop_strokes_paper_idx").on(t.paperId)],
+);
+
+/** People a paper is shared with, by email: they can view it once signed in with that address. */
+export const dropShares = pgTable(
+  "drop_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    paperId: uuid("paper_id")
+      .notNull()
+      .references(() => dropPapers.id, { onDelete: "cascade" }),
+    /** Lower-cased. */
+    email: text("email").notNull(),
+    invitedBy: uuid("invited_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("drop_shares_paper_email_idx").on(t.paperId, t.email), index("drop_shares_email_idx").on(t.email)],
 );
 
 /** Keys for apps that save to a paper without a browser sign-in (the Mac menu-bar app). Only the hash of the secret is kept. */

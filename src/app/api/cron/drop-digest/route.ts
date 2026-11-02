@@ -1,3 +1,4 @@
+import { sendReminders } from "@/modules/drop/reminders-server";
 import { appUrl } from "@/lib/env";
 import { longDate, todayIn } from "@/lib/time";
 import { digestItems } from "@/modules/drop/digest";
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "Not allowed." }, { status: 401 });
   }
+  // To-dos with a date whose time has come: a notification, or an email.
+  const reminders = await sendReminders(new Date(), dropZone()).catch(() => null);
   const swept = await sweepCrumpled();
   // Thought of the Day for anyone whose time came after the morning run (an evening recall time).
   const recalls = await sendRecalls(new Date(), 24 * 60, dropZone()).catch(() => null);
@@ -44,5 +47,5 @@ export async function GET(request: Request) {
     });
     if (ok) sent += 1;
   }
-  return Response.json({ date, people: digests.length, sent, swept, recalls });
+  return Response.json({ date, people: digests.length, sent, swept, recalls, reminders });
 }

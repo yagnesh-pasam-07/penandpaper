@@ -12,6 +12,15 @@ export type OverlayCtx = {
   zoom: number;
 };
 
+/** Things being carried together (a loop and what's inside it), shown shifted by (dx, dy) canvas px. */
+export type Offset = { ids: Set<string>; dx: number; dy: number };
+
+/** What the page can ask of the sheet. */
+export type CanvasApi = {
+  /** Saves these notes moved by (dx, dy) canvas px, pinning the rest where they sit (one arrange). */
+  moveBy: (ids: string[], dx: number, dy: number) => void;
+};
+
 /** A point on screen as a point on the sheet, in its own units (pan and zoom both undone). */
 export function pointOn(sheet: HTMLElement | null, zoom: number, clientX: number, clientY: number): Point {
   const r = sheet?.getBoundingClientRect();
@@ -54,6 +63,8 @@ export function FreeCanvas<T extends Item>({
   onPanBy,
   overlay,
   dragEnabled = true,
+  offset,
+  apiRef,
 }: {
   items: T[];
   label: string;
@@ -89,6 +100,9 @@ export function FreeCanvas<T extends Item>({
   overlay?: (ctx: OverlayCtx) => ReactNode;
   /** Off while another tool is in hand: presses go to the overlay, not to dragging. */
   dragEnabled?: boolean;
+  /** A group being carried (by the page): those notes show shifted, and lines tied to them follow. */
+  offset?: Offset | null;
+  apiRef?: MutableRefObject<CanvasApi | null>;
 }) {
   const sheet = useRef<HTMLElement>(null);
   const nodes = useRef(new Map<string, HTMLElement>());
@@ -135,14 +149,20 @@ export function FreeCanvas<T extends Item>({
     // Follows the pointer, then settles on release.
     boxes.set(drag.id, raw);
   }
+  if (offset && (offset.dx || offset.dy)) {
+    for (const id of offset.ids) {
+      const b = boxes.get(id);
+      if (b) boxes.set(id, { ...b, x: b.x + offset.dx, y: b.y + offset.dy });
+    }
+  }
 
   const bottoms = [...boxes.values()].map((b) => b.y + b.h / 2 + 32).filter(Number.isFinite);
   const height = Math.max(typeof minHeight === "number" ? minHeight : 0, ...bottoms);
 
   // Handlers read the latest layout from here, so a fast drag never sees a stale render.
-  const latest = useRef({ boxes, items, width, lift, onArrange, onPanBy, column, zoom: view.zoom });
+  const latest = useRef({ boxes, items, width, lift, onArrange, onPanBy, column, zoom: view.zoom, offset });
   useLayoutEffect(() => {
-    latest.current = { boxes, items, width, lift, onArrange, onPanBy, column, zoom: view.zoom };
+    latest.current = { boxes, items, width, lift, onArrange, onPanBy, column, zoom: view.zoom, offset };
   });
 
   // Saved spots are relative to the reading column and the arranged group, not the screen.
@@ -177,13 +197,51 @@ export function FreeCanvas<T extends Item>({
   }, [spotRef]);
 
   /** The bubbles still flowing, pinned where they sit (so moving one never shuffles the others). */
-  const pins = (except: string): Placement[] =>
+  const pins = (except: string | Set<string>): Placement[] =>
     latest.current.items
-      .filter((it) => it.id !== except && (it.x === null || it.y === null))
+      .filter((it) => (typeof except === "string" ? it.id !== except : !except.has(it.id)) && (it.x === null || it.y === null))
       .flatMap((it) => {
         const b = latest.current.boxes.get(it.id);
         return b ? [{ id: it.id, ...saved(b) }] : [];
       });
+
+  /** Saves placements, then re-anchors the group if every bubble is placed now (panning the other way so nothing moves on screen). */
+  const commit = (placements: Placement[], arrange: ((p: Placement[]) => void) | undefined) => {
+    arrange?.(placements);
+    const { items, boxes: now, lift: held, zoom: k, onPanBy: pan } = latest.current;
+    const moved = new Map(placements.map((p) => [p.id, p.y]));
+    const placed = items.flatMap((it) => {
+      const h = now.get(it.id)?.h;
+      const y = moved.get(it.id) ?? it.y;
+      return h === undefined || y === null ? [] : [{ y, h }];
+    });
+    const shift = settleShift(placed, held);
+    if (shift) {
+      // Re-anchor now (not at the next new drop or reload) and pan the same amount, so both agree.
+      setHeld(null);
+      pan?.(0, -shift * k);
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (!apiRef) return;
+    apiRef.current = {
+      moveBy: (ids, dx, dy) => {
+        const { boxes: now, width: w, onArrange: arrange } = latest.current;
+        if (!w || !ids.length) return;
+        // `now` already shows the carried group shifted; move from where they were.
+        const off = latest.current.offset;
+        const placements = ids.flatMap((id) => {
+          const b = now.get(id);
+          if (!b) return [];
+          const ox = off?.ids.has(id) ? off.dx : 0;
+          const oy = off?.ids.has(id) ? off.dy : 0;
+          return [{ id, ...saved({ ...b, x: b.x - ox + dx, y: b.y - oy + dy }) }];
+        });
+        commit([...placements, ...pins(new Set(ids))], arrange);
+      },
+    };
+  });
 
   /** Where a drag lets go: snapped against the others. */
   const landing = (d: Drag): Box => {
@@ -217,12 +275,18 @@ export function FreeCanvas<T extends Item>({
     dragRef.current = first;
     pointerRef.current = at;
     setDrag(first);
+    // One layout per frame, however fast the pointer reports.
+    let queued = 0;
     const move = (ev: PointerEvent) => {
       const d = dragRef.current;
       if (!d || ev.pointerId !== d.pointer) return;
       pointerRef.current = { x: ev.clientX, y: ev.clientY };
-      follow();
-      if (dragRef.current?.moving) ev.preventDefault();
+      if (d.moving) ev.preventDefault();
+      if (!queued)
+        queued = requestAnimationFrame(() => {
+          queued = 0;
+          follow();
+        });
     };
     // Near the window's edge the view drifts, so a note can be carried well past one screen.
     let raf = 0;
@@ -243,26 +307,17 @@ export function FreeCanvas<T extends Item>({
       window.removeEventListener("pointerup", stop);
       window.removeEventListener("pointercancel", stop);
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(queued);
+      queued = 0;
+      // The last position, exactly where the pointer let go.
+      pointerRef.current = { x: ev.clientX, y: ev.clientY };
+      follow();
+      const dd = dragRef.current ?? d;
       const { width: w, onArrange: arrange } = latest.current;
-      if (ev.type === "pointerup" && d.moving && w > 0) {
+      if (ev.type === "pointerup" && dd.moving && w > 0) {
         justDragged.current = true;
         setTimeout(() => (justDragged.current = false), 0);
-        const placements = [{ id: d.id, ...saved(landing(d)) }, ...pins(d.id)];
-        arrange?.(placements);
-        // Every bubble is placed now; the group re-anchors to the sheet's top. Pan the other way so nothing moves on screen.
-        const { items, boxes: now, lift: held, zoom: k, onPanBy: pan } = latest.current;
-        const moved = new Map(placements.map((p) => [p.id, p.y]));
-        const placed = items.flatMap((it) => {
-          const h = now.get(it.id)?.h;
-          const y = moved.get(it.id) ?? it.y;
-          return h === undefined || y === null ? [] : [{ y, h }];
-        });
-        const shift = settleShift(placed, held);
-        if (shift) {
-          // Re-anchor now (not at the next new drop or reload) and pan the same amount, so both agree.
-          setHeld(null);
-          pan?.(0, -shift * k);
-        }
+        commit([{ id: dd.id, ...saved(landing(dd)) }, ...pins(dd.id)], arrange);
       }
       dragRef.current = null;
       pointerRef.current = null;

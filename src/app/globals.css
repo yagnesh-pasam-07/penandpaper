@@ -36,6 +36,12 @@
   /* Paper lifts off paper: a hairline, then a long soft fall. Light only; at night surfaces lift by colour. */
   --lift: 0 1px 2px rgba(30, 28, 25, 0.04), 0 14px 36px -14px rgba(30, 28, 25, 0.14);
   --scrim: rgba(34, 32, 28, 0.28);
+  /* The five inks on the canvas (THEME.md): deep by day, like ink on ivory. */
+  --ink-ink: var(--ink);
+  --ink-vermilion: #c2412d;
+  --ink-cobalt: #2456c7;
+  --ink-viridian: #17805a;
+  --ink-saffron: #b06d00;
   /* Canvas tokens. Dotted keeps today's dots; Grid is squares; Ruled is warm paper with thin vertical lines. */
   --canvas-dotted-dot: var(--line);
   --canvas-grid-line: color-mix(in srgb, var(--mute) 12%, transparent);
@@ -78,6 +84,12 @@
   --shadow: rgba(0, 0, 0, 0.45);
   --lift: none;
   --scrim: rgba(0, 0, 0, 0.55);
+  /* At night the inks are lifted and luminous, so they glow on charcoal instead of sinking. */
+  --ink-ink: var(--ink);
+  --ink-vermilion: #ff7a5c;
+  --ink-cobalt: #7aa7ff;
+  --ink-viridian: #4fd19a;
+  --ink-saffron: #ffc24a;
   --canvas-dotted-dot: var(--line);
   --canvas-grid-line: rgb(255 255 255 / 0.07);
   --canvas-ruled-bg: var(--sheet);
@@ -554,6 +566,9 @@ html.theme-ease * {
 .tool-text, .tool-text [data-note] { cursor: text; }
 .tool-draw, .tool-draw * { cursor: crosshair !important; }
 .tool-erase, .tool-erase * { cursor: cell !important; }
+.tool-shape, .tool-shape * { cursor: crosshair !important; }
+/* While the view moves, nothing under it needs to repaint. */
+.canvas-moving [data-note] { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   .voice-dot, .ink-draw { animation: none; }
 }

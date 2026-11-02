@@ -1,11 +1,20 @@
 import { z } from "zod";
-import { MAX_THOUGHT } from "@/modules/drop/logic";
+import { INKS, MAX_TEXT_SIZE, MAX_THOUGHT, MIN_TEXT_SIZE } from "@/modules/drop/logic";
 import { noStore, requireUser, userFromRequest } from "@/modules/drop/http";
 import { crumpleThought, updateThought } from "@/modules/drop/server";
 
 const patch = z
-  .object({ paperId: z.uuid(), text: z.string().trim().min(1).max(MAX_THOUGHT).optional(), status: z.enum(["open", "done"]).optional() })
-  .refine((p) => p.text !== undefined || p.status !== undefined);
+  .object({
+    paperId: z.uuid(),
+    text: z.string().trim().min(1).max(MAX_THOUGHT).optional(),
+    status: z.enum(["open", "done"]).optional(),
+    /** Written text's size (a corner dragged). */
+    size: z.number().min(MIN_TEXT_SIZE).max(MAX_TEXT_SIZE).optional(),
+    color: z.enum(INKS).optional(),
+    /** A to-do's day, with or without a time (a reminder); null takes it off. */
+    due: z.object({ at: z.iso.datetime({ offset: true }), hasTime: z.boolean() }).nullable().optional(),
+  })
+  .refine((p) => p.text !== undefined || p.status !== undefined || p.size !== undefined || p.color !== undefined || p.due !== undefined);
 
 const gone = () => Response.json({ error: "That thought isn't on this paper." }, { status: 404 });
 

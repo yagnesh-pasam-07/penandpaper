@@ -8,6 +8,7 @@ import {
   SEARCH_LIMIT,
   cleanName,
   escapeLike,
+  isInk,
   groupDigest,
   previewNotes,
   type DigestGroup,
@@ -45,6 +46,10 @@ function toThought(r: ThoughtRow): Thought {
     y: r.y,
     image: r.image,
     kind: r.kind,
+    size: r.size,
+    color: isInk(r.color) ? r.color : "ink",
+    dueAt: r.dueAt ? iso(r.dueAt) : null,
+    dueHasTime: r.dueHasTime,
   };
 }
 
@@ -98,11 +103,11 @@ async function contentsOf(paper: { id: string; name: string | null; createdAt: D
 async function strokesOf(paperId: string): Promise<Stroke[]> {
   try {
     const rows = await db
-      .select({ id: dropStrokes.id, points: dropStrokes.points, fromId: dropStrokes.fromId, toId: dropStrokes.toId })
+      .select({ id: dropStrokes.id, points: dropStrokes.points, fromId: dropStrokes.fromId, toId: dropStrokes.toId, color: dropStrokes.color, shape: dropStrokes.shape, label: dropStrokes.label })
       .from(dropStrokes)
       .where(and(eq(dropStrokes.paperId, paperId), isNull(dropStrokes.erasedAt)))
       .orderBy(asc(dropStrokes.createdAt), asc(dropStrokes.id));
-    return rows;
+    return rows.map((r) => ({ ...r, color: isInk(r.color) ? r.color : "ink", shape: r.shape === "rect" || r.shape === "ellipse" ? r.shape : null }));
   } catch {
     return [];
   }
@@ -113,10 +118,32 @@ export async function addStroke(userId: string, paperId: string, input: Stroke):
   if (!(await ownedPaper(userId, paperId))) throw new PaperNotFound();
   await db
     .insert(dropStrokes)
-    .values({ id: input.id, paperId, userId, points: input.points, fromId: input.fromId, toId: input.toId })
+    .values({ id: input.id, paperId, userId, points: input.points, fromId: input.fromId, toId: input.toId, color: input.color ?? "ink", shape: input.shape ?? null, label: input.label ?? null })
     .onConflictDoNothing();
   await touch(paperId);
   return input;
+}
+
+/** Changes a line or shape on this paper: moved or reshaped (new points), re-coloured, re-tied, or the words inside. */
+export async function updateStroke(
+  userId: string,
+  paperId: string,
+  id: string,
+  patch: { points?: [number, number][]; color?: Stroke["color"]; label?: string | null; fromId?: string | null; toId?: string | null },
+): Promise<boolean> {
+  const rows = await db
+    .update(dropStrokes)
+    .set({
+      ...(patch.points ? { points: patch.points } : {}),
+      ...(patch.color ? { color: patch.color } : {}),
+      ...(patch.label !== undefined ? { label: patch.label } : {}),
+      ...(patch.fromId !== undefined ? { fromId: patch.fromId } : {}),
+      ...(patch.toId !== undefined ? { toId: patch.toId } : {}),
+    })
+    .where(and(eq(dropStrokes.id, id), eq(dropStrokes.userId, userId), eq(dropStrokes.paperId, paperId), isNull(dropStrokes.erasedAt)))
+    .returning({ id: dropStrokes.id });
+  if (rows.length) await touch(paperId);
+  return rows.length > 0;
 }
 
 /** Erases a line on this paper (or brings it back, for an undo). */
@@ -272,11 +299,20 @@ export async function captureTarget(userId: string): Promise<{ paperId: string; 
 }
 
 /** Edits or strikes a thought on this paper. Returns null if it isn't there. */
-export async function updateThought(userId: string, paperId: string, id: string, patch: { text?: string; status?: "open" | "done" }): Promise<Thought | null> {
+export async function updateThought(
+  userId: string,
+  paperId: string,
+  id: string,
+  patch: { text?: string; status?: "open" | "done"; size?: number; color?: Thought["color"]; due?: { at: string; hasTime: boolean } | null },
+): Promise<Thought | null> {
   const [row] = await db
     .update(dropThoughts)
     .set({
       ...(patch.text !== undefined ? { text: patch.text } : {}),
+      ...(patch.size !== undefined ? { size: patch.size } : {}),
+      ...(patch.color ? { color: patch.color } : {}),
+      // A new date is a new reminder.
+      ...(patch.due !== undefined ? { dueAt: patch.due?.at ?? null, dueHasTime: patch.due?.hasTime ?? false, remindedAt: null } : {}),
       ...(patch.status ? { status: patch.status, doneAt: patch.status === "done" ? sql`now()` : null } : {}),
     })
     .where(
@@ -286,7 +322,8 @@ export async function updateThought(userId: string, paperId: string, id: string,
         eq(dropThoughts.paperId, paperId),
         isNull(dropThoughts.crumpledAt),
         // A drop (a picture) is never struck: see isDrop. Its caption can still be edited.
-        patch.status ? and(isNull(dropThoughts.image), eq(dropThoughts.kind, "note")) : undefined,
+        // Nor does it get a due date: it's kept to look at, not to do.
+        patch.status || patch.due ? and(isNull(dropThoughts.image), eq(dropThoughts.kind, "note")) : undefined,
       ),
     )
     .returning();

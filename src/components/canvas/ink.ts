@@ -133,3 +133,104 @@ export function endAngle(points: Pt[]): number | null {
   }
   return null;
 }
+
+/* ---------- Loops, shapes and selection ---------- */
+
+/** The smallest box around the points. */
+export function boundsOfPoints(points: Pt[]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * A line that comes back to where it started is a loop: a ring drawn round a
+ * group of things (like a person's column on a planning paper). The ends must
+ * meet within a quarter of its size (at least 40 px), and it must be big enough
+ * to hold something.
+ */
+export function isLoop(points: Pt[]): boolean {
+  if (points.length < 8) return false;
+  const b = boundsOfPoints(points);
+  const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  if (size < 60) return false;
+  const [ax, ay] = points[0];
+  const [zx, zy] = points[points.length - 1];
+  return Math.hypot(zx - ax, zy - ay) <= Math.max(40, size * 0.25);
+}
+
+/** Whether `p` is inside the closed polygon (ray casting; the gap between the ends is closed). */
+export function insidePolygon(p: Point, poly: Pt[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if (yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** The outline a shape is drawn as, for hit tests and "what's inside" (an ellipse as 48 points). */
+export function shapeOutline(shape: "rect" | "ellipse", corners: Pt[]): Pt[] {
+  const [[x1, y1], [x2, y2]] = corners.length >= 2 ? corners : [corners[0], corners[0]];
+  const minX = Math.min(x1, x2), maxX = Math.max(x1, x2), minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+  if (shape === "rect") return [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]];
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, rx = (maxX - minX) / 2, ry = (maxY - minY) / 2;
+  return Array.from({ length: 49 }, (_, i) => {
+    const a = (i / 48) * Math.PI * 2;
+    return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)] as Pt;
+  });
+}
+
+/** Shape corners as given while dragging: Shift keeps it a square or circle. */
+export function shapeCorners(from: Point, to: Point, even: boolean): Pt[] {
+  if (!even) return [[from.x, from.y], [to.x, to.y]];
+  const d = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+  return [[from.x, from.y], [from.x + Math.sign(to.x - from.x || 1) * d, from.y + Math.sign(to.y - from.y || 1) * d]];
+}
+
+/**
+ * A hand-drawn path for a shape: each side bows a little and the pen
+ * overshoots where it closes, seeded so it looks the same every time.
+ */
+export function handShapePath(shape: "rect" | "ellipse", corners: Pt[], seed: string): string {
+  const r = (k: number) => {
+    let h = 0x811c9dc5 ^ k;
+    for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193) >>> 0;
+    return ((h >>> 0) / 0xffffffff - 0.5) * 2;
+  };
+  const b = boundsOfPoints(corners.length >= 2 ? corners : [corners[0], corners[0]]);
+  const w = b.maxX - b.minX, h = b.maxY - b.minY;
+  const wob = Math.min(3, Math.max(w, h) * 0.015);
+  const f = (n: number) => Math.round(n * 10) / 10;
+  if (shape === "rect") {
+    const c: Pt[] = [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]];
+    const j = c.map(([x, y], i) => [x + r(i * 2) * wob, y + r(i * 2 + 1) * wob] as Pt);
+    let d = `M${f(j[0][0])} ${f(j[0][1])}`;
+    for (let i = 1; i <= 4; i++) {
+      const [px, py] = j[i - 1];
+      const [x, y] = j[i % 4];
+      const mx = (px + x) / 2 + r(10 + i) * wob, my = (py + y) / 2 + r(20 + i) * wob;
+      d += `Q${f(mx)} ${f(my)} ${f(x)} ${f(y)}`;
+    }
+    // A little overshoot past the first corner, as a pen does.
+    const [ox, oy] = j[1];
+    return `${d}L${f(j[0][0] + (ox - j[0][0]) * 0.06)} ${f(j[0][1] + (oy - j[0][1]) * 0.06)}`;
+  }
+  const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2, rx = w / 2, ry = h / 2;
+  const start = r(1) * Math.PI;
+  const pts: Pt[] = Array.from({ length: 27 }, (_, i) => {
+    const a = start + (i / 24) * Math.PI * 2;
+    const k = 1 + r(30 + (i % 24)) * 0.015;
+    return [cx + rx * k * Math.cos(a), cy + ry * k * Math.sin(a)];
+  });
+  return pathOf(pts);
+}
+
+/** Moves every point by (dx, dy). */
+export const shift = (points: Pt[], dx: number, dy: number): Pt[] => points.map(([x, y]) => [Math.round((x + dx) * 10) / 10, Math.round((y + dy) * 10) / 10]);

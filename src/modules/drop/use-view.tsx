@@ -25,10 +25,26 @@ export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefOb
   const ref = useRef(view);
   const loaded = useRef(false);
 
+  // A trackpad sends far more wheel events than the screen has frames: the view
+  // is kept in a ref at once and drawn at most once a frame. While it moves,
+  // the page carries "canvas-moving" so notes skip hover work.
+  const frame = useRef(0);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setView = useCallback((next: View | ((v: View) => View)) => {
     ref.current = typeof next === "function" ? next(ref.current) : next;
-    setViewState(ref.current);
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      setViewState(ref.current);
+    });
   }, []);
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(frame.current);
+      if (settle.current) clearTimeout(settle.current);
+    },
+    [],
+  );
 
   // Remembered per device; read after mount so the server and first render agree.
   useEffect(() => {
@@ -58,6 +74,9 @@ export function useCanvasView(page: RefObject<HTMLElement | null>, origin: RefOb
       return;
     }
     const r = p.getBoundingClientRect();
+    p.classList.add("canvas-moving");
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => p.classList.remove("canvas-moving"), 140);
     p.style.setProperty("--canvas-zoom", String(view.zoom));
     p.toggleAttribute("data-far", view.zoom < PATTERN_MIN_ZOOM);
     p.style.setProperty("--canvas-x", `${o.left - r.left + view.x}px`);

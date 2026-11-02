@@ -242,3 +242,42 @@ describe("drops and to-dos", () => {
     expect(isDrop({})).toBe(false);
   });
 });
+
+import { dueLabel, reminderDue, clampSize } from "./logic";
+
+describe("due dates", () => {
+  const now = new Date("2026-11-02T06:00:00Z"); // 11:30 IST, Monday
+  const tz = "Asia/Kolkata";
+  it("reads like Slack: Today, Tomorrow, a weekday, a date", () => {
+    expect(dueLabel("2026-11-02T12:30:00Z", true, now, tz)).toEqual({ text: "Today, 6:00 PM", late: false, soon: true });
+    expect(dueLabel("2026-11-02T18:30:00Z", false, now, tz).text).toBe("Tomorrow");
+    expect(dueLabel("2026-11-05T18:30:00Z", false, now, tz).text).toBe("Fri");
+    expect(dueLabel("2026-11-20T18:30:00Z", false, now, tz).text).toBe("21 Nov");
+  });
+  it("is late once the time or the day has passed", () => {
+    expect(dueLabel("2026-11-02T05:00:00Z", true, now, tz).late).toBe(true);
+    expect(dueLabel("2026-11-01T18:30:00Z", false, now, tz).late).toBe(false); // today (IST midnight), day only
+    expect(dueLabel("2026-10-30T18:30:00Z", false, now, tz).late).toBe(true);
+  });
+  it("owes a reminder once, when its time has come", () => {
+    const t = { dueAt: "2026-11-02T05:55:00Z", dueHasTime: true, remindedAt: null, status: "open" as const };
+    expect(reminderDue(t, now, 3600_000)).toBe(true);
+    expect(reminderDue({ ...t, remindedAt: "2026-11-02T05:56:00Z" }, now, 3600_000)).toBe(false);
+    expect(reminderDue({ ...t, status: "done" }, now, 3600_000)).toBe(false);
+    expect(reminderDue({ ...t, dueAt: "2026-11-02T07:00:00Z" }, now, 3600_000)).toBe(false);
+  });
+  it("keeps text sizes sensible", () => {
+    expect(clampSize(10)).toBe(4.4);
+    expect(clampSize(0.1)).toBe(0.64);
+  });
+});
+
+import { mentionedEmails } from "./logic";
+
+describe("mentions", () => {
+  it("finds @someone@company.com, not plain emails or handles", () => {
+    expect(mentionedEmails("ask @Teja@tilicho.in and @ravi@x.co about it")).toEqual(["teja@tilicho.in", "ravi@x.co"]);
+    expect(mentionedEmails("mail teja@tilicho.in")).toEqual([]);
+    expect(mentionedEmails("@teja please")).toEqual([]);
+  });
+});

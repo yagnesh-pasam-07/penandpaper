@@ -35,6 +35,12 @@ type Props = {
   onToggle?: () => void;
   /** Crumple it (with undo, by whoever owns it). */
   onDelete?: () => void;
+  /** Shown under the text (a to-do's date chip). */
+  footer?: ReactNode;
+  /** A to-do's date: the clock button opens this. */
+  onDue?: () => void;
+  /** Floating beside the note (the date picker). */
+  popover?: ReactNode;
 };
 
 const SWIPE = 64;
@@ -211,6 +217,9 @@ export function ThoughtBubble({
   onEdit,
   onToggle,
   onDelete,
+  footer,
+  onDue,
+  popover,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -428,6 +437,7 @@ export function ThoughtBubble({
           image && !readOnly && <span className="px-1 font-note text-[18px] text-mute">add a caption…</span>
         )}
         {!image && <LinkPreview text={text} rich={!!previews && !readOnly} />}
+        {footer}
         {stream && meta && <span className="font-mono text-[11px] text-mute">{meta}</span>}
       </div>
       {!stream && meta && (
@@ -442,6 +452,14 @@ export function ThoughtBubble({
               <CheckIcon size={12} />
             </button>
           )}
+          {onDue && (
+            <button type="button" onClick={onDue} aria-label={`Date or reminder for "${text}"`} title="Date · reminder" className={`${toolButton} text-ink`}>
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                <circle cx="6" cy="6" r="4.8" />
+                <path d="M6 3.4V6l1.8 1.1" />
+              </svg>
+            </button>
+          )}
           <button type="button" onClick={startEdit} aria-label={`Edit "${text}"`} className={`${toolButton} text-[13px] font-semibold`}>
             Aa
           </button>
@@ -450,6 +468,7 @@ export function ThoughtBubble({
           </button>
         </span>
       )}
+      {popover}
       {zoom && image && (
         <div
           role="dialog"

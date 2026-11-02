@@ -16,6 +16,13 @@ export type Thought = {
   image?: string | null;
   /** "note" (a hand-cut note) or "text" (words written straight on the paper with the Text tool). Missing means "note". */
   kind?: ThoughtKind;
+  /** Written text's size, as a multiple of the base (1 = 22 px). Missing means 1. */
+  size?: number;
+  /** One of the five inks (written text). Missing means "ink". */
+  color?: InkName;
+  /** A to-do's day (ISO); with `dueHasTime`, a reminder at that moment. */
+  dueAt?: string | null;
+  dueHasTime?: boolean;
 };
 
 export type ThoughtKind = "note" | "text";
@@ -27,7 +34,32 @@ export type Stroke = {
   points: [number, number][];
   fromId: string | null;
   toId: string | null;
+  /** One of the five inks. Missing means "ink". */
+  color?: InkName;
+  /** A shape instead of a freehand line: `points` is two opposite corners. */
+  shape?: ShapeKind | null;
+  /** Words inside a shape. */
+  label?: string | null;
 };
+
+/**
+ * The five inks: one neutral that does most of the work, four pigments that
+ * each mean something. Kept by name, so a line drawn by day re-colours itself
+ * at night (each has a deep day value and a luminous night value, see THEME.md).
+ */
+export const INKS = ["ink", "vermilion", "cobalt", "viridian", "saffron"] as const;
+export type InkName = (typeof INKS)[number];
+export const INK_MEANING: Record<InkName, string> = { ink: "Ink", vermilion: "Vermilion · urgent", cobalt: "Cobalt · a decision", viridian: "Viridian · done", saffron: "Saffron · an idea" };
+export const isInk = (v: unknown): v is InkName => typeof v === "string" && (INKS as readonly string[]).includes(v);
+
+export const SHAPES = ["rect", "ellipse"] as const;
+export type ShapeKind = (typeof SHAPES)[number];
+export const MAX_LABEL = 300;
+
+/** Text size limits (multiples of 22 px: about 14 px to 96 px). */
+export const MIN_TEXT_SIZE = 0.64;
+export const MAX_TEXT_SIZE = 4.4;
+export const clampSize = (n: number) => Math.min(MAX_TEXT_SIZE, Math.max(MIN_TEXT_SIZE, Math.round(n * 100) / 100));
 
 /** One paper: a canvas the person made, with the thoughts dropped on it. */
 export type DropPaper = {
@@ -86,6 +118,49 @@ export { firstLink, firstYoutube, isOnlyYoutube, linkify, youtubeId, type TextPa
  */
 export function isDrop(t: { image?: string | null; kind?: ThoughtKind | null }): boolean {
   return Boolean(t.image) || t.kind === "text";
+}
+
+/* ---------- Mentions ---------- */
+
+/** Emails mentioned as "@name@company.com" (or a bare address after @), lower-cased, at most five. */
+export function mentionedEmails(text: string): string[] {
+  const found = text.match(/@([a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,})/gi) ?? [];
+  return [...new Set(found.map((m) => m.slice(1).toLowerCase()))].slice(0, 5);
+}
+
+/* ---------- Due dates and reminders ---------- */
+
+/** The calendar day (YYYY-MM-DD) an instant falls on in a zone. */
+export function dayIn(d: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+/**
+ * How a due date reads on a note, like Slack's: "Today", "Tomorrow", "Fri",
+ * "12 Nov", with the time when it has one; and whether it is late.
+ */
+export function dueLabel(dueAt: string, hasTime: boolean, now: Date, tz: string): { text: string; late: boolean; soon: boolean } {
+  const due = new Date(dueAt);
+  const today = dayIn(now, tz);
+  const day = dayIn(due, tz);
+  const dayMs = (s: string) => Date.parse(`${s}T00:00:00Z`);
+  const diff = Math.round((dayMs(day) - dayMs(today)) / 86_400_000);
+  let text: string;
+  if (diff === 0) text = "Today";
+  else if (diff === 1) text = "Tomorrow";
+  else if (diff === -1) text = "Yesterday";
+  else if (diff > 1 && diff < 7) text = due.toLocaleDateString("en-GB", { weekday: "short", timeZone: tz });
+  else text = due.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(day.slice(0, 4) !== today.slice(0, 4) ? { year: "numeric" } : {}), timeZone: tz });
+  if (hasTime) text += `, ${due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz })}`;
+  const late = hasTime ? due.getTime() < now.getTime() : diff < 0;
+  return { text, late, soon: !late && diff <= 1 };
+}
+
+/** Whether a reminder is owed: it has a time, that time has come (within the window), it's open and not yet reminded. */
+export function reminderDue(t: { dueAt: string | null; dueHasTime: boolean; remindedAt: string | null; status: "open" | "done" }, now: Date, windowMs: number): boolean {
+  if (!t.dueAt || t.status !== "open" || t.remindedAt) return false;
+  const at = new Date(t.dueAt).getTime();
+  return at <= now.getTime() && at > now.getTime() - windowMs;
 }
 
 /** Most points a line keeps, and how far (canvas px) a line can reach, for the API's sanity checks. */

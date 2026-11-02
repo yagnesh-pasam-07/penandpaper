@@ -34,6 +34,13 @@ Pen and Paper has two themes that are the same brand under different light. Ever
 | `highlight` | `#fbe7a6` | `#5a4a1e` | the marker pen |
 | `selection` | `#f1d9c8` | `#4a2c24` | selected text |
 | `green`, `amber` (+ `-soft`) | | | success, warning |
+| `ink-ink` | = `ink` | = `ink` | canvas ink: most lines |
+| `ink-vermilion` | `#c2412d` | `#ff7a5c` | canvas ink: urgent, a risk |
+| `ink-cobalt` | `#2456c7` | `#7aa7ff` | canvas ink: a decision |
+| `ink-viridian` | `#17805a` | `#4fd19a` | canvas ink: done, go |
+| `ink-saffron` | `#b06d00` | `#ffc24a` | canvas ink: an idea |
+
+**The five canvas inks** are a painter's limited palette: one neutral that does most of the work and four pigments, each with a meaning. By day they are deep, like ink on ivory; at night they are lifted and luminous so they glow on charcoal. Lines and shapes store the *name*, so they change with the theme. Measured on `bg`, every ink is at least 3:1 (the bar for lines and shapes) in both themes: light 16.0 / 4.8 / 6.1 / 4.6 / 3.9, dark 14.3 / 7.1 / 7.6 / 9.4 / 11.3. Saffron by day is for lines and shapes, not small text.
 
 ## Contrast (WCAG, measured)
 

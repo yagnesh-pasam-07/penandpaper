@@ -1,3 +1,4 @@
+import { sendReminders } from "@/modules/drop/reminders-server";
 import { sendRecalls } from "@/modules/drop/recall-server";
 import { dropZone } from "@/modules/drop/server";
 
@@ -14,6 +15,8 @@ export async function GET(request: Request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "Not allowed." }, { status: 401 });
   }
+  // To-dos with a date whose time has come: a notification, or an email.
+  const reminders = await sendReminders(new Date(), dropZone()).catch(() => null);
   const window = Number(new URL(request.url).searchParams.get("window")) || 24 * 60;
-  return Response.json(await sendRecalls(new Date(), Math.min(window, 24 * 60), dropZone()));
+  return Response.json({ ...(await sendRecalls(new Date(), Math.min(window, 24 * 60), dropZone())), reminders });
 }
