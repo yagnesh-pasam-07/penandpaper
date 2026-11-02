@@ -659,3 +659,26 @@ html.theme-ease * {
 @media (prefers-reduced-motion: reduce) { .story-clap-pop, .story-clap-plus { animation: none; } }
 /* While the Listen bar is open, the floating clap sits above it. */
 body:has([aria-label="Listening"]) .story-clap-float { bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+
+/* Homepage: the timeline behind the headline. Faint, blurred, black and white, drifting. */
+.timeline-strip {
+  display: flex;
+  align-items: center;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent), linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent), linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.timeline-track {
+  opacity: 0.1;
+  filter: grayscale(1) blur(3px);
+  animation: timeline-drift 90s linear infinite;
+  will-change: transform;
+}
+[data-theme="dark"] .timeline-track { opacity: 0.12; }
+@keyframes timeline-drift {
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timeline-track { animation: none; }
+}

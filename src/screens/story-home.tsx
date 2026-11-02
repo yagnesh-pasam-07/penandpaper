@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui";
 import { PenIcon } from "@/components/icons";
+import { TimelineStrip } from "@/modules/home/timeline-strip";
 import { Picture } from "@/modules/stories/reader";
 import { lovedThisMonth, publishedStories, type StoryCard } from "@/modules/stories/server";
 
@@ -128,6 +129,9 @@ function Footer() {
           <Link href="/privacy" className={link}>
             Privacy
           </Link>
+          <Link href="/credits" className={link}>
+            Photo credits
+          </Link>
           <span>© Pen and Paper</span>
         </p>
       </div>
@@ -146,11 +150,11 @@ export async function StoryHome() {
     <div className="flex min-h-dvh flex-col bg-bg">
       <Header />
       <main className="flex flex-1 flex-col">
-        <section className="mx-auto flex w-full max-w-[880px] flex-col items-center gap-4 px-5 pt-10 pb-12 text-center sm:px-8 sm:pt-16 sm:pb-16">
+        <section className="relative isolate flex w-full flex-col items-center gap-4 px-5 pt-10 pb-12 text-center sm:px-8 sm:pt-16 sm:pb-16">
+          <TimelineStrip />
           <p className="font-sans text-[12px] font-semibold tracking-[0.16em] text-red-text uppercase">Pen and Paper</p>
-          <h1 className="story-serif text-[38px] leading-[1.08] tracking-[-0.02em] text-balance text-ink sm:text-[60px]">Your thoughts deserve to be written down.</h1>
-          <p className="max-w-[520px] font-sans text-[17px] leading-relaxed text-mute sm:text-[19px]">Other people&apos;s, in our stories. Your own, on your desk.</p>
-        </section>
+          <h1 className="story-serif max-w-[820px] text-[38px] leading-[1.08] tracking-[-0.02em] text-balance text-ink sm:text-[60px]">Your thoughts deserve to be written down.</h1>
+          <p className="max-w-[520px] font-sans text-[17px] leading-relaxed text-mute sm:text-[19px]">Other people&apos;s, in our stories. Your own, on your desk.</p>        </section>
 
         <Doors lead={lead} />
 

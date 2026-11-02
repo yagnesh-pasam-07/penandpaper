@@ -76,6 +76,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - The paper header sits above the canvas; notes slide under it, never over it.
 - Keys are shown in the visitor's own system (⌥ on Mac, Alt on Windows).
 - Logo: a ruled sheet with the red fountain-pen nib, in `public/brand/` (see its README). The favicon is the nib alone.
+- Homepage only: behind the headline, a faint strip of everything that changes (fire to the galaxy, 19 freely licensed pictures in `public/timeline/`), black and white, blurred, ~10% opacity, drifting one loop every 90 s, still for reduced motion. Faith images sit together, away from war. Credits at `/credits`.
 
 ### Tech
 - Next.js 16 on Vercel (`sin1`), Neon Postgres, Drizzle, Better Auth.
@@ -142,6 +143,7 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 | Feature | State | Ticket |
 | --- | --- | --- |
+| Homepage: a slow, faint timeline of everything that changes behind the headline; /credits | Shipped | (issue not created yet) |
 | Stories: readers sign in (Google) to clap and save; who loved it in Studio | Shipped | [#39](https://github.com/yagnesh-pasam-07/penandpaper/issues/39) |
 | Stories: claps (tap up to 50, a sound, mobile-first) and Most loved ranking | Shipped | [#38](https://github.com/yagnesh-pasam-07/penandpaper/issues/38) |
 | Stories: the person (name, place, photo, permission), series, sources box, Telugu ⇄ English | Shipped | [#37](https://github.com/yagnesh-pasam-07/penandpaper/issues/37) |
@@ -155,6 +157,11 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-02 05:45 IST · design · Behind the homepage headline, a faint timeline of everything that changes
+Why: the brand's belief is that a few things are constant (food, work, sleep, emotion) while everything else changes. Fire, cave painting, a hunter, palm leaf, a dhow, Krishna, Christ, Jama Masjid, the Great Wall, Darwin, the Somme, first flight, Mumbai and Dharavi, a full thali and an empty plate, a laptop, a phone and Andromeda drift slowly behind a still headline: the change moves, the belief stays. Kept as texture, not pictures (black and white, blurred, ~10% opacity, faded at the edges) so the headline reads first; real, freely licensed photographs and paintings, not drawings, because the brand is about real people; faith images placed together, never beside war. Tiles are 4–53 KB WebP (about 0.5 MB in all), decorative and hidden from screen readers; reduced motion stops the drift. Homepage only; story and Desk pages stay clean. Decision tree: 1 serves the homepage's job of saying what we believe; 2 adds no control (one footer link, Photo credits); 3–5 no.
+Replaces: nothing (the headline sat on plain paper).
+Commit: (this commit)
 
 ### 2026-11-02 00:30 IST · growth · Added auto OG share images + WhatsApp share button to stories — to improve reach from shares
 Why: most readers arrive from a shared link (WhatsApp first, then Instagram and LinkedIn), and the preview card decides whether they tap. Every story gets its own 1200×630 card, made on the fly: warm ruled paper with a red margin line, *pen & paper* **stories** in our handwriting (Caveat), the title in Newsreader with a red marker stroke under it, the one-line hook, the reading time (and "Listen"), and the cover on the right. Telugu titles and hooks are shaped by sharp (Pango/HarfBuzz) with Noto Serif Telugu so conjuncts stack correctly (the card renderer, Satori, can't stack Telugu consonants); a short Telugu title shrinks to sit on one line. Fonts ship in the repo (no network at share time). JPEG of about 40–60 KB (WhatsApp skips previews much over 300 KB), cached a day. The homepage gets a brand card ("Your thoughts deserve to be written down."). Story pages already carry og:title, og:description, og:image and twitter:card summary_large_image, and the WhatsApp share button (in the byline and at the end). No new services.
