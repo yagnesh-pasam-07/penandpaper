@@ -15,8 +15,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/drop",
     scope: "/",
     display: "standalone",
-    background_color: "#f6f3ec",
-    theme_color: "#f6f3ec",
+    background_color: "#faf8f4",
+    theme_color: "#faf8f4",
     categories: ["productivity"],
     icons: [
       { src: "/pwa/icon/192", sizes: "192x192", type: "image/png", purpose: "any" },

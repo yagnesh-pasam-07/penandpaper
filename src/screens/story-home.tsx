@@ -59,7 +59,7 @@ function PaperMock() {
 
 /** The two products, as two equal doors under one belief. */
 function Doors({ lead }: { lead: StoryCard | null }) {
-  const door = "group flex flex-col gap-5 rounded-2xl border border-line bg-sheet p-5 transition-colors hover:border-ink sm:p-7";
+  const door = "group flex flex-col gap-5 rounded-2xl border border-line bg-sheet p-5 shadow-[var(--lift)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-line-strong sm:p-7";
   return (
     <section aria-label="Pen and Paper" className="mx-auto grid w-full max-w-[1120px] gap-5 px-5 pb-16 sm:px-8 md:grid-cols-2 md:gap-8 md:pb-24">
       <Link href="/stories" className={door}>

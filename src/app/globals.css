@@ -4,16 +4,16 @@
 :root,
 [data-theme="light"] {
   /* Paper by day: warm off-white, never pure white (glare); warm near-black ink, never pure black. */
-  --bg: #f6f3ec;
-  --sheet: #fbf9f4;
-  --raised: #fefdfa;
-  --sunken: #efebe2;
-  --line: #e5e0d4;
-  --line-strong: #8f8879;
-  --soft: #f0ece3;
-  --ink: #22201c;
+  --bg: #faf8f4;
+  --sheet: #fffdf9;
+  --raised: #fffefb;
+  --sunken: #f2efe8;
+  --line: #ebe6dc;
+  --line-strong: #8a8478;
+  --soft: #f3f0e9;
+  --ink: #1e1c19;
   --mute: #57534b;
-  --graphite: #6c675e;
+  --graphite: #6a655c;
   /* One accent, a touch deeper by day so it weighs the same as the softer red at night. */
   --red: #b23a2c;
   --red-text: #b23a2c;
@@ -32,7 +32,9 @@
   --t3: #d8e8fa;
   --t4: #fadcd6;
   --t5: #e8def8;
-  --shadow: rgba(34, 32, 28, 0.09);
+  --shadow: rgba(30, 28, 25, 0.09);
+  /* Paper lifts off paper: a hairline, then a long soft fall. Light only; at night surfaces lift by colour. */
+  --lift: 0 1px 2px rgba(30, 28, 25, 0.04), 0 14px 36px -14px rgba(30, 28, 25, 0.14);
   --scrim: rgba(34, 32, 28, 0.28);
   /* Canvas tokens. Dotted keeps today's dots; Grid is squares; Ruled is warm paper with thin vertical lines. */
   --canvas-dotted-dot: var(--line);
@@ -74,6 +76,7 @@
   --t4: #42302b;
   --t5: #363047;
   --shadow: rgba(0, 0, 0, 0.45);
+  --lift: none;
   --scrim: rgba(0, 0, 0, 0.55);
   --canvas-dotted-dot: var(--line);
   --canvas-grid-line: rgb(255 255 255 / 0.07);
@@ -124,6 +127,7 @@
 body {
   background-color: var(--bg);
   background-image: var(--grain);
+  background-blend-mode: normal;
   color: var(--ink);
   font-family: var(--font-sans);
 }
@@ -681,4 +685,23 @@ body:has([aria-label="Listening"]) .story-clap-float { bottom: calc(5.5rem + env
 }
 @media (prefers-reduced-motion: reduce) {
   .timeline-track { animation: none; }
+}
+
+/* By day the grain is a whisper (on ivory it reads as dust, not paper). */
+[data-theme="light"] body,
+:root:not([data-theme="dark"]) body { background-image: none; }
+
+/* By day the timeline is ink printed on the paper: multiplied, warm, fainter. */
+[data-theme="light"] .timeline-track,
+:root:not([data-theme="dark"]) .timeline-track {
+  opacity: 0.075;
+  mix-blend-mode: multiply;
+  filter: grayscale(1) sepia(0.35) blur(3px);
+}
+/* By day each picture dissolves into the paper top and bottom: no grey box edges. */
+[data-theme="light"] .timeline-track img,
+:root:not([data-theme="dark"]) .timeline-track img {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+  border-radius: 0;
 }

@@ -158,6 +158,11 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-02 06:20 IST · design · Light theme made premium: ivory paper, cards that lift, no grain by day
+Why: light mode felt flat and beige next to the dark theme. Paper moves from beige (`#f6f3ec`) to bright warm ivory (`#faf8f4`), cards to `#fffdf9`, ink a touch deeper (`#1e1c19`, 16:1); every contrast pair still passes (mute 7.2, graphite 5.5, red 5.6, line-strong 3.5). Cards lift off the page with a new `--lift` shadow (a hairline and a long soft fall) and rise 2 px on hover; at night `--lift` is none and surfaces lift by colour as before. The paper grain is off by day (on light paper it read as dust). The homepage timeline is multiplied into the paper like faint print, each picture dissolving top and bottom, so there are no grey box edges. Dark theme unchanged. Rules in THEME.md (rules 4 and 7).
+Replaces: 2026-11-01 23:00 "Paper by day, a lamp at night", for the light values and rule 4 only.
+Commit: (this commit)
+
 ### 2026-11-02 06:00 IST · design · The homepage strip now includes the makers: da Vinci, Shakespeare, Nolan, Rajamouli, Keeravani, Naval Ravikant
 Why: the brand admires the people behind the work (directors, writers, composers, thinkers) more than the faces on screen. Da Vinci and Shakespeare sit with history (after the Great Wall); Nolan, Rajamouli, Keeravani and Naval Ravikant after the first flight, as makers of the modern age. Same treatment (black and white, blurred, faint); portraits cropped to show the face. Credits on /credits. The founder will update this list.
 Replaces: the 19-picture strip (2026-11-02 05:45), for its contents only.
