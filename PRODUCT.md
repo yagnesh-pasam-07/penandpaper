@@ -176,7 +176,7 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
-### 2026-11-02 13:50 IST · tech · Google sign-in is on; the reader sign-in sheet opens on the page, not inside the header
+### 2026-11-02 13:31 IST · tech · Google sign-in is on; the reader sign-in sheet opens on the page, not inside the header
 Why: Google keys are now set on Vercel (production) and `.env.local`, so "Continue with Google" shows on /login and on the clap sheet. The clap sheet was rendered inside the frosted stories header, and a backdrop-filter makes a fixed child position against that 65 px header instead of the window: on a computer the sheet centred on the header and its top, with the Google button, ran off the screen. It now renders on the page body and scrolls if a window is short. Google sends people back to penandpaper-app.vercel.app from every address (BETTER_AUTH_URL), so the other domains need no extra redirect URIs. Decision tree: a fix and a setting, no new control (steps 1-2); no data change (step 4).
 Replaces: nothing
 
