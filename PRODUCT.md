@@ -50,7 +50,8 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - **Five inks:** Ink, Vermilion (urgent), Cobalt (a decision), Viridian (done), Saffron (an idea). The dots show in the tool bar while drawing, writing or with something picked (it takes the colour). Kept by name, so they re-colour with the theme (THEME.md). The pen's colour and shape are remembered on the device.
 - **Dates and reminders on to-dos** (like Slack): a clock on a to-do opens Today / Tomorrow / Next Monday / In an hour, or a day and an optional time. The note shows a chip ("Today, 6:00 PM"), amber when soon, red when late. With a time, it reminds: on the minute while the paper is open (a toast, or a browser notification if the tab is hidden), otherwise by web push, or email if no device has notifications, from the 9 AM and 9 PM IST jobs (Hobby allows one run a day per job; `/api/cron/reminders` is ready to run hourly on Pro). Once per date; changing the date re-arms it. Drops never take a date (enforced on the server).
 - **Sharing a paper** (Share, top right): invite by email (they sign in with that address and see it read-only at `/drop/shared/<id>`; an email tells them), or turn on **Anyone with the link** (off by default; `/p/<random token>`, read-only, no sign-in, `noindex`; off kills it at once; "Make a new link" replaces it). Shared readers see the notes, text, lines and shapes, the owner's first name, never due dates, other papers or the owner's email. 20 invites a day.
-- **Mentions:** writing `@name@company.com` in a note or text offers "Share this paper with them?" (one tap invites them, view only). It never shares by itself.
+- **Mentions:** typing `@` in written text suggests the people this paper is shared with; mentioning one emails them the line. Writing `@name@company.com` for someone not on it offers "Share this paper with them?" (one tap invites, view only). A mention never shares by itself.
+- **Writing on the paper** (see the PRD below): `/` offers To-do, Remind me, Heading, List, Mention someone. Written text becomes a to-do with a hand-drawn box (`[ ] ` or the To-do chip on picked text) and counts as a to-do everywhere. "… remind me tomorrow at 5" sets the reminder as you write. **⌘Z / ⇧⌘Z** (Ctrl+Z / Ctrl+Y) undo and redo every change on the paper this visit.
 - **Voice, hold to talk** (like Claude's CLI): in any text box (text on the paper, the writer) a tap of Space is a space; **held**, it listens until you let go, takes back the spaces the key typed, shows the words as they're heard and puts them in at the cursor. A **mic** sits beside the cursor for speaking without holding. On bare paper, tap Space for the writer; hold it and the words land as text where the pointer is. Uses the browser's own recogniser (no key), listening continuously while held so a pause doesn't cut it off.
 - **The paper has no header bar:** the logo and paper name float top-left, search, Library and the account top-right, the tools top-centre, and the canvas runs to the top of the screen. Other pages (library, settings, rewind) keep the bar.
 - **Capture surfaces:** the web canvas, the quick box (`/capture`), phone share (`/share`), the Chrome & Edge extension, the Mac menu-bar app. Each tags its thoughts by id prefix (`ext-`, `mac-`, `cap-`, `share-`), which Studio counts.
@@ -110,6 +111,39 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - Exact-time notifications need an hourly job (Vercel Pro); today they arrive at 9 AM or 9 PM IST, whichever comes first after the chosen time. The in-app greeting is always on time.
 - Drops: should a person be able to turn a picture into a to-do (or words into a drop) by hand? Not yet: see the decision tree, step 3.
 
+
+---
+
+## PRD: writing on the paper, the five verbs (2026-11-02)
+
+**Problem.** People plan real projects on the paper (a column per person, rings round what matters, arrows to the next step). Writing there was slow to structure: a thought couldn't become a to-do, a reminder needed the mouse, nobody could be pulled in, and nothing could be undone. Slack canvas, Notion and Things solve this with a `/` menu of thirty blocks. That turns a paper into a document editor, which is the opposite of what we are.
+
+**First principles.** A thinker with a pen does five things to words, and nothing else: **decide** (this is a to-do), **remember** (bring it back at a time), **structure** (a heading, a list), **involve** (this is for someone), and **take back** (undo). Everything else (tables, columns, code, embeds) is layout or storage, and the free canvas already *is* the layout. So: five verbs, each one reachable three ways (typed naturally, from `/`, or with a click), and never a new screen.
+
+**What we build**
+| Verb | Typed | `/` menu | Click |
+| --- | --- | --- | --- |
+| Decide | `[ ] ` at the start | To-do | "To-do" chip on picked text |
+| Remember | `… remind me tomorrow at 5` | Remind me | clock / "+ Date · remind me" |
+| Structure | `• ` (Enter continues the list) | Heading, List | drag the corner to resize |
+| Involve | `@` suggests people on the paper | Mention someone | Share |
+| Take back | ⌘Z / ⇧⌘Z (Ctrl+Y) | | Undo in the toast |
+
+- A written to-do keeps its handwriting: a small hand-drawn box in the text's own ink, a red pen tick, the words struck. It counts as a to-do everywhere (Tonight's paper, the morning recall, reminders, strike), enforced on the server.
+- "remind me" understands today, tonight, tomorrow, weekdays, "12 nov", "at 5", "5:30pm", morning/noon/evening and "in 20 minutes". A bare "remind me" is tomorrow 9 AM. The words keep everything before "remind me"; a toast says when, with Change.
+- `@` suggests only people the paper is already shared with (name or email). Mentioning one emails them the line (40 a day). An email typed after `@` for someone not on the paper still only *offers* to share: a mention never shares by itself.
+- Undo covers every change on the paper this visit (add, edit, strike, colour, size, date, move, tidy, crumple, draw, rub out, reshape, a ring and all it carries as one step), 100 steps, and works after the crumple has been sent.
+
+**What we take from others, and what we leave**
+- From **Slack canvas**: `/`, `@`, check lists, dates on a line. *Not* tables, columns, code blocks, video/audio clips, files, channels, profiles: layout and storage, not thinking. Voice is already first-class (hold Space).
+- From **Things / Todoist**: natural-language dates ("remind me friday"). *Not* projects, areas, priorities or tags: the ring and the five inks already do that visually.
+- From **Google Keep**: a to-do box that lives *in* the note, and time reminders. *Not* labels or pinned colours.
+- From **Obsidian**: the idea that a mention is a link between thoughts. Back-links ("where else did I write about Teja?") are the next step, via search, not built yet.
+
+**Not now, on purpose:** tables, embeds, file uploads, sub-tasks, assignees with permissions (a mention is enough), recurring reminders (open question).
+
+**Success:** more to-dos written as text and ticked on the paper; reminders set by typing rather than the picker; fewer "undo" losses (crumple → undo within a visit).
+
 ---
 
 ## Decision tree
@@ -150,6 +184,7 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 | Feature | State | Ticket |
 | --- | --- | --- |
+| Writing on the paper: / menu, @ people, text → to-do, remind me, ⌘Z undo | Built | [#50](https://github.com/yagnesh-pasam-07/penandpaper/issues/50) |
 | Mentions: @name@company.com offers to share the paper with them | Built (branch canvas-planning) | [#49](https://github.com/yagnesh-pasam-07/penandpaper/issues/49) |
 | To-dos: a date and a reminder time (chip, push or email) | Built (branch canvas-planning) | [#48](https://github.com/yagnesh-pasam-07/penandpaper/issues/48) |
 | Canvas: a ring round things holds them; carry it and everything inside moves | Built (branch canvas-planning) | [#47](https://github.com/yagnesh-pasam-07/penandpaper/issues/47) |
@@ -175,6 +210,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-02 13:44 IST · product · Writing on the paper: five verbs, not thirty blocks (/ menu, @ people, text → to-do, remind me, ⌘Z)
+Why: see "PRD: writing on the paper". Slack's canvas menu was studied item by item; only what a thinker does to words made it (decide, remember, structure, involve, take back), each reachable by typing, by `/`, or by a click. Decision tree: serves the loop (step 1: a written to-do is reviewed tonight and comes back; a typed reminder brings it back on time); no new screen or setting, `/` and `@` are menus that appear only while typing (step 2); a new kind `todo` (written text that is a to-do) changes what a thought is, so Tonight's paper, the resurface, the recall, strike and dates all accept it and the server enforces it; pictures stay drops (step 3); no migration, `kind` is plain text (step 4); undo protects words, and a mention never shares by itself (step 5).
+Replaces: 2026-10-31 11:40 · Two kinds of thought (written text was always a drop; it can now be made a to-do by hand, which that entry left open)
 
 ### 2026-11-02 13:35 IST · design · Carrying a ring moves the ring, never the paper
 Why: dragging a ring (or a shape or line) with Select also panned the whole canvas, so everything slid together and the move looked hectic. The page's pan listener is a native one that runs before React's, so the ring's own stopPropagation came too late; pressing a picked line, shape or corner handle now never pans (dragging bare paper still does). Notes carried inside a ring also lost their 200 ms easing while carried, so they stay locked to the ring instead of trailing it. Moving the paper and moving a thing are now separate gestures. Decision tree: a fix, no new control (steps 1-2), no data change (step 4).

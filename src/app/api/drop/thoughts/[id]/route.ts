@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { INKS, MAX_TEXT_SIZE, MAX_THOUGHT, MIN_TEXT_SIZE } from "@/modules/drop/logic";
 import { noStore, requireUser, userFromRequest } from "@/modules/drop/http";
-import { crumpleThought, updateThought } from "@/modules/drop/server";
+import { crumpleThought, setThoughtKind, uncrumpleThought, updateThought } from "@/modules/drop/server";
 
 const patch = z
   .object({
@@ -13,8 +13,12 @@ const patch = z
     color: z.enum(INKS).optional(),
     /** A to-do's day, with or without a time (a reminder); null takes it off. */
     due: z.object({ at: z.iso.datetime({ offset: true }), hasTime: z.boolean() }).nullable().optional(),
+    /** Written text ⇄ a to-do with a checkbox (a hand-cut note stays a note; a picture is always a drop). */
+    kind: z.enum(["text", "todo"]).optional(),
+    /** Takes a crumple back (an undo). */
+    restore: z.literal(true).optional(),
   })
-  .refine((p) => p.text !== undefined || p.status !== undefined || p.size !== undefined || p.color !== undefined || p.due !== undefined);
+  .refine((p) => p.text !== undefined || p.status !== undefined || p.size !== undefined || p.color !== undefined || p.due !== undefined || p.kind !== undefined || p.restore);
 
 const gone = () => Response.json({ error: "That thought isn't on this paper." }, { status: 404 });
 
@@ -24,7 +28,13 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/thoug
   const parsed = patch.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Nothing to change." }, { status: 400 });
   const { id } = await ctx.params;
-  const { paperId, ...change } = parsed.data;
+  const { paperId, kind, restore, ...change } = parsed.data;
+  if (restore) return (await uncrumpleThought(user.id, paperId, id)) ? new Response(null, { status: 204 }) : gone();
+  if (kind) {
+    const k = await setThoughtKind(user.id, paperId, id, kind);
+    if (!k) return gone();
+    if (!Object.values(change).some((v) => v !== undefined)) return Response.json(k, noStore);
+  }
   const thought = await updateThought(user.id, paperId, id, change);
   return thought ? Response.json(thought, noStore) : gone();
 }

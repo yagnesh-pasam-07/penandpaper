@@ -85,8 +85,8 @@ export const dropThoughts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     text: text("text").notNull(),
-    /** "note": a hand-cut note (a to-do unless it holds a picture). "text": words written straight on the paper with the Text tool, a drop. */
-    kind: text("kind", { enum: ["note", "text"] }).notNull().default("note"),
+    /** "note": a hand-cut note (a to-do unless it holds a picture). "text": words written straight on the paper with the Text tool, a drop. "todo": written text with a checkbox, a to-do. */
+    kind: text("kind", { enum: ["note", "text", "todo"] }).notNull().default("note"),
     status: text("status", { enum: ["open", "done"] }).notNull().default("open"),
     shape: integer("shape").notNull().default(0),
     /** When it was dropped. */

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { getPaper } from "./server";
 import type { DropPaper } from "./logic";
@@ -16,7 +16,7 @@ const db = httpDb;
  * Every read checks the share on the server, so a change takes effect on the next request.
  */
 
-export type ShareState = { people: { email: string; createdAt: string }[]; publicToken: string | null };
+export type ShareState = { people: { email: string; name: string | null; createdAt: string }[]; publicToken: string | null };
 
 async function owned(userId: string, paperId: string) {
   const [p] = await db
@@ -29,8 +29,14 @@ async function owned(userId: string, paperId: string) {
 export async function shareState(userId: string, paperId: string): Promise<ShareState | null> {
   const p = await owned(userId, paperId);
   if (!p) return null;
-  const people = await db.select({ email: dropShares.email, createdAt: dropShares.createdAt }).from(dropShares).where(eq(dropShares.paperId, paperId)).orderBy(asc(dropShares.createdAt));
-  return { people: people.map((r) => ({ email: r.email, createdAt: new Date(r.createdAt).toISOString() })), publicToken: p.publicToken };
+  const { users } = await import("@/db/schema");
+  const people = await db
+    .select({ email: dropShares.email, name: users.name, createdAt: dropShares.createdAt })
+    .from(dropShares)
+    .leftJoin(users, sql`lower(${users.email}) = ${dropShares.email}`)
+    .where(eq(dropShares.paperId, paperId))
+    .orderBy(asc(dropShares.createdAt));
+  return { people: people.map((r) => ({ email: r.email, name: r.name || null, createdAt: new Date(r.createdAt).toISOString() })), publicToken: p.publicToken };
 }
 
 /** Adds a person; false if the paper isn't theirs. Returns whether they were new (so the email goes once). */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { dueLabel } from "./logic";
+import { dueLabel, partsIn, zonedIso } from "./logic";
 
 /** A to-do's date on the note, like Slack's: "Today, 6:00 PM", red once late, warm when soon. */
 export function DueChip({ dueAt, hasTime, tz, onClick }: { dueAt: string; hasTime: boolean; tz: string; onClick?: () => void }) {
@@ -41,20 +41,7 @@ function ClockIcon() {
   );
 }
 
-/** "YYYY-MM-DD" and "HH:MM" in a zone, for the inputs. */
-function partsIn(d: Date, tz: string) {
-  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d).map((x) => [x.type, x.value]));
-  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
-}
-
-/** A wall-clock time in a zone, as an instant (ISO). */
-export function zonedIso(date: string, time: string, tz: string): string {
-  const guess = new Date(`${date}T${time}:00Z`);
-  // How far the zone is from UTC at that moment, then correct once (good across DST edges too).
-  const seen = partsIn(guess, tz);
-  const diff = Date.parse(`${seen.date}T${seen.time}:00Z`) - guess.getTime();
-  return new Date(guess.getTime() - diff).toISOString();
-}
+export { zonedIso };
 
 /**
  * Pick a day, and a time if it should remind you: quick choices first

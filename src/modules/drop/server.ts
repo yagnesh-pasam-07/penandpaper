@@ -323,7 +323,7 @@ export async function updateThought(
         isNull(dropThoughts.crumpledAt),
         // A drop (a picture) is never struck: see isDrop. Its caption can still be edited.
         // Nor does it get a due date: it's kept to look at, not to do.
-        patch.status || patch.due ? and(isNull(dropThoughts.image), eq(dropThoughts.kind, "note")) : undefined,
+        patch.status || patch.due ? and(isNull(dropThoughts.image), inArray(dropThoughts.kind, ["note", "todo"])) : undefined,
       ),
     )
     .returning();
@@ -341,6 +341,29 @@ export async function crumpleThought(userId: string, paperId: string, id: string
     .returning({ id: dropThoughts.id });
   if (rows.length) await touch(paperId);
   return rows.length > 0;
+}
+
+/** Takes a crumple back (an undo): the thought returns exactly as it was. */
+export async function uncrumpleThought(userId: string, paperId: string, id: string): Promise<boolean> {
+  const rows = await db
+    .update(dropThoughts)
+    .set({ crumpledAt: null })
+    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNotNull(dropThoughts.crumpledAt)))
+    .returning({ id: dropThoughts.id });
+  if (rows.length) await touch(paperId);
+  return rows.length > 0;
+}
+
+/** Turns written text into a to-do (a checkbox in front), or back into plain written text. Notes and pictures are left as they are. */
+export async function setThoughtKind(userId: string, paperId: string, id: string, kind: "text" | "todo"): Promise<Thought | null> {
+  const [row] = await db
+    .update(dropThoughts)
+    .set({ kind, ...(kind === "text" ? { status: "open" as const, doneAt: null, dueAt: null, dueHasTime: false, remindedAt: null } : {}) })
+    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image), inArray(dropThoughts.kind, ["text", "todo"])))
+    .returning();
+  if (!row) return null;
+  await touch(paperId);
+  return toThought(row);
 }
 
 /**

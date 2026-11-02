@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, sql, inArray } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { dropPapers, dropPrefs, dropThoughts } from "./schema";
 import { dayRange } from "./tonight";
@@ -30,7 +30,7 @@ export async function resolveResurface(userId: string, thoughtId: string, choice
   const [t] = await db
     .select({ step: dropThoughts.resurfaceStep, at: dropThoughts.resurfaceAt })
     .from(dropThoughts)
-    .where(and(eq(dropThoughts.id, thoughtId), eq(dropThoughts.userId, userId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image), eq(dropThoughts.kind, "note")));
+    .where(and(eq(dropThoughts.id, thoughtId), eq(dropThoughts.userId, userId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image), inArray(dropThoughts.kind, ["note", "todo"])));
   if (!t) return false;
   const next = resolve({ step: t.step, dueAt: t.at }, choice, now);
   await db

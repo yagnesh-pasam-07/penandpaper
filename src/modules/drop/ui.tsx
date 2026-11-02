@@ -13,10 +13,12 @@ import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { uid } from "@/lib/mutations";
 import { viewKey } from "@/components/canvas/view";
 import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from "./chrome";
-import { isDrop, isInk, mentionedEmails, paperTitle, type DropPaper, type InkName, type PaperMeta, type ShapeKind, type Stroke, type Thought, type ThoughtKind } from "./logic";
+import { isDrop, isInk, mentionedEmails, paperTitle, parseReminder, type DropPaper, type InkName, type PaperMeta, type ShapeKind, type Stroke, type Thought, type ThoughtKind } from "./logic";
 import { DueChip, DuePicker } from "./due";
+import { dueLabel } from "./logic";
 import { ShareButton } from "./share-ui";
 import { useReminders } from "./use-reminders";
+import { mentionText, usePeople } from "./use-people";
 import { draggingFiles, imageFiles, shrinkImage, type Picture } from "./image";
 import { PaperBar, SearchButton, UNDO_PAPER_KEY } from "./papers-ui";
 import { TodayThought } from "./today";
@@ -112,7 +114,10 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   // Crumples waiting out their undo window; sent at once if the page goes away.
   const waiting = useRef(new Map<string, () => void>());
+  const cancelCrumple = useRef(new Map<string, () => void>());
   const tz = useViewerTz();
+  // Who "@" can suggest and notify: the people this paper is shared with.
+  const people = usePeople(paperId);
   // The tool in hand (desktop canvas): Select, Text, Draw or the eraser.
   const [tool, setTool] = useState<Tool>("select");
   // Text just placed with the Text tool, open for writing.
@@ -427,6 +432,17 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   const offered = useRef(new Set<string>());
   /** Words with "@name@company.com": offer to share the paper with them (never shares on its own). */
   const offerMentions = (text: string) => {
+    // "@Teja": someone already on the paper. They get a short email with the words (once per name per visit).
+    const named = people.filter((p) => {
+      const handle = mentionText(p).slice(1).toLowerCase();
+      return new RegExp(`(^|\\s)@${handle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w@])`, "i").test(text) && !offered.current.has(`told:${p.email}`);
+    });
+    for (const p of named) {
+      offered.current.add(`told:${p.email}`);
+      void call(`/api/drop/papers/${paperId}/share`, { method: "POST", body: JSON.stringify({ mention: p.email, words: text.slice(0, 400) }) })
+        .then(() => setToast({ text: `${p.name?.split(/\s+/)[0] ?? p.email} will get an email` }))
+        .catch(() => {});
+    }
     const fresh = mentionedEmails(text).filter((e) => !offered.current.has(e) && e !== me.email.toLowerCase());
     if (!fresh.length) return;
     fresh.forEach((e) => offered.current.add(e));
@@ -446,8 +462,76 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     });
   };
 
+  /*
+   * Undo and redo (⌘Z, ⇧⌘Z / Ctrl+Y). Every change records how to take it back
+   * and how to do it again; both go through the same save queue as the change.
+   * Kept for this visit, up to 100 steps. A new change clears what could be redone.
+   */
+  type Step = { undo: () => void; redo: () => void; label: string };
+  const past = useRef<Step[]>([]);
+  const future = useRef<Step[]>([]);
+  // While an undo or redo runs, the changes it makes aren't recorded again.
+  const replaying = useRef(false);
+  const record = (step: Step) => {
+    if (replaying.current) return;
+    past.current.push(step);
+    if (past.current.length > 100) past.current.shift();
+    future.current = [];
+  };
+  const replay = (from: typeof past, to: typeof past, which: "undo" | "redo") => {
+    const step = from.current.pop();
+    if (!step) {
+      setToast({ text: which === "undo" ? "Nothing to undo" : "Nothing to redo" });
+      return;
+    }
+    replaying.current = true;
+    try {
+      step[which]();
+    } finally {
+      replaying.current = false;
+    }
+    to.current.push(step);
+    setToast({ text: `${which === "undo" ? "Undid" : "Redid"}: ${step.label}` });
+  };
+  const historyRef = useRef({ undo: () => {}, redo: () => {} });
+  useEffect(() => {
+    historyRef.current = { undo: () => replay(past, future, "undo"), redo: () => replay(future, past, "redo") };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return;
+      // Text being written keeps its own undo.
+      if ((e.target as HTMLElement | null)?.closest("input, textarea, [contenteditable='true']")) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) historyRef.current.undo();
+      else if ((k === "z" && e.shiftKey) || (k === "y" && e.ctrlKey)) historyRef.current.redo();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /** Crumples at once, no toast (an undo of adding it). */
+  const crumpleNow = (id: string) => {
+    if (!live.current.thoughts.some((x) => x.id === id)) return;
+    playOut(id, CRUMPLE_MS, () => update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) })));
+    void save(() => call(`/api/drop/thoughts/${id}?paper=${paperId}`, { method: "DELETE", keepalive: true }));
+  };
+
+  /** Brings a crumpled thought back (an undo after the crumple was sent). */
+  const uncrumple = (t: Thought) => {
+    update((p) => ({ ...p, thoughts: [...p.thoughts.filter((x) => x.id !== t.id), t] }));
+    briefly(setReturning, [t.id], CRUMPLE_MS);
+    void save(() => call(`/api/drop/thoughts/${t.id}`, { method: "PATCH", body: JSON.stringify({ paperId, restore: true }) }));
+  };
+
   /** Puts a new thought on the paper and saves it; a picture and a spot are optional. */
-  const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number }; kind?: ThoughtKind; id?: string }) => {
+  const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number }; kind?: ThoughtKind; id?: string; color?: InkName; size?: number }) => {
+    // "… remind me tomorrow at 5": the words become a to-do with that reminder.
+    const ask = !extra.image ? parseReminder(value, new Date(), tz) : null;
+    if (ask) value = ask.text;
+    const kind: ThoughtKind = ask && extra.kind === "text" ? "todo" : (extra.kind ?? "note");
     const thought: Thought = {
       id: extra.id ?? uid(),
       text: value,
@@ -458,7 +542,10 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       x: extra.x ?? null,
       y: extra.y ?? null,
       image: extra.image ?? null,
-      kind: extra.kind ?? "note",
+      kind,
+      ...(extra.color && extra.color !== "ink" ? { color: extra.color } : {}),
+      ...(extra.size && extra.size !== 1 ? { size: extra.size } : {}),
+      ...(ask ? { dueAt: ask.at, dueHasTime: true } : {}),
     };
     update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setFresh((f) => new Set(f).add(thought.id));
@@ -469,12 +556,18 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
         call("/api/drop/thoughts", {
           method: "POST",
           body: JSON.stringify({ paperId, id: thought.id, text: thought.text, shape: thought.shape, image: thought.image, x: thought.x, y: thought.y, kind: thought.kind }),
+        }).then(() => {
+          // Colour, size and a reminder go with it once it exists.
+          const more = { ...(thought.color ? { color: thought.color } : {}), ...(thought.size ? { size: thought.size } : {}), ...(ask ? { due: { at: ask.at, hasTime: true } } : {}) };
+          if (Object.keys(more).length) return call(`/api/drop/thoughts/${thought.id}`, { method: "PATCH", body: JSON.stringify({ paperId, ...more }) });
         }),
       () => {
         update((p) => ({ ...p, thoughts: p.thoughts.filter((t) => t.id !== thought.id) }));
         if (extra.from) setDraft((current) => current || value);
       },
     );
+    if (ask) setToast({ text: `I'll remind you ${dueLabel(ask.at, true, new Date(), tz).text}`, action: { label: "Change", run: () => setDueFor(thought.id) } });
+    record({ label: thought.image ? "picture" : "new thought", undo: () => crumpleNow(thought.id), redo: () => uncrumple(thought) });
     return thought.id;
   };
 
@@ -578,6 +671,35 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       () => call(`/api/drop/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ ...change, paperId }) }),
       () => update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? before : t)) })),
     );
+    // Its opposite: every changed field back to what it was.
+    const back: typeof change = {};
+    if (change.text !== undefined) back.text = before.text;
+    if (change.status !== undefined) back.status = before.status;
+    if (change.size !== undefined) back.size = before.size ?? 1;
+    if (change.color !== undefined) back.color = before.color ?? "ink";
+    if (due !== undefined) back.due = before.dueAt ? { at: before.dueAt, hasTime: !!before.dueHasTime } : null;
+    const label = change.text !== undefined ? "edit" : change.status ? (change.status === "done" ? "strike" : "unstrike") : change.size !== undefined ? "resize" : change.color ? "colour" : "date";
+    record({ label, undo: () => patch(id, back), redo: () => patch(id, change) });
+  };
+
+  /** Written text ⇄ a to-do with a box in front (the same words, the same place). */
+  const setKind = (id: string, kind: "text" | "todo") => {
+    const before = live.current.thoughts.find((t) => t.id === id);
+    if (!before || before.kind === kind) return;
+    const after: Thought = { ...before, kind, ...(kind === "text" ? { status: "open", doneAt: null, dueAt: null, dueHasTime: false } : {}) };
+    update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? after : t)) }));
+    void save(
+      () => call(`/api/drop/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ paperId, kind }) }),
+      () => update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? before : t)) })),
+    );
+    record({
+      label: kind === "todo" ? "to-do" : "plain text",
+      undo: () => {
+        setKind(id, before.kind === "todo" ? "todo" : "text");
+        if (before.dueAt && kind === "text") patch(id, { due: { at: before.dueAt, hasTime: !!before.dueHasTime } });
+      },
+      redo: () => setKind(id, kind),
+    });
   };
 
   /** Puts things back exactly as they were in `before` (an undo). */
@@ -594,6 +716,19 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     const t = live.current.thoughts.find((x) => x.id === id);
     if (!t || waiting.current.has(id)) return;
     const before = live.current;
+    record({
+      label: "crumple",
+      undo: () => {
+        // Still in its undo window: nothing was sent yet, just keep it.
+        const pendingSend = waiting.current.get(id);
+        if (pendingSend) {
+          waiting.current.delete(id);
+          cancelCrumple.current.get(id)?.();
+          restore(before, id);
+        } else uncrumple(t);
+      },
+      redo: () => crumpleNow(id),
+    });
     playOut(id, CRUMPLE_MS, () => update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) })));
     const send = () => {
       waiting.current.delete(id);
@@ -603,6 +738,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       );
     };
     const timer = setTimeout(send, UNDO_MS);
+    cancelCrumple.current.set(id, () => clearTimeout(timer));
     waiting.current.set(id, () => {
       clearTimeout(timer);
       send();
@@ -621,6 +757,21 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   /** Saves where thoughts were dragged (or, with null spots, sends them back into rows). */
   const arrange = (placements: { id: string; x: number | null; y: number | null }[], body: object) => {
     const before = live.current;
+    const was = placements.map((pl) => {
+      const t = before.thoughts.find((x) => x.id === pl.id);
+      return { id: pl.id, x: t?.x ?? null, y: t?.y ?? null };
+    });
+    // Back to where they were; ones that were flowing go back to flowing.
+    const backTo = (list: typeof placements) => {
+      const placed = list.filter((p): p is Placement => p.x !== null && p.y !== null);
+      const flowing = list.filter((p) => p.x === null || p.y === null);
+      if (placed.length) arrange(placed, { paperId, placements: placed });
+      if (flowing.length) {
+        update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (flowing.some((f) => f.id === t.id) ? { ...t, x: null, y: null } : t)) }));
+        void save(() => call("/api/drop/arrange", { method: "POST", body: JSON.stringify({ paperId, placements: flowing.map((f) => ({ id: f.id, x: null, y: null })) }) }));
+      }
+    };
+    record({ label: "tidy" in body ? "tidy up" : "move", undo: () => backTo(was), redo: () => arrange(placements, body) });
     const at = new Map(placements.map((p) => [p.id, p]));
     const moved = <T extends { id: string }>(x: T) => (at.has(x.id) ? { ...x, x: at.get(x.id)!.x, y: at.get(x.id)!.y } : x);
     update((p) => ({ ...p, thoughts: p.thoughts.map(moved) }));
@@ -652,14 +803,16 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   const writeText = (id: string, value: string) => {
     const t = live.current.thoughts.find((x) => x.id === id);
     if (!t) return;
+    // "[ ] buy milk" (or "[] …", "- [ ] …") makes it a to-do as it's written.
+    const box = /^\s*(?:-\s*)?\[\s?\]\s*/.exec(value);
+    if (box) value = value.slice(box[0].length);
     if (unsaved.current.has(id) || !t.text) {
       unsaved.current.delete(id);
       update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) }));
-      add(value, { kind: "text", x: t.x, y: t.y, id });
-      // Its colour and size go with it once it has words.
-      if ((t.color && t.color !== "ink") || (t.size && t.size !== 1)) patch(id, { ...(t.color && t.color !== "ink" ? { color: t.color } : {}), ...(t.size && t.size !== 1 ? { size: t.size } : {}) });
+      add(value, { kind: box ? "todo" : "text", x: t.x, y: t.y, id, color: t.color, size: t.size });
       return;
     }
+    if (box && t.kind !== "todo") setKind(id, "todo");
     patch(id, { text: value });
   };
 
@@ -689,6 +842,18 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       () => call("/api/drop/strokes", { method: "POST", body: JSON.stringify({ paperId, ...s }) }),
       () => update((p) => ({ ...p, strokes: (p.strokes ?? []).filter((x) => x.id !== s.id) })),
     );
+    record({ label: s.shape ? "shape" : "line", undo: () => eraseQuiet(s.id), redo: () => unerase(s) });
+  };
+
+  /** Rubs a line out without a toast (an undo of drawing it). */
+  const eraseQuiet = (id: string) => {
+    update((p) => ({ ...p, strokes: (p.strokes ?? []).filter((x) => x.id !== id) }));
+    void save(() => call(`/api/drop/strokes/${id}?paper=${paperId}`, { method: "DELETE" }));
+  };
+  /** Brings a rubbed-out line back. */
+  const unerase = (s: Stroke) => {
+    update((p) => ({ ...p, strokes: [...(p.strokes ?? []).filter((x) => x.id !== s.id), s] }));
+    void save(() => call(`/api/drop/strokes/${s.id}`, { method: "PATCH", body: JSON.stringify({ paperId, restore: true }) }));
   };
 
   /** Rubbed out with the eraser, with a moment to take it back. */
@@ -699,6 +864,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     const back = () => update((p) => ({ ...p, strokes: [...(p.strokes ?? []).filter((x) => x.id !== id), s] }));
     gone();
     void save(() => call(`/api/drop/strokes/${id}?paper=${paperId}`, { method: "DELETE" }), back);
+    record({ label: "rub out", undo: () => unerase(s), redo: () => eraseQuiet(id) });
     setToast({
       text: "Rubbed out",
       undo: () => {
@@ -722,6 +888,8 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       () => call(`/api/drop/strokes/${id}`, { method: "PATCH", body: JSON.stringify({ paperId, ...change }) }),
       () => update((p) => ({ ...p, strokes: (p.strokes ?? []).map((x) => (x.id === id ? before : x)) })),
     );
+    const back = Object.fromEntries(Object.keys(change).map((k) => [k, before[k as keyof Stroke] ?? null])) as typeof change;
+    record({ label: change.points ? "move" : change.color ? "colour" : "words", undo: () => editStroke(id, back), redo: () => editStroke(id, change) });
   };
 
   /**
@@ -761,6 +929,13 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     carryGroup.current = null;
     setCarry(null);
     if (!dx && !dy) return;
+    // The ring and all it holds is one step to undo.
+    const mark = past.current.length;
+    queueMicrotask(() => {
+      const steps = past.current.splice(mark);
+      if (steps.length > 1) record({ label: "move", undo: () => [...steps].reverse().forEach((st) => st.undo()), redo: () => steps.forEach((st) => st.redo()) });
+      else if (steps.length) past.current.push(...steps);
+    });
     const all = live.current.strokes ?? [];
     for (const sid of group.strokeIds) {
       const s = all.find((x) => x.id === sid);
@@ -830,6 +1005,40 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       selected={!stream && picked?.kind === "text" && picked.id === t.id}
       onSelect={() => setPicked({ kind: "text", id: t.id })}
       onResize={(size) => (unsaved.current.has(t.id) ? update((p) => ({ ...p, thoughts: p.thoughts.map((x) => (x.id === t.id ? { ...x, size } : x)) })) : patch(t.id, { size }))}
+      people={people}
+      todo={t.kind === "todo"}
+      done={t.status === "done"}
+      onToggle={() => patch(t.id, { status: t.status === "done" ? "open" : "done" })}
+      onMakeTodo={t.text && !stream ? () => setKind(t.id, t.kind === "todo" ? "text" : "todo") : undefined}
+      footer={
+        t.kind === "todo" ? (
+          <span className="relative inline-block text-[13px] leading-normal">
+            {t.dueAt ? (
+              <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} />
+            ) : (
+              !stream &&
+              picked?.id === t.id && (
+                <button type="button" onClick={() => setDueFor(t.id)} className="rounded-full bg-soft px-2 py-0.5 text-[12px] font-medium text-mute hover:text-ink">
+                  + Date · remind me
+                </button>
+              )
+            )}
+            {dueFor === t.id && (
+              <DuePicker
+                dueAt={t.dueAt ?? null}
+                hasTime={!!t.dueHasTime}
+                tz={tz}
+                onClose={() => setDueFor(null)}
+                onSave={(due) => {
+                  setDueFor(null);
+                  patch(t.id, { due });
+                  if (due?.hasTime) setToast({ text: "I'll remind you then" });
+                }}
+              />
+            )}
+          </span>
+        ) : undefined
+      }
     />
   );
 
@@ -881,7 +1090,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
           <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 flex-col gap-3 sm:hidden`}>
             {onSheet.map((it) => (
               <Fly key={it.id} from={flights.get(it.id)}>
-                <div data-item={it.id}>{it.thought.kind === "text" ? textItem(it.thought, true) : bubble(it.thought, { stream: true })}</div>
+                <div data-item={it.id}>{it.thought.kind === "text" || it.thought.kind === "todo" ? textItem(it.thought, true) : bubble(it.thought, { stream: true })}</div>
               </Fly>
             ))}
           </PaperSurface>
@@ -966,7 +1175,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
             }}
             render={(it) => (
               <Fly from={flights.get(it.id)}>
-                <div data-item={it.id}>{it.thought.kind === "text" ? textItem(it.thought) : bubble(it.thought, { movable: true })}</div>
+                <div data-item={it.id}>{it.thought.kind === "text" || it.thought.kind === "todo" ? textItem(it.thought) : bubble(it.thought, { movable: true })}</div>
               </Fly>
             )}
           />

@@ -281,3 +281,47 @@ describe("mentions", () => {
     expect(mentionedEmails("@teja please")).toEqual([]);
   });
 });
+
+import { parseReminder } from "./logic";
+
+describe("remind me", () => {
+  const now = new Date("2026-11-02T06:00:00Z"); // Mon 11:30 IST
+  const tz = "Asia/Kolkata";
+  const at = (s: string) => parseReminder(s, now, tz)?.at;
+  it("reads the day and time, and keeps the words", () => {
+    expect(parseReminder("call Ravi, remind me tomorrow at 5", now, tz)).toEqual({ text: "call Ravi", at: "2026-11-03T11:30:00.000Z" });
+    expect(at("send deck remind me at 6pm")).toBe("2026-11-02T12:30:00.000Z");
+    expect(at("x remind me 10:30am")).toBe("2026-11-03T05:00:00.000Z"); // already past today
+    expect(at("x remind me friday")).toBe("2026-11-06T03:30:00.000Z"); // 9 AM
+    expect(at("x remind me tonight")).toBe("2026-11-02T14:30:00.000Z");
+    expect(at("x remind me in 2 hours")).toBe("2026-11-02T08:00:00.000Z");
+    expect(at("x remind me 12 nov evening")).toBe("2026-11-12T12:30:00.000Z");
+    expect(at("x remind me")).toBe("2026-11-03T03:30:00.000Z");
+  });
+  it("leaves other words alone", () => {
+    expect(parseReminder("reminders are hard", now, tz)).toBeNull();
+    expect(parseReminder("remind me tomorrow", now, tz)?.text).toBe("remind me tomorrow");
+  });
+});
+
+import { matchPeople, mentionAt, mentionText } from "./use-people";
+
+describe("@ suggestions", () => {
+  const people = [
+    { email: "teja@tilicho.in", name: "Teja Reddy" },
+    { email: "ravi@x.co", name: null },
+    { email: "neha@tilicho.in", name: "Neha" },
+  ];
+  it("finds the @word at the cursor", () => {
+    expect(mentionAt("insights from @te", 17)).toEqual({ start: 14, query: "te" });
+    expect(mentionAt("mail me@x", 9)).toBeNull();
+    expect(mentionAt("@", 1)).toEqual({ start: 0, query: "" });
+  });
+  it("suggests by name or email, and writes a first name", () => {
+    expect(matchPeople(people, "te").map((p) => p.email)).toEqual(["teja@tilicho.in"]);
+    expect(matchPeople(people, "ra").map((p) => p.email)).toEqual(["ravi@x.co"]);
+    expect(matchPeople(people, "").length).toBe(3);
+    expect(mentionText(people[0])).toBe("@Teja");
+    expect(mentionText(people[1])).toBe("@ravi@x.co");
+  });
+});

@@ -25,7 +25,8 @@ export type Thought = {
   dueHasTime?: boolean;
 };
 
-export type ThoughtKind = "note" | "text";
+/** "note": a hand-cut note (a to-do). "text": words written on the paper (a drop). "todo": written text with a checkbox (a to-do that keeps its handwriting). */
+export type ThoughtKind = "note" | "text" | "todo";
 
 /** A line drawn on a paper. Tied at either end to a thought (a connector), or free. */
 export type Stroke = {
@@ -117,6 +118,7 @@ export { firstLink, firstYoutube, isOnlyYoutube, linkify, youtubeId, type TextPa
  * other note is a to-do.
  */
 export function isDrop(t: { image?: string | null; kind?: ThoughtKind | null }): boolean {
+  // "todo" is written text with a checkbox: a to-do, not a drop.
   return Boolean(t.image) || t.kind === "text";
 }
 
@@ -154,6 +156,106 @@ export function dueLabel(dueAt: string, hasTime: boolean, now: Date, tz: string)
   if (hasTime) text += `, ${due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz })}`;
   const late = hasTime ? due.getTime() < now.getTime() : diff < 0;
   return { text, late, soon: !late && diff <= 1 };
+}
+
+/** "YYYY-MM-DD" and "HH:MM" of an instant in a zone. */
+export function partsIn(d: Date, tz: string): { date: string; time: string } {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  );
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+}
+
+/** A wall-clock time in a zone, as an instant (ISO). */
+export function zonedIso(date: string, time: string, tz: string): string {
+  const guess = new Date(`${date}T${time}:00Z`);
+  const seen = partsIn(guess, tz);
+  const diff = Date.parse(`${seen.date}T${seen.time}:00Z`) - guess.getTime();
+  return new Date(guess.getTime() - diff).toISOString();
+}
+
+const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/**
+ * "call Ravi, remind me tomorrow at 5" → the words without the ask, and when.
+ * Understands today / tonight / tomorrow / a weekday / "12 nov", "at 5", "5:30pm",
+ * "17:00", morning / noon / evening, and "in 20 minutes / 2 hours / 3 days".
+ * A day with no time reminds at 9 AM; a time with no day is the next one to come;
+ * "remind me" alone is tomorrow at 9 AM. Null when the words don't ask.
+ */
+export function parseReminder(text: string, now: Date, tz: string): { text: string; at: string } | null {
+  const m = /(?:^|[\s,.;:–—-])remind me\b([\s\S]*)$/i.exec(text);
+  if (!m) return null;
+  const ask = m[1].toLowerCase().replace(/[.!]+$/, " ").trim();
+  const before = text.slice(0, m.index + (/^[\s,.;:–—-]/.test(m[0]) ? 0 : 0)).replace(/[\s,.;:–—-]+$/, "").trim();
+  const rest = before || text.trim();
+
+  const rel = /\bin\s+(\d+|an?|one)\s*(m|mins?|minutes?|h|hrs?|hours?|d|days?)\b/.exec(ask);
+  if (rel) {
+    const n = /^\d+$/.test(rel[1]) ? Number(rel[1]) : 1;
+    const unit = rel[2][0] === "m" ? 60_000 : rel[2][0] === "h" ? 3_600_000 : 86_400_000;
+    return { text: rest, at: new Date(now.getTime() + n * unit).toISOString() };
+  }
+
+  const today = partsIn(now, tz).date;
+  const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+  let day: string | null = null;
+  let time: string | null = null;
+
+  if (/\btomorrow\b|\btmrw\b/.test(ask)) day = addDays(today, 1);
+  else if (/\btoday\b/.test(ask)) day = today;
+  else if (/\btonight\b/.test(ask)) {
+    day = today;
+    time = "20:00";
+  } else {
+    const wd = DAYS.findIndex((d) => new RegExp(`\\b${d.slice(0, 3)}(${d.slice(3)})?\\b`).test(ask));
+    if (wd >= 0) {
+      const nowWd = new Date(`${today}T12:00:00Z`).getUTCDay();
+      day = addDays(today, ((wd - nowWd + 7) % 7) || 7);
+    } else {
+      const dm = /\b(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*(\d{1,2})\b/.exec(ask);
+      if (dm) {
+        const dd = Number(dm[1] ?? dm[4]);
+        const mm = MONTHS.indexOf(dm[2] ?? dm[3]) + 1;
+        let y = Number(today.slice(0, 4));
+        const cand = (yy: number) => `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+        if (cand(y) < today) y += 1;
+        day = cand(y);
+      }
+    }
+  }
+
+  if (!time) {
+    if (/\bmorning\b/.test(ask)) time = "09:00";
+    else if (/\bnoon\b|\blunch\b/.test(ask)) time = "12:00";
+    else if (/\bafternoon\b/.test(ask)) time = "15:00";
+    else if (/\bevening\b/.test(ask)) time = "18:00";
+    else if (/\bnight\b/.test(ask)) time = "20:00";
+    else {
+      const t = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?(?=\s|$)/.exec(ask.replace(/\b\d{1,2}\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/g, ""));
+      const explicit = t && (t[2] || t[3] || /\bat\s+\d/.test(ask));
+      if (t && explicit) {
+        let h = Number(t[1]);
+        const min = t[2] ?? "00";
+        const ap = t[3]?.[0];
+        if (ap === "p" && h < 12) h += 12;
+        if (ap === "a" && h === 12) h = 0;
+        if (!ap && !t[2] && h < 8) h += 12;
+        if (h < 24) time = `${String(h).padStart(2, "0")}:${min}`;
+      }
+    }
+  }
+
+  if (!day && !time) {
+    day = addDays(today, 1);
+    time = "09:00";
+  } else if (!day) {
+    day = zonedIso(today, time!, tz) > now.toISOString() ? today : addDays(today, 1);
+  } else if (!time) time = "09:00";
+  return { text: rest, at: zonedIso(day, time!, tz) };
 }
 
 /** Whether a reminder is owed: it has a time, that time has come (within the window), it's open and not yet reminded. */

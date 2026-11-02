@@ -13,7 +13,7 @@ export type DailyThought = {
   id: string;
   text: string;
   image: string | null;
-  kind: "note" | "text";
+  kind: "note" | "text" | "todo";
   createdAt: string;
   /** "You wrote this 12 days ago". */
   ago: string;

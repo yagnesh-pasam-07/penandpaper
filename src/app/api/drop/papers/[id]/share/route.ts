@@ -21,6 +21,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/drop/papers
 }
 
 const body = z.union([
+  /** Someone already on the paper was @mentioned: tell them, with the words. */
+  z.object({ mention: z.string().trim().max(254), words: z.string().trim().max(400) }),
   z.object({ invite: z.string().trim().max(254) }),
   z.object({ remove: z.string().trim().max(254) }),
   z.object({ link: z.boolean(), reset: z.boolean().optional() }),
@@ -36,6 +38,22 @@ export async function POST(request: Request, ctx: RouteContext<"/api/drop/papers
   if (!parsed.success) return Response.json({ error: "That didn't come through." }, { status: 400 });
   const b = parsed.data;
 
+  if ("mention" in b) {
+    const email = b.mention.toLowerCase();
+    const state = await shareState(user.id, id);
+    if (!state) return gone();
+    // Only people the paper is already shared with: a mention never shares by itself.
+    if (!state.people.some((p) => p.email === email)) return Response.json({ error: "They aren't on this paper yet. Share it with them first." }, { status: 400 });
+    if (!(await allowWithin(`share-mention:${user.id}`, 40, 86_400_000))) return Response.json({ error: "That's a lot of mentions today. Try tomorrow." }, { status: 429 });
+    await sendMail({
+      to: email,
+      subject: `${user.name || user.email} mentioned you`,
+      heading: `${user.name || user.email} mentioned you on a paper`,
+      lines: [`"${b.words}"`],
+      cta: { label: "Open the paper", url: `${appUrl}/drop/shared/${id}` },
+    }).catch(() => false);
+    return Response.json(state, noStore);
+  }
   if ("invite" in b) {
     const email = b.invite.toLowerCase();
     if (email === user.email.toLowerCase()) return Response.json({ error: "That's you: it's already yours." }, { status: 400 });

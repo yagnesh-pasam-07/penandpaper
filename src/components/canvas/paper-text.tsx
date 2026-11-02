@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { clampSize, type InkName } from "@/modules/drop/logic";
+import { matchPeople, mentionAt, mentionText, type Person } from "@/modules/drop/use-people";
 import { MicIcon } from "@/components/icons";
 import { useHoldToTalk } from "@/modules/drop/use-hold-to-talk";
 import { useVoice } from "@/modules/drop/use-voice";
@@ -36,6 +37,12 @@ export function PaperText({
   selected = false,
   onSelect,
   onResize,
+  todo = false,
+  done = false,
+  onToggle,
+  onMakeTodo,
+  footer,
+  people = [],
 }: {
   text: string;
   seed: string;
@@ -58,6 +65,17 @@ export function PaperText({
   onSelect?: () => void;
   /** A corner was dragged: the new size. */
   onResize?: (size: number) => void;
+  /** A to-do: a hand-drawn box in front of the words. */
+  todo?: boolean;
+  done?: boolean;
+  /** Tick or untick the box. */
+  onToggle?: () => void;
+  /** Picked text offers a small box to make it a to-do (or take the box away). */
+  onMakeTodo?: () => void;
+  /** Under the words (a to-do's date chip). */
+  footer?: React.ReactNode;
+  /** Who "@" can suggest: the people this paper is shared with. */
+  people?: Person[];
 }) {
   const [live, setLive] = useState<number | null>(null);
   const shown = live ?? size;
@@ -134,12 +152,34 @@ export function PaperText({
         onFinish={finish}
         // The hint shows only on fresh text just placed, never when editing words already written.
         hint={!text}
+        people={people}
+        onHeading={() => onResize?.(size >= 1.8 ? 1 : 2)}
       />
     );
   }
 
+  const box = todo ? <TodoBox done={done} size={shown} color={color} onToggle={onToggle} /> : null;
   return (
     <div className="relative">
+      {selected && onMakeTodo && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMakeTodo();
+          }}
+          title={todo ? "Make it plain text again" : "Make it a to-do · or type [ ] at the start"}
+          className="absolute -top-9 left-0 flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised px-2 font-sans text-[12px] font-medium whitespace-nowrap text-ink shadow-[0_8px_20px_-12px_var(--shadow)] hover:bg-soft"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="9" height="9" rx="2" />
+            {!todo && <path d="M3.8 6.2l1.6 1.6 3-3.4" />}
+          </svg>
+          {todo ? "Plain text" : "To-do"}
+        </button>
+      )}
+      <div className={todo ? "flex items-start" : undefined} style={todo ? { gap: 10 * shown } : undefined}>
+      {box}
       <div
         ref={self}
         role="button"
@@ -161,11 +201,15 @@ export function PaperText({
             onDelete();
           }
         }}
-        className={`paper-text hand font-note leading-snug break-words whitespace-pre-wrap outline-none ${motion} ${fresh ? "write-on" : ""} ${
+        className={`paper-text hand font-note leading-snug break-words whitespace-pre-wrap outline-none ${motion} ${fresh ? "write-on" : ""} ${done ? "is-done opacity-55" : ""} ${
           selected ? "rounded-md ring-1 ring-red-text/70 ring-offset-4 ring-offset-transparent" : ""
         }`}
       >
-        <HandText text={text} seed={seed} />
+        <span className={todo ? "pen-strike" : undefined}>
+          <HandText text={text} seed={seed} />
+        </span>
+        {footer && <span className="mt-1 block font-sans">{footer}</span>}
+      </div>
       </div>
       {selected && onResize && (
         <button
@@ -195,6 +239,8 @@ function TextEditor({
   style,
   onFinish,
   hint,
+  people,
+  onHeading,
 }: {
   draft: string;
   setDraft: (fn: (d: string) => string) => void;
@@ -202,7 +248,13 @@ function TextEditor({
   style: CSSProperties;
   onFinish: () => void;
   hint: boolean;
+  people: Person[];
+  onHeading: () => void;
 }) {
+  // The "/" menu and "@" suggestions: what's being typed after the trigger, and which row is lit.
+  const [cursor, setCursor] = useState(draft.length);
+  const [lit, setLit] = useState(0);
+  const [shut, setShut] = useState<string | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const id = useId();
   // Where the words go: the cursor when listening started.
@@ -242,6 +294,54 @@ function TextEditor({
     setDraft,
   );
   const heard = voice.interim || outside;
+
+  const slash = slashAt(draft, cursor);
+  const mention = mentionAt(draft, cursor);
+  const commands = slash ? COMMANDS.filter((c) => c.label.toLowerCase().includes(slash.query) || c.keys.some((k) => k.startsWith(slash.query))) : [];
+  const suggestions = mention ? matchPeople(people, mention.query) : [];
+  const menuKey = slash ? `/${slash.start}` : mention ? `@${mention.start}` : null;
+  const open = menuKey !== null && menuKey !== shut && (slash ? commands.length > 0 : suggestions.length > 0);
+  const rows = slash ? commands.length : suggestions.length;
+  const row = Math.min(lit, Math.max(0, rows - 1));
+
+  /** Replaces text[from, cursor) with `insert`, then puts the cursor after it. */
+  const splice = (from: number, insert: string, prefixLine?: string) => {
+    let pos = from + insert.length;
+    setDraft((d) => {
+      let next = d.slice(0, from) + insert + d.slice(cursor);
+      if (prefixLine !== undefined) {
+        const lineStart = next.lastIndexOf("\n", from - 1) + 1;
+        const line = next.slice(lineStart);
+        if (!line.startsWith(prefixLine)) {
+          next = next.slice(0, lineStart) + prefixLine + line;
+          pos += prefixLine.length;
+        }
+      }
+      return next;
+    });
+    requestAnimationFrame(() => {
+      area.current?.focus();
+      area.current?.setSelectionRange(pos, pos);
+      setCursor(pos);
+    });
+  };
+  const choose = (i: number) => {
+    setLit(0);
+    if (slash) {
+      const c = commands[i];
+      if (!c) return;
+      if (c.id === "todo") splice(slash.start, "", "[ ] ");
+      else if (c.id === "list") splice(slash.start, "", "• ");
+      else if (c.id === "heading") {
+        splice(slash.start, "");
+        onHeading();
+      } else if (c.id === "remind") splice(slash.start, (slash.start > 0 && !/\s$/.test(draft.slice(0, slash.start)) ? " " : "") + "remind me ");
+      else if (c.id === "mention") splice(slash.start, "@");
+    } else if (mention) {
+      const p = suggestions[i];
+      if (p) splice(mention.start, `${mentionText(p)} `);
+    }
+  };
   // Leaving the box while listening keeps the words: finish only once they've landed.
   const busy = listening || working;
 
@@ -272,7 +372,12 @@ function TextEditor({
         rows={1}
         placeholder={hint ? "Write, or hold Space to talk…" : undefined}
         readOnly={listening}
-        onChange={(e) => setDraft(() => e.target.value)}
+        onChange={(e) => {
+          setDraft(() => e.target.value);
+          setCursor(e.target.selectionStart ?? e.target.value.length);
+          setLit(0);
+        }}
+        onSelect={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
         onBlur={(e) => {
           // A click on the mic, or words still being heard: keep the pen up.
           if ((e.relatedTarget as HTMLElement | null)?.closest("[data-text-mic]") || busy) return;
@@ -281,6 +386,35 @@ function TextEditor({
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           e.stopPropagation();
+          if (open) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              setLit((row + (e.key === "ArrowDown" ? 1 : rows - 1)) % rows);
+              return;
+            }
+            if (e.key === "Enter" || e.key === "Tab") {
+              e.preventDefault();
+              choose(row);
+              return;
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setShut(menuKey);
+              return;
+            }
+          }
+          // A list keeps going: Enter on a "• " or "[ ] " line starts the next one the same way.
+          if (e.key === "Enter" && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+            const pos = area.current?.selectionStart ?? draft.length;
+            const lineStart = draft.lastIndexOf("\n", pos - 1) + 1;
+            const line = draft.slice(lineStart, pos);
+            const mark = /^(• |\[ \] )/.exec(line)?.[1];
+            if (mark && line.length > mark.length) {
+              e.preventDefault();
+              splice(pos, `\n${mark}`);
+              return;
+            }
+          }
           if (talk.onKeyDown(e)) return;
           // Enter is a new line, as on paper; Esc or ⌘/Ctrl+Enter puts the pen down.
           if (e.key === "Escape" && (listening || working)) {
@@ -298,6 +432,55 @@ function TextEditor({
         style={{ fontSize: style.fontSize, color: style.color, width: `min(${style.maxWidth}px, 80vw)` }}
         className="hand block resize-none overflow-hidden bg-transparent p-0 pr-10 font-note leading-snug caret-red-text outline-none placeholder:font-sans placeholder:text-[15px] placeholder:text-mute/70"
       />
+      {open && (
+        <div
+          role="listbox"
+          aria-label={slash ? "Add" : "Mention someone on this paper"}
+          onPointerDown={(e) => {
+            // Keep the pen up: a click on the menu isn't a click away.
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          className="absolute top-full left-0 z-40 mt-1.5 w-[248px] overflow-hidden rounded-xl border border-line bg-raised py-1 font-sans shadow-[0_18px_40px_-18px_var(--shadow)]"
+        >
+          {slash && <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold tracking-[0.06em] text-mute uppercase">Add</p>}
+          {!slash && <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold tracking-[0.06em] text-mute uppercase">On this paper</p>}
+          {slash
+            ? commands.map((c, i) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="option"
+                  aria-selected={i === row}
+                  onMouseEnter={() => setLit(i)}
+                  onClick={() => choose(i)}
+                  className={`flex w-full items-center gap-3 px-3 py-1.5 text-left text-[14px] ${i === row ? "bg-soft text-ink" : "text-ink"}`}
+                >
+                  <span className="flex size-7 items-center justify-center rounded-md border border-line bg-sheet text-[13px] text-mute">{c.icon}</span>
+                  <span className="flex-1">
+                    <span className="block leading-tight">{c.label}</span>
+                    <span className="block text-[11px] leading-tight text-graphite">{c.hint}</span>
+                  </span>
+                </button>
+              ))
+            : suggestions.map((p, i) => (
+                <button
+                  key={p.email}
+                  type="button"
+                  role="option"
+                  aria-selected={i === row}
+                  onMouseEnter={() => setLit(i)}
+                  onClick={() => choose(i)}
+                  className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] ${i === row ? "bg-soft" : ""}`}
+                >
+                  <span className="flex size-6 items-center justify-center rounded-full bg-red-soft text-[11px] font-semibold text-red-text uppercase">{(p.name ?? p.email)[0]}</span>
+                  <span className="min-w-0 flex-1 truncate text-ink">
+                    {p.name ?? p.email} {p.name && <span className="text-[12px] text-mute">{p.email}</span>}
+                  </span>
+                </button>
+              ))}
+        </div>
+      )}
       {heard && <span style={{ fontSize: style.fontSize }} className="pointer-events-none block font-note leading-snug text-mute/70">{heard}</span>}
       {voice.supported && (
         <button
@@ -330,3 +513,52 @@ function TextEditor({
     </div>
   );
 }
+
+/**
+ * The box in front of a written to-do: drawn by hand in the text's own ink,
+ * the size of a capital letter. Ticked, a red pen stroke goes through it.
+ */
+function TodoBox({ done, size, color, onToggle }: { done: boolean; size: number; color: InkName; onToggle?: () => void }) {
+  const px = Math.round(BASE * size * 0.82);
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={done}
+      aria-label={done ? "Done. Untick" : "Tick it off"}
+      data-drag=""
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle?.();
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      className="group/box shrink-0 cursor-pointer rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-text"
+      style={{ width: px, height: px, marginTop: BASE * size * 0.32 }}
+    >
+      <svg viewBox="0 0 20 20" width={px} height={px} fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3.2 3.6c4.4-.5 9.3-.6 13.6-.2.4 4.3.5 8.7.1 13.1-4.4.5-9 .5-13.4.1-.5-4.3-.6-8.6-.3-13z" style={{ stroke: `var(--ink-${color})` }} strokeWidth={1.6} className="transition-opacity group-hover/box:opacity-70" />
+        {done && <path d="M5 10.4l3.4 3.6L16 4.6" className="ink-draw stroke-red-text" strokeWidth={2.4} pathLength={1} style={{ "--len": 1 } as CSSProperties} />}
+      </svg>
+    </button>
+  );
+}
+
+/** The "/word" being typed at the cursor (after a space or at a line start), if any. */
+function slashAt(text: string, cursor: number): { start: number; query: string } | null {
+  const m = /(^|\s)\/([a-z]*)$/i.exec(text.slice(0, cursor));
+  return m ? { start: cursor - m[2].length - 1, query: m[2].toLowerCase() } : null;
+}
+
+/**
+ * What "/" offers on the paper. Five, on purpose: each one is something a
+ * thinker does (decide, remember, structure, bring someone in), and each is
+ * also a thing you can just type ("[ ] ", "• ", "remind me …", "@").
+ */
+const COMMANDS: { id: "todo" | "remind" | "heading" | "list" | "mention"; label: string; hint: string; keys: string[]; icon: string }[] = [
+  { id: "todo", label: "To-do", hint: "A box to tick · or type [ ]", keys: ["todo", "task", "check"], icon: "☐" },
+  { id: "remind", label: "Remind me", hint: "…tomorrow at 5, friday, in 2 hours", keys: ["remind", "date", "due", "reminder"], icon: "⏰" },
+  { id: "heading", label: "Heading", hint: "Bigger words, to name a part", keys: ["heading", "title", "h1", "big"], icon: "H" },
+  { id: "list", label: "List", hint: "Points · Enter for the next", keys: ["list", "bullet", "points"], icon: "•" },
+  { id: "mention", label: "Mention someone", hint: "Someone this paper is shared with", keys: ["mention", "person", "people", "@"], icon: "@" },
+];

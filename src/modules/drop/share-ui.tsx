@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { call } from "./chrome";
 
-type State = { people: { email: string; createdAt: string }[]; publicToken: string | null };
+type State = { people: { email: string; name: string | null; createdAt: string }[]; publicToken: string | null };
 
 /**
  * Share, top right on the paper: one small sheet with two parts.
@@ -54,6 +54,8 @@ export function ShareSheet({ paperId, onClose, initialEmail = "" }: { paperId: s
     setError("");
     try {
       setState(await call<State>(`/api/drop/papers/${paperId}/share`, { method: "POST", body: JSON.stringify(body) }));
+      // "@" suggestions pick up the change.
+      window.dispatchEvent(new Event("pp-shared"));
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -104,7 +106,15 @@ export function ShareSheet({ paperId, onClose, initialEmail = "" }: { paperId: s
           {state.people.map((p) => (
             <li key={p.email} className="flex items-center gap-2 rounded-lg px-1 py-1 text-[13px]">
               <span className="flex size-6 items-center justify-center rounded-full bg-soft text-[11px] font-semibold text-mute uppercase">{p.email[0]}</span>
-              <span className="min-w-0 flex-1 truncate text-ink">{p.email}</span>
+              <span className="min-w-0 flex-1 truncate text-ink">
+                {p.name ? (
+                  <>
+                    {p.name} <span className="text-mute">{p.email}</span>
+                  </>
+                ) : (
+                  p.email
+                )}
+              </span>
               <span className="text-graphite">can view</span>
               <button type="button" onClick={() => void send({ remove: p.email })} aria-label={`Stop sharing with ${p.email}`} className="rounded-md px-1.5 text-mute hover:bg-red-soft hover:text-red-text">
                 ✕
