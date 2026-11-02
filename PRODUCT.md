@@ -160,6 +160,11 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-02 09:25 IST · product · Studio Overview drops the Insights card
+Why: the writer found the automatic advice ("Act: only 50% of new people wrote…", "Watch…", "Good…") noise next to the numbers themselves; the journey, realtime and charts already show the same facts. The Journey card takes the full width, its two funnels side by side. The insight rules stay in code (unused) in case they come back.
+Replaces: the Insights card on /studio (2026-10 Studio entry).
+Commit: (this commit)
+
 ### 2026-11-02 09:15 IST · design · Studio gets a frame like YouTube Studio: a left rail and full-width pages
 Why: Studio pages sat in a narrow centred column (880–1200 px) with wide empty sides, and each page had its own header, so moving between the overview, the stories list and one story meant going back and forth. Now every Studio page shares one shell: a top bar (pen mark, Studio, View site, Lock), a fixed 240 px left rail with Overview, Stories and every live story listed by name (one click to any story's numbers), and the page using the full width beside it. On a phone the rail becomes a row of tabs under the top bar. A story's page leads with its four headline numbers, then on wide screens puts where readers stop, reading time and daily views on the left and who clapped and read-through by source on the right. The passcode screen keeps the plain bar. Decision tree: 1 serves the writer improving stories; 2 no new control (navigation that already existed, gathered in one place); 3 no; 4 no migration; 5 no.
 Replaces: the per-page centred headers and max-width columns in /studio, /studio/stories and /studio/stories/[id]/reach.

@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { PenIcon } from "@/components/icons";
-import { change, type Insight } from "@/modules/studio/insights";
+import { change } from "@/modules/studio/insights";
 import { studioAdmin, studioConfigured, studioOpen } from "@/modules/studio/gate";
 import { SOURCE_LABEL, studioStats, WINDOW_DAYS, type Metric, type StudioStats } from "@/modules/studio/stats";
 import { currentUser } from "@/server/session";
@@ -61,45 +61,6 @@ function Kpi({ label, value, m, note, digits = 0 }: { label: string; value: numb
       <Delta m={m} />
       {note && <span className="text-[12px] text-mute">{note}</span>}
     </div>
-  );
-}
-
-const TONE: Record<Insight["tone"], { mark: string; label: string; color: string }> = {
-  act: { mark: "●", label: "Act", color: "var(--studio-down)" },
-  watch: { mark: "◆", label: "Watch", color: "#c98500" },
-  good: { mark: "▲", label: "Good", color: "var(--studio-up)" },
-};
-
-function Insights({ list }: { list: Insight[] }) {
-  return (
-    <section aria-labelledby="insights" className={`${card} flex flex-col gap-1 p-5`}>
-      <h2 id="insights" className="pb-2 text-[15px] font-semibold">
-        Insights
-      </h2>
-      {list.length === 0 ? (
-        <p className="text-[14px] text-mute">Nothing moved enough to call out. More people, more signal.</p>
-      ) : (
-        <ul className="flex flex-col divide-y divide-line">
-          {list.slice(0, 6).map((i) => {
-            const t = TONE[i.tone];
-            return (
-              <li key={i.title} className="flex gap-3 py-3">
-                <span aria-hidden="true" className="pt-0.5 text-[12px]" style={{ color: t.color }}>
-                  {t.mark}
-                </span>
-                <span className="flex flex-col gap-0.5">
-                  <span className="text-[14px] font-semibold">
-                    <span className="sr-only">{t.label}: </span>
-                    {i.title}
-                  </span>
-                  <span className="text-[13px] leading-snug text-mute">{i.detail}</span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
   );
 }
 
@@ -197,24 +158,25 @@ function Dashboard({ s }: { s: StudioStats }) {
         <Realtime s={s} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-        <Insights list={s.insights} />
+      <div className="grid gap-5">
         <section aria-labelledby="journey" className={`${card} flex flex-col gap-4 p-5`}>
           <h2 id="journey" className="text-[15px] font-semibold">
             The journey
           </h2>
-          <Funnel
-            steps={[
-              { label: "Joined, last 28 days", value: s.activated.joined },
-              { label: "Wrote a first thought", value: s.activated.wrote },
-            ]}
-          />
-          <Funnel
-            steps={[
-              { label: "Joined 1–5 weeks ago", value: s.retained.cohort },
-              { label: "Still writing a week later", value: s.retained.came_back },
-            ]}
-          />
+          <div className="grid gap-6 md:grid-cols-2">
+            <Funnel
+              steps={[
+                { label: "Joined, last 28 days", value: s.activated.joined },
+                { label: "Wrote a first thought", value: s.activated.wrote },
+              ]}
+            />
+            <Funnel
+              steps={[
+                { label: "Joined 1–5 weeks ago", value: s.retained.cohort },
+                { label: "Still writing a week later", value: s.retained.came_back },
+              ]}
+            />
+          </div>
           <dl className="grid grid-cols-3 gap-3 border-t border-line pt-4">
             <div>
               <dt className="text-[12px] text-mute">Stopped writing</dt>
