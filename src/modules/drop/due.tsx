@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { dueLabel, partsIn, zonedIso } from "./logic";
+import { dueLabel, parseReminder, partsIn, zonedIso } from "./logic";
 
 /** A to-do's date on the note, like Slack's: "Today, 6:00 PM", red once late, warm when soon. */
 export function DueChip({ dueAt, hasTime, tz, onClick }: { dueAt: string; hasTime: boolean; tz: string; onClick?: () => void }) {
@@ -43,9 +43,41 @@ function ClockIcon() {
 
 export { zonedIso };
 
+const WEEK = ["M", "T", "W", "T", "F", "S", "S"];
+const TIMES: [string, string][] = [
+  ["09:00", "9 AM"],
+  ["12:00", "Noon"],
+  ["15:00", "3 PM"],
+  ["18:00", "6 PM"],
+  ["21:00", "9 PM"],
+];
+const plusDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const weekdayOf = (d: string) => (new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7; // Monday = 0
+const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+const clock = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "AM" : "PM"}`;
+};
+
+/** A hand-drawn ring, like a red pen circling a day in a diary. */
+function Circled({ seed }: { seed: number }) {
+  const r = (n: number) => ((Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453) % 1) * 0.9;
+  return (
+    <svg viewBox="0 0 36 36" className="pointer-events-none absolute inset-0 size-full" fill="none" aria-hidden="true">
+      <path
+        d={`M${19 + r(1)} ${4.5 + r(2)}c7.6.4 12.8 5.6 12.4 ${12.6 + r(3)}-.5 7.6-6.6 12.6-13.4 12.3C11.3 ${29.2 + r(4)} 5.6 24 5.9 17.6 6.2 10.4 12 5 ${20.6 + r(5)} 5.4`}
+        className="stroke-red-text"
+        strokeWidth={1.9}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /**
- * Pick a day, and a time if it should remind you: quick choices first
- * (Today, Tomorrow, Next Monday), then the exact day and time. One small card.
+ * When it should come back: like a page of a pocket diary. Write it in your
+ * own words ("fri 5pm", "in 2 hours"), tap a quick day, or circle one on the
+ * month; a time is a tap too. One line at the top says exactly when.
  */
 export function DuePicker({
   dueAt,
@@ -61,9 +93,12 @@ export function DuePicker({
   onClose: () => void;
 }) {
   const now = new Date();
-  const start = partsIn(dueAt ? new Date(dueAt) : now, tz);
-  const [date, setDate] = useState(start.date);
-  const [time, setTime] = useState(hasTime ? start.time : "");
+  const today = partsIn(now, tz).date;
+  const start = dueAt ? partsIn(new Date(dueAt), tz) : null;
+  const [day, setDay] = useState<string | null>(start?.date ?? null);
+  const [time, setTime] = useState<string | null>(hasTime && start ? start.time : null);
+  const [month, setMonth] = useState((start?.date ?? today).slice(0, 7));
+  const [words, setWords] = useState("");
   const card = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,60 +114,183 @@ export function DuePicker({
     };
   }, [onClose]);
 
-  const dayOffset = (n: number) => partsIn(new Date(now.getTime() + n * 86_400_000), tz).date;
-  const nextMonday = () => {
-    const wd = new Date(`${partsIn(now, tz).date}T12:00:00Z`).getUTCDay();
-    return dayOffset(((8 - wd) % 7) || 7);
+  // Words typed win: "fri 5pm" is read the same way "remind me fri 5pm" is.
+  const heard = words.trim() ? parseReminder(`x remind me ${words}`, now, tz) : null;
+  const heardParts = heard ? partsIn(new Date(heard.at), tz) : null;
+  const finalDay = heardParts?.date ?? day;
+  const finalTime = heardParts ? heardParts.time : time;
+  const ready = !!finalDay;
+  const when = finalDay ? dueLabel(zonedIso(finalDay, finalTime ?? "00:00", tz), !!finalTime, now, tz).text : null;
+
+  const save = () => {
+    if (!finalDay) return;
+    onSave({ at: zonedIso(finalDay, finalTime ?? "00:00", tz), hasTime: !!finalTime });
   };
-  const save = (d: string, t: string) => onSave({ at: zonedIso(d, t || "00:00", tz), hasTime: !!t });
-  const quick: [string, string, string][] = [
-    ["Today", dayOffset(0), ""],
-    ["Tomorrow", dayOffset(1), ""],
-    ["Next Monday", nextMonday(), ""],
-    ["In an hour", ...(Object.values(partsIn(new Date(now.getTime() + 3_600_000), tz)) as [string, string])],
+  const pick = (d: string, t?: string | null) => {
+    setWords("");
+    setDay(d);
+    setMonth(d.slice(0, 7));
+    if (t !== undefined) setTime(t);
+  };
+
+  const nextMonday = plusDays(today, ((7 - weekdayOf(today)) % 7) || 7);
+  const inHour = partsIn(new Date(now.getTime() + 3_600_000), tz);
+  const quick: { label: string; sub: string; run: () => void; on: boolean }[] = [
+    { label: "Today", sub: shortDay(today).split(" ")[0], run: () => pick(today), on: !heard && day === today },
+    { label: "Tomorrow", sub: shortDay(plusDays(today, 1)).split(" ")[0], run: () => pick(plusDays(today, 1)), on: !heard && day === plusDays(today, 1) },
+    { label: "Next Mon", sub: `${Number(nextMonday.slice(8))} ${shortDay(nextMonday).split(" ")[2]}`, run: () => pick(nextMonday), on: !heard && day === nextMonday },
+    { label: "In 1 hr", sub: clock(inHour.time), run: () => pick(inHour.date, inHour.time), on: false },
   ];
+
+  // The month as a diary page: Monday first, blanks before the 1st.
+  const first = `${month}-01`;
+  const lead = weekdayOf(first);
+  const daysIn = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+  const cells: (string | null)[] = [...Array(lead).fill(null), ...Array.from({ length: daysIn }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`)];
+  const shiftMonth = (n: number) => {
+    const d = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1));
+    setMonth(d.toISOString().slice(0, 7));
+  };
+  const monthName = new Date(`${first}T12:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
     <div
       ref={card}
       role="dialog"
-      aria-label="Due date and reminder"
+      aria-label="When should it come back?"
       data-no-pan=""
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
-      className="absolute top-full left-0 z-40 mt-2 w-[260px] rounded-2xl border border-line bg-raised p-3 font-sans shadow-[0_18px_40px_-18px_var(--shadow)]"
+      className="absolute top-full left-0 z-40 mt-2 w-[300px] overflow-hidden rounded-2xl border border-line bg-raised font-sans text-ink shadow-[0_24px_50px_-22px_var(--shadow)]"
     >
-      <div className="mb-2 grid grid-cols-2 gap-1.5">
-        {quick.map(([label, d, t]) => (
-          <button key={label} type="button" onClick={() => save(d, t)} className="rounded-lg bg-soft px-2 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-red-soft hover:text-red-text">
-            {label}
-          </button>
-        ))}
+      {/* The answer first, in the hand the note is written in. */}
+      <div className="border-b border-line bg-sheet px-4 pt-3.5 pb-3">
+        <p className="text-[11px] font-semibold tracking-[0.08em] text-mute uppercase">Bring it back</p>
+        <p className={`font-hand text-[26px] leading-tight ${when ? "text-red-text" : "text-graphite"}`}>{when ?? "when?"}</p>
+        <label htmlFor="due-words" className="sr-only">
+          Say when
+        </label>
+        <input
+          id="due-words"
+          autoFocus
+          value={words}
+          onChange={(e) => setWords(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && ready) {
+              e.preventDefault();
+              save();
+            }
+          }}
+          placeholder="Type it: fri 5pm, in 2 hours, 12 nov…"
+          className="mt-1.5 h-9 w-full rounded-lg border border-line bg-raised px-2.5 text-[14px] placeholder:text-mute focus:border-line-strong focus:outline-none"
+        />
       </div>
-      <label className="mb-1 block text-[12px] text-mute" htmlFor="due-date">
-        Day
-      </label>
-      <input id="due-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mb-2 h-9 w-full rounded-lg border border-line-strong bg-sheet px-2 text-[14px] text-ink" />
-      <label className="mb-1 block text-[12px] text-mute" htmlFor="due-time">
-        Remind me at <span className="text-graphite">(optional)</span>
-      </label>
-      <input id="due-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className="mb-3 h-9 w-full rounded-lg border border-line-strong bg-sheet px-2 text-[14px] text-ink" />
-      <div className="flex items-center gap-2">
-        <button type="button" disabled={!date} onClick={() => save(date, time)} className="h-9 rounded-[10px] bg-ink px-3.5 text-sm font-semibold text-bg disabled:opacity-40">
-          Save
-        </button>
+
+      <div className="flex flex-col gap-3 px-4 py-3">
+        <div className="grid grid-cols-4 gap-1.5">
+          {quick.map((q) => (
+            <button
+              key={q.label}
+              type="button"
+              onClick={q.run}
+              className={`flex flex-col items-start rounded-xl px-2 py-1.5 text-left whitespace-nowrap transition-colors ${q.on ? "bg-red-soft text-red-text" : "bg-soft hover:bg-red-soft hover:text-red-text"}`}
+            >
+              <span className="text-[12px] leading-tight font-semibold">{q.label}</span>
+              <span className="text-[11px] leading-tight opacity-70">{q.sub}</span>
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-hand text-[18px] text-ink">{monthName}</span>
+            <span className="flex">
+              <button type="button" onClick={() => shiftMonth(-1)} disabled={month <= today.slice(0, 7)} aria-label="Previous month" className="size-7 rounded-lg text-mute hover:bg-soft hover:text-ink disabled:opacity-30">
+                ‹
+              </button>
+              <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month" className="size-7 rounded-lg text-mute hover:bg-soft hover:text-ink">
+                ›
+              </button>
+            </span>
+          </div>
+          <div className="grid grid-cols-7 text-center text-[11px] text-graphite">
+            {WEEK.map((w, i) => (
+              <span key={i} className="py-0.5">
+                {w}
+              </span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 text-center">
+            {cells.map((d, i) =>
+              d ? (
+                <button
+                  key={d}
+                  type="button"
+                  disabled={d < today}
+                  onClick={() => pick(d)}
+                  aria-pressed={finalDay === d}
+                  aria-label={shortDay(d)}
+                  className={`relative mx-auto flex size-8 items-center justify-center text-[13px] tabular-nums disabled:text-graphite/40 ${
+                    finalDay === d ? "font-semibold text-red-text" : d === today ? "font-semibold text-ink underline decoration-red-text/60 decoration-2 underline-offset-4" : "text-ink hover:text-red-text"
+                  }`}
+                >
+                  {Number(d.slice(8))}
+                  {finalDay === d && <Circled seed={Number(d.slice(8))} />}
+                </button>
+              ) : (
+                <span key={`b${i}`} />
+              ),
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1 text-[11px] font-semibold tracking-[0.08em] text-mute uppercase">Remind me at</p>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setWords("");
+                setTime(null);
+              }}
+              className={`rounded-full px-2.5 py-1 text-[12px] font-medium ${!finalTime ? "bg-ink text-bg" : "bg-soft text-mute hover:text-ink"}`}
+            >
+              Any time
+            </button>
+            {TIMES.map(([t, label]) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  setWords("");
+                  if (!day) setDay(heardParts?.date ?? today);
+                  setTime(t);
+                }}
+                className={`rounded-full px-2.5 py-1 text-[12px] font-medium ${finalTime === t ? "bg-red text-on-red" : "bg-soft text-ink hover:bg-red-soft hover:text-red-text"}`}
+              >
+                {label}
+              </button>
+            ))}
+            {finalTime && !TIMES.some(([t]) => t === finalTime) && <span className="rounded-full bg-red px-2.5 py-1 text-[12px] font-medium text-on-red">{clock(finalTime)}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 border-t border-line px-4 py-2.5">
         {dueAt && (
-          <button type="button" onClick={() => onSave(null)} className="h-9 rounded-[10px] px-3 text-sm font-medium text-red-text hover:bg-red-soft">
+          <button type="button" onClick={() => onSave(null)} className="h-9 rounded-[10px] px-2 text-[13px] font-medium text-red-text hover:bg-red-soft">
             Remove
           </button>
         )}
-        <span className="flex-1" />
-        <button type="button" onClick={onClose} className="h-9 rounded-[10px] px-2 text-sm text-mute hover:text-ink">
+        <span className="flex-1 text-[11px] leading-snug text-graphite">{finalTime ? "A nudge then, here or by email." : "On its day, in your morning."}</span>
+        <button type="button" onClick={onClose} className="h-9 rounded-[10px] px-2.5 text-[13px] text-mute hover:text-ink">
           Cancel
         </button>
+        <button type="button" disabled={!ready} onClick={save} className="h-9 rounded-[10px] bg-red px-3.5 text-[13px] font-semibold text-on-red disabled:opacity-40">
+          Set
+        </button>
       </div>
-      <p className="mt-2 text-[11px] leading-snug text-graphite">With a time, it reminds you on this device (and by email if notifications are off).</p>
     </div>
   );
 }
