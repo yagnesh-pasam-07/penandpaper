@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Logo } from "@/components/ui";
 import { readLabel } from "@/modules/stories/logic";
 import { CHANNEL_LABEL, readThrough, SOURCE_LABEL, type Channel, type Source } from "@/modules/stories/reach";
 import { allReach, clapsByStory, totalsByStory } from "@/modules/stories/reach-server";
@@ -10,6 +9,7 @@ import { allStories } from "@/modules/stories/server";
 import { writerOrPage } from "@/modules/stories/studio-gate";
 import { newStory } from "./actions";
 import { ImportForm } from "./import-form";
+import { StudioShell } from "../shell";
 
 export const metadata: Metadata = { title: "Stories · Studio", robots: { index: false, follow: false } };
 
@@ -23,19 +23,21 @@ async function List() {
   if (!writer || typeof writer !== "object" || !("id" in writer)) return writer;
   const [list, totals, all, claps] = await Promise.all([allStories(), totalsByStory(), allReach(), clapsByStory()]);
   const n = (v: number) => v.toLocaleString("en-IN");
+  const rail = list.filter((s) => s.state === "published").map((s) => ({ id: s.id, title: s.title }));
   return (
-    <main className="mx-auto flex w-full max-w-[880px] flex-col gap-8 px-4 pt-8 pb-24 sm:px-8">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-semibold tracking-[-0.02em]">Stories</h1>
-          <p className="text-[14px] text-mute">Write, schedule one a week, and see them at /stories.</p>
-        </div>
+    <StudioShell
+      section="stories"
+      title="Stories"
+      subtitle="Write, schedule one a week, and see them at /stories."
+      stories={rail}
+      actions={
         <form action={newStory}>
-          <button type="submit" className="h-11 rounded-full bg-ink px-5 text-[15px] font-semibold text-bg">
+          <button type="submit" className="h-10 rounded-full bg-ink px-5 text-[14px] font-semibold text-bg">
             Write a story
           </button>
         </form>
-      </div>
+      }
+    >
       <section aria-label="All stories" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: "Views", value: n(all.views) },
@@ -99,27 +101,14 @@ async function List() {
         ))}
       </ul>
       <ImportForm />
-    </main>
+    </StudioShell>
   );
 }
 
 export default function StudioStoriesPage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-bg">
-      <header className="border-b border-line">
-        <div className="mx-auto flex h-14 w-full max-w-[880px] items-center gap-3 px-4 sm:px-8">
-          <Link href="/studio">
-            <Logo size="sm" />
-          </Link>
-          <span className="text-[14px] text-mute">Studio</span>
-          <Link href="/stories" className="ml-auto text-[14px] text-mute hover:text-ink">
-            View /stories →
-          </Link>
-        </div>
-      </header>
-      <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
-        <List />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="min-h-dvh bg-bg" aria-busy="true" />}>
+      <List />
+    </Suspense>
   );
 }

@@ -198,6 +198,15 @@ export async function allStories(): Promise<DraftRow[]> {
   return rows.map((r) => ({ id: r.id, slug: r.slug, title: r.title, state: storyState(r.status, r.publishAt), publishAt: r.publishAt?.toISOString() ?? null, updatedAt: r.updatedAt.toISOString(), readingMinutes: r.readingMinutes }));
 }
 
+/** Live stories for Studio's rail, newest first. */
+export async function liveStoriesForRail(): Promise<{ id: string; title: string }[]> {
+  try {
+    return (await allStories()).filter((s) => s.state === "published").map((s) => ({ id: s.id, title: s.title }));
+  } catch {
+    return [];
+  }
+}
+
 async function freeSlug(title: string, exceptId?: string): Promise<string> {
   const base = slugify(title || "untitled");
   const taken = await httpDb

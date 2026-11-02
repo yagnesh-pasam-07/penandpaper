@@ -8,9 +8,10 @@ import { change, type Insight } from "@/modules/studio/insights";
 import { studioAdmin, studioConfigured, studioOpen } from "@/modules/studio/gate";
 import { SOURCE_LABEL, studioStats, WINDOW_DAYS, type Metric, type StudioStats } from "@/modules/studio/stats";
 import { currentUser } from "@/server/session";
-import { leave } from "./actions";
 import { Bars, RankBars, Rhythm, TabbedChart } from "./charts";
 import { GateForm } from "./gate-form";
+import { StudioShell, studioNumbers as numbers, studioVars } from "./shell";
+import { liveStoriesForRail } from "@/modules/stories/server";
 
 export const metadata: Metadata = { title: "Studio · Pen & Paper", robots: { index: false, follow: false } };
 
@@ -20,8 +21,6 @@ export const metadata: Metadata = { title: "Studio · Pen & Paper", robots: { in
  * arrow so colour never carries the meaning alone. The blue was validated
  * against both surfaces (dataviz palette checks).
  */
-const studioVars = "[--studio-blue:#2a78d6] [--studio-up:#0b7a0b] [--studio-down:#c43333] [[data-theme=dark]_&]:[--studio-blue:#3987e5] [[data-theme=dark]_&]:[--studio-up:#3fbf3f] [[data-theme=dark]_&]:[--studio-down:#e66767]";
-const numbers = "[font-family:var(--font-inter),var(--font-instrument),system-ui,sans-serif] [font-feature-settings:'tnum'_1,'cv11'_1]";
 const card = "rounded-2xl border border-line bg-sheet";
 
 function ago(iso: string | null): string {
@@ -182,7 +181,7 @@ function Dashboard({ s }: { s: StudioStats }) {
   const monthlyPeople = s.monthly.map((m) => ({ label: month(m.month).toLocaleDateString("en-GB", { month: "long", year: "numeric" }), short: month(m.month).toLocaleDateString("en-GB", { month: "short" }), value: m.people }));
 
   return (
-    <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 pb-20 sm:px-8">
+    <div className="flex flex-col gap-5">
       {/* Headline numbers, each against the 28 days before. */}
       <section aria-label={`Last ${WINDOW_DAYS} days`} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Writers" value={s.writers.now} m={s.writers} note={`${pct(s.writers.now, s.people)}% of ${s.people} accounts`} />
@@ -317,7 +316,7 @@ function Dashboard({ s }: { s: StudioStats }) {
       <p className="text-center text-[12px] text-mute">
         Days in {s.zone}. A writer is someone who saved a thought. Changes compare the last {WINDOW_DAYS} days with the {WINDOW_DAYS} before.
       </p>
-    </main>
+    </div>
   );
 }
 
@@ -325,7 +324,7 @@ function Dashboard({ s }: { s: StudioStats }) {
 function Brand({ right }: { right?: React.ReactNode }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-3 px-4 sm:px-8">
+      <div className="flex h-14 w-full items-center gap-3 px-4 lg:px-6">
         <Link href="/drop" aria-label="Back to my paper" className="flex items-center gap-2 rounded-md">
           <span className="text-red-text">
             <PenIcon size={20} />
@@ -352,19 +351,19 @@ async function Studio() {
   }
   if (!studioConfigured()) {
     return (
-      <>
+      <div className={`flex min-h-dvh flex-col bg-bg ${studioVars} ${numbers}`}>
         <Brand />
         <main className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
           <h1 className="text-[28px] font-semibold">Studio is off</h1>
           <p className="text-mute">Set STUDIO_PASSCODE on the server to switch it on.</p>
         </main>
-      </>
+      </div>
     );
   }
   // Lock two, the passcode.
   if (!(await studioOpen(admin.id))) {
     return (
-      <>
+      <div className={`flex min-h-dvh flex-col bg-bg ${studioVars} ${numbers}`}>
         <Brand />
         <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pb-24 text-center">
           <span className="flex flex-col gap-2">
@@ -373,43 +372,22 @@ async function Studio() {
           </span>
           <GateForm />
         </main>
-      </>
+      </div>
     );
   }
-  const stats = await studioStats();
+  const [stats, rail] = await Promise.all([studioStats(), liveStoriesForRail()]);
   return (
-    <>
-      <Brand
-        right={
-          <>
-            <Link href="/studio/stories" className="h-8 rounded-lg px-3 text-[13px] leading-8 font-medium text-mute hover:bg-soft hover:text-ink">
-              Stories
-            </Link>
-            <span className="text-[12px] text-mute max-sm:hidden">Last {WINDOW_DAYS} days</span>
-            <form action={leave}>
-              <button type="submit" className="h-8 rounded-lg px-3 text-[13px] font-medium text-mute hover:bg-soft hover:text-ink">
-                Lock
-              </button>
-            </form>
-          </>
-        }
-      />
-      <div className="mx-auto w-full max-w-[1200px] px-4 pt-6 pb-4 sm:px-8">
-        <h1 className="text-[26px] font-semibold tracking-[-0.02em]">Overview</h1>
-        <p className="text-[14px] text-mute">How Pen &amp; Paper is growing, and what to do next.</p>
-      </div>
+    <StudioShell section="overview" title="Overview" subtitle={`How Pen & Paper is growing, and what to do next · last ${WINDOW_DAYS} days`} stories={rail}>
       <Dashboard s={stats} />
-    </>
+    </StudioShell>
   );
 }
 
 /** /studio: for the admin account, with its passcode. The numbers that say whether Pen & Paper is becoming a habit, and what to do next. */
 export default function StudioPage() {
   return (
-    <div className={`flex min-h-dvh flex-col bg-bg ${studioVars} ${numbers}`}>
-      <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
-        <Studio />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="min-h-dvh bg-bg" aria-busy="true" />}>
+      <Studio />
+    </Suspense>
   );
 }
