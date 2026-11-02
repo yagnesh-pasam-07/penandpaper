@@ -96,7 +96,7 @@ function FounderNote() {
     <section aria-labelledby="founder-title" className="mx-auto w-full max-w-[720px] px-5 pb-20 sm:px-8 md:pb-28">
       <div className="flex flex-col items-start gap-5 border-t border-line pt-10 sm:flex-row sm:gap-7">
         {/* eslint-disable-next-line @next/next/no-img-element -- a 320 px local photo shown small */}
-        <img src="/creator.jpg" alt="Yagnesh Pasam" width={72} height={72} loading="lazy" className="size-[72px] shrink-0 rounded-full object-cover ring-1 ring-line grayscale" />
+        <img src="/creator.jpg" alt="Yagnesh Pasam" width={72} height={72} loading="lazy" className="size-[72px] shrink-0 rounded-full object-cover ring-1 ring-line" />
         <div className="flex flex-col gap-3">
           <h2 id="founder-title" className="sr-only">
             Why Pen and Paper

@@ -119,7 +119,7 @@ export function Home({ supportEmail }: { supportEmail?: string }) {
               {/* Black and white by CSS, so the colour photo stays untouched. A second link to the same place would be a pointless tab stop, so it is hidden from keyboards and screen readers. */}
               <a href="https://www.linkedin.com/in/yagneshpasam/" target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true" className="shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element -- a 320 px local file shown at 44 px */}
-                <img src="/creator.jpg" alt="" width={44} height={44} loading="lazy" className="size-11 rounded-full object-cover ring-1 ring-line grayscale contrast-[1.05] [[data-theme=dark]_&]:opacity-90" />
+                <img src="/creator.jpg" alt="" width={44} height={44} loading="lazy" className="size-11 rounded-full object-cover ring-1 ring-line [[data-theme=dark]_&]:opacity-90" />
               </a>
               <span className="flex items-center gap-1.5">
                 Made by

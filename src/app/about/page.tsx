@@ -18,7 +18,7 @@ export default function AboutPage() {
         <article className="story-serif mx-auto flex w-full max-w-[680px] flex-col gap-7 px-6 pt-12 pb-24 text-[20px] leading-[1.65] text-ink/90 sm:pt-16">
           <div className="flex items-center gap-5">
             {/* eslint-disable-next-line @next/next/no-img-element -- a 320 px local photo shown small */}
-            <img src="/creator.jpg" alt="Yagnesh Pasam" width={80} height={80} className="size-20 shrink-0 rounded-full object-cover ring-1 ring-line grayscale" />
+            <img src="/creator.jpg" alt="Yagnesh Pasam" width={80} height={80} className="size-20 shrink-0 rounded-full object-cover ring-1 ring-line" />
             <h1 className="text-[40px] leading-[1.05] font-medium tracking-[-0.02em] text-ink sm:text-[48px]">Hi, I&apos;m Yagnesh.</h1>
           </div>
 
