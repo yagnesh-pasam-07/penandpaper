@@ -20,10 +20,10 @@ export function readerId(): string {
 }
 
 /** Tells Story Studio what a reader did. Fire and forget; a failure is ignored. */
-export function track(slug: string, kind: EventKind, extra: { channel?: Channel } = {}): void {
+export function track(slug: string, kind: EventKind, extra: { channel?: Channel; depth?: number; seconds?: number } = {}): void {
   try {
     const params = new URLSearchParams(location.search);
-    const body = JSON.stringify({ slug, kind, reader: readerId(), channel: extra.channel, tag: kind === "view" ? (params.get("s") ?? undefined) : undefined, referrer: kind === "view" ? document.referrer.slice(0, 500) || undefined : undefined });
+    const body = JSON.stringify({ slug, kind, reader: readerId(), channel: extra.channel, depth: extra.depth, seconds: extra.seconds, tag: kind === "view" ? (params.get("s") ?? undefined) : undefined, referrer: kind === "view" ? document.referrer.slice(0, 500) || undefined : undefined });
     void fetch("/api/stories/event", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
   } catch {}
 }

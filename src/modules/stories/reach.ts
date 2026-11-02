@@ -8,7 +8,7 @@ export const CHANNELS = ["whatsapp", "instagram", "copy", "native", "x", "other"
 export type Channel = (typeof CHANNELS)[number];
 export const SOURCES = ["whatsapp", "instagram", "google", "home", "stories", "social", "direct", "other"] as const;
 export type Source = (typeof SOURCES)[number];
-export const EVENT_KINDS = ["view", "read", "listen", "share"] as const;
+export const EVENT_KINDS = ["view", "read", "listen", "share", "depth"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
 export const CHANNEL_LABEL: Record<Channel, string> = { whatsapp: "WhatsApp", instagram: "Instagram", copy: "Copied link", native: "Phone share", x: "X", other: "Other" };
@@ -117,4 +117,60 @@ export function shortCount(n: number): string {
   if (n < 1000) return String(n);
   if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
   return `${Math.round(n / 1000)}K`;
+}
+
+/* ---------- Attention: how far people read, and for how long ---------- */
+
+/** A reader's furthest point in a story: the last block seen (0-based), and active seconds. */
+export type Depth = { block: number; seconds: number };
+
+/** Active reading caps at 2 hours: a tab left open overnight is not attention. */
+export const MAX_ACTIVE_SECONDS = 7200;
+
+/**
+ * The retention curve: for each block, the share of readers (0–100) who
+ * reached it. `depths` is each reader's furthest block. Readers with no depth
+ * row (opened, then left before the first block came into view) count as 0%
+ * reach beyond the top, so the curve starts from everyone who opened it.
+ */
+export function retention(depths: number[], blockCount: number, openers: number): number[] {
+  const total = Math.max(openers, depths.length);
+  if (!total || blockCount <= 0) return Array.from({ length: Math.max(0, blockCount) }, () => 0);
+  const reached = new Array<number>(blockCount).fill(0);
+  for (const d of depths) {
+    const last = Math.min(Math.max(Math.floor(d), -1), blockCount - 1);
+    for (let i = 0; i <= last; i++) reached[i]++;
+  }
+  return reached.map((n) => Math.round((n / total) * 100));
+}
+
+/**
+ * Where the story loses the most people: the block after which the biggest
+ * share of readers stopped, and that share (percentage points). Null when the
+ * curve is flat or empty.
+ */
+export function biggestDrop(curve: number[]): { after: number; lost: number } | null {
+  let best: { after: number; lost: number } | null = null;
+  for (let i = 0; i < curve.length - 1; i++) {
+    const lost = curve[i] - curve[i + 1];
+    if (lost > 0 && (!best || lost > best.lost)) best = { after: i, lost };
+  }
+  return best;
+}
+
+/** The middle value: a typical reader, not skewed by one tab left open. */
+export function median(values: number[]): number {
+  const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  if (!v.length) return 0;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : Math.round((v[m - 1] + v[m]) / 2);
+}
+
+/** "3 min 20 s", "45 s": how long people actually read. */
+export function duration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m} min ${r} s` : `${m} min`;
 }

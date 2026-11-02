@@ -1,4 +1,5 @@
-import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "../../db/schema";
 
 /**
@@ -111,7 +112,11 @@ export const storyEvents = pgTable(
     storyId: uuid("story_id")
       .notNull()
       .references(() => stories.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["view", "read", "listen", "share"] }).notNull(),
+    kind: text("kind", { enum: ["view", "read", "listen", "share", "depth"] }).notNull(),
+    /** For a depth row: the furthest block this reader saw (0-based). One row per reader per story, updated as they read. */
+    depth: integer("depth"),
+    /** For a depth row: active reading seconds (tab visible, reader not idle). */
+    seconds: integer("seconds"),
     /** For a share: whatsapp, instagram, copy, native, x, other. */
     channel: text("channel"),
     /** Where the reader came from: whatsapp, instagram, google, home, stories, direct, other. */
@@ -120,7 +125,12 @@ export const storyEvents = pgTable(
     reader: text("reader").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("story_events_story_idx").on(t.storyId, t.kind), index("story_events_time_idx").on(t.createdAt)],
+  (t) => [
+    index("story_events_story_idx").on(t.storyId, t.kind),
+    index("story_events_time_idx").on(t.createdAt),
+    // One depth row per reader per story, updated in place as they read.
+    uniqueIndex("story_events_depth_uniq").on(t.storyId, t.reader).where(sql`${t.kind} = 'depth'`),
+  ],
 );
 
 /**

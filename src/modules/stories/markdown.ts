@@ -145,3 +145,11 @@ export function pullQuote(body: string, max = 200): string {
   const text = q && q.t === "quote" ? plain(q.c).replace(/\s+/g, " ").trim() : "";
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
+
+/** Plain text of one block, for a short preview (Studio's attention chart). */
+export function blockText(b: Block, max = 140): string {
+  const flat = (c: Inline[]): string => c.map((n) => (n.t === "text" ? n.v : n.t === "br" ? " " : "c" in n ? flat(n.c) : "")).join("");
+  const t = b.t === "img" ? b.caption : b.t === "hr" ? "· · ·" : b.t === "list" ? b.items.map(flat).join(" · ") : flat(b.c);
+  const one = t.replace(/\s+/g, " ").trim();
+  return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
+}

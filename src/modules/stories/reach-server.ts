@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { and, count, countDistinct, desc, eq, gte, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { env } from "@/lib/env";
-import { MAX_CLAPS, type Channel, type EventKind, type Source, type Totals } from "./reach";
+import { MAX_ACTIVE_SECONDS, MAX_CLAPS, type Channel, type EventKind, type Source, type Totals } from "./reach";
 import { users } from "@/db/schema";
 import { stories, storyClaps, storyEvents, storySaves } from "./schema";
 
@@ -19,7 +19,19 @@ export function readerKey(raw: string): string {
  * Records one event. A view, read or listen counts once per reader per story
  * per day (a refresh isn't a second reader); shares all count.
  */
-export async function recordEvent(e: { storyId: string; kind: EventKind; reader: string; channel?: Channel | null; source?: Source | null; device?: "phone" | "desktop" | null }): Promise<void> {
+export async function recordEvent(e: { storyId: string; kind: EventKind; reader: string; channel?: Channel | null; source?: Source | null; device?: "phone" | "desktop" | null; depth?: number; seconds?: number }): Promise<void> {
+  if (e.kind === "depth") {
+    // One row per reader per story; it only ever moves forward (deeper, longer).
+    const depth = Math.max(0, Math.min(Math.floor(e.depth ?? 0), 5000));
+    const seconds = Math.max(0, Math.min(Math.floor(e.seconds ?? 0), MAX_ACTIVE_SECONDS));
+    await httpDb.execute(sql`
+      insert into ${storyEvents} (story_id, kind, reader, device, depth, seconds)
+      values (${e.storyId}::uuid, 'depth', ${e.reader}, ${e.device ?? null}, ${depth}, ${seconds})
+      on conflict (story_id, reader) where kind = 'depth'
+      do update set depth = greatest(${storyEvents.depth}, excluded.depth), seconds = greatest(${storyEvents.seconds}, excluded.seconds)
+    `);
+    return;
+  }
   if (e.kind !== "share") {
     const [dup] = await httpDb
       .select({ id: storyEvents.id })
@@ -217,4 +229,45 @@ export async function savedStories(userId: string): Promise<{ slug: string; titl
     .innerJoin(stories, eq(stories.id, storySaves.storyId))
     .where(and(eq(storySaves.userId, userId), eq(stories.status, "published"), sql`${stories.publishAt} <= now()`))
     .orderBy(desc(storySaves.createdAt));
+}
+
+/**
+ * Attention for one story: each reader's furthest block and active seconds,
+ * and read-through by where they came from (readers who finished ÷ readers
+ * who opened, per source). For the writer only.
+ */
+export async function storyAttention(storyId: string): Promise<{
+  depths: number[];
+  seconds: number[];
+  finishedSeconds: number[];
+  bySource: { source: string; readers: number; finished: number }[];
+}> {
+  const [rows, src] = await Promise.all([
+    httpDb.execute<{ depth: number; seconds: number; finished: boolean }>(sql`
+      select d.depth, d.seconds,
+        exists (select 1 from ${storyEvents} r where r.story_id = d.story_id and r.reader = d.reader and r.kind = 'read') as finished
+      from ${storyEvents} d
+      where d.story_id = ${storyId}::uuid and d.kind = 'depth'
+    `),
+    httpDb.execute<{ source: string | null; readers: number; finished: number }>(sql`
+      with v as (
+        select distinct on (reader) reader, source from ${storyEvents}
+        where story_id = ${storyId}::uuid and kind = 'view'
+        order by reader, created_at
+      )
+      select v.source, count(*)::int as readers,
+        count(*) filter (where exists (select 1 from ${storyEvents} r where r.story_id = ${storyId}::uuid and r.reader = v.reader and r.kind = 'read'))::int as finished
+      from v group by v.source
+    `),
+  ]);
+  const list = <T,>(r: unknown): T[] => ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
+  const d = list<{ depth: number; seconds: number; finished: boolean }>(rows);
+  return {
+    depths: d.map((x) => Number(x.depth ?? 0)),
+    seconds: d.map((x) => Number(x.seconds ?? 0)).filter((x) => x > 0),
+    finishedSeconds: d.filter((x) => x.finished).map((x) => Number(x.seconds ?? 0)).filter((x) => x > 0),
+    bySource: list<{ source: string | null; readers: number; finished: number }>(src)
+      .map((x) => ({ source: x.source ?? "direct", readers: Number(x.readers), finished: Number(x.finished) }))
+      .sort((a, b) => b.readers - a.readers),
+  };
 }

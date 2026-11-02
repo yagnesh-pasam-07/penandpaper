@@ -11,6 +11,8 @@ const body = z.object({
   channel: z.enum(CHANNELS).optional(),
   tag: z.string().max(12).optional(),
   referrer: z.string().max(500).optional(),
+  depth: z.number().int().min(0).max(5000).optional(),
+  seconds: z.number().int().min(0).max(86400).optional(),
 });
 
 /**
@@ -38,6 +40,8 @@ export async function POST(request: Request) {
       channel: e.kind === "share" ? (e.channel ?? "other") : null,
       source: e.kind === "view" ? sourceOf(e.tag, e.referrer, url.hostname) : null,
       device: deviceOf(request.headers.get("user-agent")),
+      depth: e.depth,
+      seconds: e.seconds,
     });
   } catch {
     // Counting must never break reading.

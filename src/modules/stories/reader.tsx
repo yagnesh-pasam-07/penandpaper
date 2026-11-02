@@ -49,29 +49,30 @@ function Inlines({ c }: { c: Inline[] }): ReactNode {
 }
 
 /** One block of a story, typeset for reading. */
-function BlockView({ b, base, sizes, first }: { b: Block; base: MediaBase; sizes: Sizes; first: boolean }) {
+function BlockView({ b, base, sizes, first, index }: { b: Block; base: MediaBase; sizes: Sizes; first: boolean; index?: number }) {
+  const at = index === undefined ? {} : { "data-block": index };
   switch (b.t) {
     case "p":
       return (
-        <p className={first ? "story-dropcap" : undefined}>
+        <p {...at} className={first ? "story-dropcap" : undefined}>
           <Inlines c={b.c} />
         </p>
       );
     case "h":
       return (
-        <h2 className="pt-6 font-sans text-[22px] leading-snug font-semibold tracking-[-0.01em] text-ink sm:text-[24px]">
+        <h2 {...at} className="pt-6 font-sans text-[22px] leading-snug font-semibold tracking-[-0.01em] text-ink sm:text-[24px]">
           <Inlines c={b.c} />
         </h2>
       );
     case "quote":
       return (
-        <blockquote className="my-2 border-l-[3px] border-red pl-5 text-[23px] leading-[1.5] text-ink italic sm:pl-6 sm:text-[26px]">
+        <blockquote {...at} className="my-2 border-l-[3px] border-red pl-5 text-[23px] leading-[1.5] text-ink italic sm:pl-6 sm:text-[26px]">
           <Inlines c={b.c} />
         </blockquote>
       );
     case "list":
       return (
-        <ul className="flex list-disc flex-col gap-2 pl-6 text-[17px] leading-[1.55] marker:text-red-text sm:text-[18px]">
+        <ul {...at} className="flex list-disc flex-col gap-2 pl-6 text-[17px] leading-[1.55] marker:text-red-text sm:text-[18px]">
           {b.items.map((c, i) => (
             <li key={i}>
               <Inlines c={c} />
@@ -81,13 +82,13 @@ function BlockView({ b, base, sizes, first }: { b: Block; base: MediaBase; sizes
       );
     case "hr":
       return (
-        <div role="separator" aria-hidden="true" className="flex justify-center gap-4 py-4 text-[20px] tracking-[0.6em] text-mute">
+        <div {...at} role="separator" aria-hidden="true" className="flex justify-center gap-4 py-4 text-[20px] tracking-[0.6em] text-mute">
           · · ·
         </div>
       );
     case "img":
       return (
-        <figure className="my-2 flex flex-col gap-3">
+        <figure {...at} className="my-2 flex flex-col gap-3">
           <Picture base={base} id={b.id} alt={b.caption || "A picture from the story"} sizes="(max-width: 728px) 100vw, 680px" size={sizes[b.id]} className="rounded-md" />
           {(b.caption || b.credit) && (
             <figcaption className="px-1 text-center font-sans text-[14px] leading-relaxed text-mute">
@@ -248,7 +249,7 @@ export function StoryReader({ story, base, sizes, url, more, count = false, othe
 
       <div className="story-body mx-auto flex w-full max-w-[728px] flex-col gap-8 px-6 pt-10 pb-6 text-[19px] leading-[1.6] tracking-[-0.003em] text-ink/90 sm:text-[20px]">
         {blocks.map((b, i) => (
-          <BlockView key={i} b={b} base={base} sizes={sizes} first={i === firstP} />
+          <BlockView key={i} b={b} base={base} sizes={sizes} first={i === firstP} index={i} />
         ))}
       </div>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daily, deviceOf, isBot, readThrough, shareRate, sourceOf, tagged, whatsappText } from "./reach";
+import { biggestDrop, daily, deviceOf, duration, isBot, median, readThrough, retention, shareRate, sourceOf, tagged, whatsappText } from "./reach";
 
 const own = "penandpaper-app.vercel.app";
 
@@ -86,5 +86,32 @@ describe("claps", () => {
     expect(shortCount(1200)).toBe("1.2K");
     expect(shortCount(3000)).toBe("3K");
     expect(shortCount(15400)).toBe("15K");
+  });
+});
+
+describe("attention", () => {
+  it("retention counts everyone who opened, including those who saw no block", () => {
+    // 4 opened; one left at the top (no depth row), others reached blocks 0, 2 and 4 of 5
+    expect(retention([0, 2, 4], 5, 4)).toEqual([75, 50, 50, 25, 25]);
+  });
+  it("depth beyond the last block is clamped; empty stories give zeros", () => {
+    expect(retention([99], 3, 1)).toEqual([100, 100, 100]);
+    expect(retention([], 3, 0)).toEqual([0, 0, 0]);
+    expect(retention([1], 0, 1)).toEqual([]);
+  });
+  it("finds the paragraph where most people leave", () => {
+    expect(biggestDrop([100, 90, 50, 45])).toEqual({ after: 1, lost: 40 });
+    expect(biggestDrop([100, 100])).toBeNull();
+    expect(biggestDrop([])).toBeNull();
+  });
+  it("median is a typical reader, not the tab left open", () => {
+    expect(median([30, 40, 7200])).toBe(40);
+    expect(median([10, 20])).toBe(15);
+    expect(median([])).toBe(0);
+  });
+  it("durations read like a person says them", () => {
+    expect(duration(45)).toBe("45 s");
+    expect(duration(200)).toBe("3 min 20 s");
+    expect(duration(180)).toBe("3 min");
   });
 });
