@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StoriesShell } from "@/modules/stories/chrome";
+import { Social } from "@/modules/about/social";
 import { WritingJourney } from "@/modules/about/writing-journey";
 import { storyFonts } from "@/modules/stories/fonts";
 
@@ -98,12 +99,10 @@ export default function AboutPage() {
 
           <p>This is just the beginning. Let&apos;s see where it takes us.</p>
 
-          <p className="flex flex-col gap-1 pt-2">
+          <div className="flex flex-col gap-4 pt-2">
             <span>Yagnesh</span>
-            <a href="https://www.linkedin.com/in/yagneshpasam/" target="_blank" rel="noopener noreferrer" className="font-sans text-[15px] text-mute underline underline-offset-4 hover:text-ink">
-              LinkedIn
-            </a>
-          </p>
+            <Social />
+          </div>
         </article>
       </StoriesShell>
     </div>

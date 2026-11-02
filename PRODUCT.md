@@ -160,6 +160,11 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-02 08:55 IST · design · About ends with LinkedIn, Instagram and X, each mark hand-drawn
+Why: readers who like the stories want to follow the writer where he posts photos and thoughts. Three pill links under the signature (LinkedIn, instagram.com/yagnesh.pasam, x.com/YagneshPasam), with the marks drawn as pen strokes in the brand's style rather than pasted brand logos, ink by default and the red pen on hover; rel="me" so profiles can verify each other.
+Replaces: the single plain "LinkedIn" text link on /about.
+Commit: (this commit)
+
 ### 2026-11-02 08:40 IST · product · A story's own page in Studio: who clapped, and its average attention first
 Why: the writer clicked a story and landed in the editor, and could see total claps but not who gave them or how many people that was. Now a published story in the Studio list opens its numbers page (Edit stays a link beside it; drafts still open the editor). The page leads, like YouTube Studio, with the four numbers that say whether a story held people: average attention (mean active reading time against the estimate), average % read (each tracked reader's furthest paragraph as a share of the story, averaged), finished it, and clapped (% of readers). **Who clapped** replaces the chips: every signed-in reader with their photo, name, email, when they last clapped and a bar of their claps out of 50, most first; above it people, claps each, how many gave all 50, and % of readers who clapped; claps from before sign-in was required are counted but unnamed. The list shows claps and people per story. Decision tree: 1 serves the writer improving stories; 2 no new control (a link target changes, one section on an existing page); 3 no; 4 no migration (reads story_claps and story_events as they are); 5 no.
 Replaces: the "Who loved it" chips (2026-11-01 20:00) and the list row opening the editor for published stories.
