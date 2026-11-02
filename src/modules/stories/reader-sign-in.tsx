@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { authClient } from "@/lib/auth-client";
 
 function GoogleMark() {
@@ -57,7 +58,11 @@ export function ReaderSignIn({ reason, onClose }: { reason: keyof typeof WHY; on
   };
 
   const why = WHY[reason];
-  return (
+  // Rendered on <body>, not where it was opened: the stories header is frosted
+  // (backdrop-filter), which makes a "fixed" child sit inside the header's own
+  // 65 px strip, so the sheet was centred there and its top (Google) ran off screen.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--scrim)] font-sans backdrop-blur-[2px] sm:items-center" onClick={onClose}>
       <div
         ref={sheet}
@@ -66,7 +71,7 @@ export function ReaderSignIn({ reason, onClose }: { reason: keyof typeof WHY; on
         aria-labelledby="reader-sign-in-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-[420px] flex-col gap-5 rounded-t-[24px] border border-line bg-bg px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-left outline-none sm:rounded-[24px] sm:pb-6"
+        className="flex max-h-[100dvh] w-full max-w-[420px] flex-col gap-5 overflow-y-auto rounded-t-[24px] border border-line bg-bg px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-left outline-none sm:rounded-[24px] sm:pb-6"
       >
         <span aria-hidden="true" className="mx-auto -mt-2 h-1 w-10 rounded-full bg-line sm:hidden" />
         <div className="flex flex-col gap-1.5">
@@ -105,6 +110,7 @@ export function ReaderSignIn({ reason, onClose }: { reason: keyof typeof WHY; on
           Not now
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
