@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { Logo } from "@/components/ui";
 import { readLabel } from "@/modules/stories/logic";
 import { CHANNEL_LABEL, readThrough, SOURCE_LABEL, type Channel, type Source } from "@/modules/stories/reach";
-import { allReach, totalsByStory } from "@/modules/stories/reach-server";
+import { allReach, clapsByStory, totalsByStory } from "@/modules/stories/reach-server";
 import { allStories } from "@/modules/stories/server";
 import { writerOrPage } from "@/modules/stories/studio-gate";
 import { newStory } from "./actions";
@@ -21,7 +21,7 @@ async function List() {
   await connection();
   const writer = await writerOrPage("/studio/stories");
   if (!writer || typeof writer !== "object" || !("id" in writer)) return writer;
-  const [list, totals, all] = await Promise.all([allStories(), totalsByStory(), allReach()]);
+  const [list, totals, all, claps] = await Promise.all([allStories(), totalsByStory(), allReach(), clapsByStory()]);
   const n = (v: number) => v.toLocaleString("en-IN");
   return (
     <main className="mx-auto flex w-full max-w-[880px] flex-col gap-8 px-4 pt-8 pb-24 sm:px-8">
@@ -55,7 +55,8 @@ async function List() {
         {list.length === 0 && <li className="px-5 py-10 text-center text-mute">No stories yet.</li>}
         {list.map((s) => (
           <li key={s.id}>
-            <Link href={`/studio/stories/${s.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-soft">
+            {/* A live story opens its own page (numbers, who clapped); a draft opens the editor. */}
+            <Link href={s.state === "published" ? `/studio/stories/${s.id}/reach` : `/studio/stories/${s.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-soft">
               <span className={`size-2.5 shrink-0 rounded-full ${DOT[s.state]}`} aria-hidden="true" />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[16px] font-medium">{s.title || "Untitled"}</span>
@@ -75,13 +76,24 @@ async function List() {
                   <span className="flex flex-col">
                     <span className="text-[15px] font-semibold text-ink">{n(totals[s.id]?.shares ?? 0)}</span>shares
                   </span>
+                  <span className="flex flex-col">
+                    <span className="text-[15px] font-semibold text-ink">{n(claps[s.id]?.claps ?? 0)}</span>claps
+                  </span>
+                  <span className="flex flex-col max-sm:hidden">
+                    <span className="text-[15px] font-semibold text-ink">{n(claps[s.id]?.people ?? 0)}</span>clapped
+                  </span>
                 </span>
               )}
             </Link>
             {s.state === "published" && (
-              <Link href={`/studio/stories/${s.id}/reach`} className="block border-t border-line/60 px-5 py-2 text-[13px] text-mute hover:bg-soft hover:text-ink">
-                See reach: where readers came from, and where it was shared →
-              </Link>
+              <span className="flex items-center justify-between border-t border-line/60 px-5 py-2 text-[13px] text-mute">
+                <Link href={`/studio/stories/${s.id}/reach`} className="hover:text-ink">
+                  Open its numbers: who clapped, where readers stop, where it was shared →
+                </Link>
+                <Link href={`/studio/stories/${s.id}`} className="hover:text-ink">
+                  Edit
+                </Link>
+              </span>
             )}
           </li>
         ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biggestDrop, daily, deviceOf, duration, isBot, median, readThrough, retention, shareRate, sourceOf, tagged, whatsappText } from "./reach";
+import { averageRead, biggestDrop, daily, deviceOf, duration, isBot, mean, median, readThrough, retention, shareRate, sourceOf, tagged, whatsappText } from "./reach";
 
 const own = "penandpaper-app.vercel.app";
 
@@ -108,6 +108,16 @@ describe("attention", () => {
     expect(median([30, 40, 7200])).toBe(40);
     expect(median([10, 20])).toBe(15);
     expect(median([])).toBe(0);
+  });
+  it("average read is each reader's share of the story, averaged", () => {
+    expect(averageRead([3, 1], 4)).toBe(75);
+    expect(averageRead([99, -1], 4)).toBe(50);
+    expect(averageRead([], 4)).toBe(0);
+    expect(averageRead([2], 0)).toBe(0);
+  });
+  it("mean is the plain average", () => {
+    expect(mean([30, 60])).toBe(45);
+    expect(mean([])).toBe(0);
   });
   it("durations read like a person says them", () => {
     expect(duration(45)).toBe("45 s");

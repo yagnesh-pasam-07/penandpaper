@@ -166,6 +166,22 @@ export function median(values: number[]): number {
   return v.length % 2 ? v[m] : Math.round((v[m - 1] + v[m]) / 2);
 }
 
+/**
+ * Average percentage read (YouTube's "average percentage viewed"): each
+ * tracked reader's furthest block as a share of the story, averaged.
+ */
+export function averageRead(depths: number[], blockCount: number): number {
+  if (!depths.length || blockCount <= 0) return 0;
+  const sum = depths.reduce((t, d) => t + Math.min(Math.max(Math.floor(d) + 1, 0), blockCount) / blockCount, 0);
+  return Math.round((sum / depths.length) * 100);
+}
+
+/** The plain mean, for "average attention" beside the median. */
+export function mean(values: number[]): number {
+  const v = values.filter((x) => Number.isFinite(x));
+  return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+}
+
 /** "3 min 20 s", "45 s": how long people actually read. */
 export function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));

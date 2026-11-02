@@ -194,18 +194,51 @@ export async function claimClaps(anon: string, userId: string): Promise<void> {
   `);
 }
 
-/** Signed-in readers who clapped for a story, most claps first: for the writer only. */
-export async function clappers(storyId: string, limit = 50): Promise<{ name: string; image: string | null; count: number }[]> {
+/** Signed-in readers who clapped for a story, most claps first, with when they last clapped: for the writer only. */
+export async function clappers(storyId: string, limit = 200): Promise<{ name: string; email: string; image: string | null; count: number; at: string }[]> {
   try {
-    return await httpDb
-      .select({ name: users.name, image: users.image, count: storyClaps.count })
+    const rows = await httpDb
+      .select({ name: users.name, email: users.email, image: users.image, count: storyClaps.count, at: storyClaps.updatedAt })
       .from(storyClaps)
       .innerJoin(users, eq(users.id, storyClaps.userId))
       .where(eq(storyClaps.storyId, storyId))
-      .orderBy(desc(storyClaps.count))
+      .orderBy(desc(storyClaps.count), desc(storyClaps.updatedAt))
       .limit(limit);
+    return rows.map((r) => ({ ...r, at: r.at.toISOString() }));
   } catch {
     return [];
+  }
+}
+
+/** Claps for one story, by people: everyone who clapped, how many were signed in, and the total. */
+export async function clapSummary(storyId: string): Promise<{ people: number; signedIn: number; total: number; full: number }> {
+  try {
+    const [r] = await httpDb
+      .select({
+        people: count(),
+        signedIn: sql<number>`count(${storyClaps.userId})::int`,
+        total: sql<number>`coalesce(sum(${storyClaps.count}), 0)::int`,
+        full: sql<number>`count(*) filter (where ${storyClaps.count} >= ${MAX_CLAPS})::int`,
+      })
+      .from(storyClaps)
+      .where(and(eq(storyClaps.storyId, storyId), sql`${storyClaps.count} > 0`));
+    return { people: Number(r?.people ?? 0), signedIn: Number(r?.signedIn ?? 0), total: Number(r?.total ?? 0), full: Number(r?.full ?? 0) };
+  } catch {
+    return { people: 0, signedIn: 0, total: 0, full: 0 };
+  }
+}
+
+/** Claps and clapping people per story, for the Studio list. */
+export async function clapsByStory(): Promise<Record<string, { claps: number; people: number }>> {
+  try {
+    const rows = await httpDb
+      .select({ storyId: storyClaps.storyId, claps: sql<number>`coalesce(sum(${storyClaps.count}), 0)::int`, people: count() })
+      .from(storyClaps)
+      .where(sql`${storyClaps.count} > 0`)
+      .groupBy(storyClaps.storyId);
+    return Object.fromEntries(rows.map((r) => [r.storyId, { claps: Number(r.claps), people: Number(r.people) }]));
+  } catch {
+    return {};
   }
 }
 

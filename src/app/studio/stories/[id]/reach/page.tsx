@@ -6,9 +6,9 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { Logo } from "@/components/ui";
 import { readLabel, storyDate } from "@/modules/stories/logic";
-import { biggestDrop, CHANNEL_LABEL, daily, duration, median, readThrough, retention, shareRate, SOURCE_LABEL, type Channel, type Source } from "@/modules/stories/reach";
+import { averageRead, biggestDrop, CHANNEL_LABEL, daily, duration, MAX_CLAPS, mean, median, readThrough, retention, shareRate, SOURCE_LABEL, type Channel, type Source } from "@/modules/stories/reach";
 import { blockText, parse } from "@/modules/stories/markdown";
-import { clappers, storyAttention, storyReach } from "@/modules/stories/reach-server";
+import { clappers, clapSummary, storyAttention, storyReach } from "@/modules/stories/reach-server";
 import { storyForWriter } from "@/modules/stories/server";
 import { writerOrPage } from "@/modules/stories/studio-gate";
 import { Bars } from "../../../charts";
@@ -68,7 +68,7 @@ async function Reach({ params }: { params: Promise<{ id: string }> }) {
   if (!z.uuid().safeParse(id).success) notFound();
   const s = await storyForWriter(id);
   if (!s) notFound();
-  const [r, fans, att] = await Promise.all([storyReach(id).catch(() => null), clappers(id), storyAttention(id).catch(() => null)]);
+  const [r, fans, att, cl] = await Promise.all([storyReach(id).catch(() => null), clappers(id), storyAttention(id).catch(() => null), clapSummary(id)]);
   if (!r) return <p className="p-10 text-center text-mute">Numbers aren&apos;t available yet.</p>;
   const days = daily(r.daily, 28, new Date());
   const sources = Object.entries(r.bySource)
@@ -89,6 +89,8 @@ async function Reach({ params }: { params: Promise<{ id: string }> }) {
   const quality = (att?.bySource ?? [])
     .filter((x) => x.readers > 0)
     .map((x) => ({ label: SOURCE_LABEL[x.source as Source] ?? x.source, readers: x.readers, pct: Math.round((x.finished / x.readers) * 100) }));
+  const avgRead = att ? averageRead(att.depths, blocks.length) : 0;
+  const avgSeconds = att ? mean(att.seconds) : 0;
   const phone = r.byDevice.phone ?? 0;
   const people = phone + (r.byDevice.desktop ?? 0);
   return (
@@ -115,12 +117,28 @@ async function Reach({ params }: { params: Promise<{ id: string }> }) {
         </span>
       </div>
 
+      {/* The headline, like YouTube Studio's: did it hold people, and how long. */}
+      <section className={`${card} grid grid-cols-2 gap-5 p-5 sm:grid-cols-4`}>
+        {[
+          { label: "Average attention", value: avgSeconds ? duration(avgSeconds) : "—", note: estimate ? `of a ${duration(estimate)} read` : "time actually reading" },
+          { label: "Average read", value: att && att.depths.length ? `${avgRead}%` : "—", note: "of the story, per reader" },
+          { label: "Finished it", value: `${readThrough(r)}%`, note: `${fmt(r.reads)} of ${fmt(r.readers)} readers` },
+          { label: "Clapped", value: r.readers ? `${Math.round((cl.people / r.readers) * 100)}%` : "—", note: `${fmt(cl.people)} people, ${fmt(cl.total)} claps` },
+        ].map((k) => (
+          <div key={k.label} className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-mute">{k.label}</span>
+            <span className="text-[34px] leading-none font-semibold tracking-[-0.02em]">{k.value}</span>
+            <span className="text-[12px] text-mute">{k.note}</span>
+          </div>
+        ))}
+      </section>
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Kpi label="Views" value={fmt(r.views)} note="opened, once a day per reader" />
         <Kpi label="Readers" value={fmt(r.readers)} note="different people" />
         <Kpi label="Read to the end" value={`${readThrough(r)}%`} note={`${fmt(r.reads)} finished it`} />
         <Kpi label="Shares" value={fmt(r.shares)} note={`${shareRate(r)} per 100 readers`} />
-        <Kpi label="Claps" value={fmt(s.claps)} note="up to 50 from each reader" />
+        <Kpi label="Claps" value={fmt(s.claps)} note={cl.people ? `from ${fmt(cl.people)} ${cl.people === 1 ? "person" : "people"}` : "no claps yet"} />
         <Kpi label="Listens" value={fmt(r.listens)} note={s.audioId ? "pressed Listen" : "no recording yet"} />
       </div>
 
@@ -188,20 +206,61 @@ async function Reach({ params }: { params: Promise<{ id: string }> }) {
         <Ranked title="Where it was shared" rows={channels} unit="shares" empty="Nobody has shared it yet." />
       </div>
 
-      <section className={`${card} flex flex-col gap-3 p-5`}>
-        <h2 className="text-[15px] font-semibold">Who loved it</h2>
+      <section id="claps" className={`${card} flex flex-col gap-5 p-5`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[15px] font-semibold">Who clapped</h2>
+          <span className="text-[13px] text-mute">
+            {cl.people ? `${fmt(cl.total)} claps from ${fmt(cl.people)} ${cl.people === 1 ? "person" : "people"}` : "No claps yet"}
+          </span>
+        </div>
+        {cl.people > 0 && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "People", value: fmt(cl.people) },
+              { label: "Claps each", value: (cl.total / cl.people).toFixed(1), note: `of ${MAX_CLAPS} possible` },
+              { label: "Gave all 50", value: fmt(cl.full), note: cl.full ? "moved the most" : undefined },
+              { label: "Clapped, of readers", value: r.readers ? `${Math.round((cl.people / r.readers) * 100)}%` : "—" },
+            ].map((k) => (
+              <div key={k.label} className="flex flex-col gap-1 rounded-xl bg-soft p-3">
+                <span className="text-[12px] text-mute">{k.label}</span>
+                <span className="text-[22px] leading-none font-semibold">{k.value}</span>
+                {k.note && <span className="text-[11px] text-mute">{k.note}</span>}
+              </div>
+            ))}
+          </div>
+        )}
         {fans.length === 0 ? (
-          <p className="text-[14px] text-mute">No claps from signed-in readers yet.</p>
+          <p className="text-[14px] text-mute">{cl.people ? "Claps from before sign-in was required have no name." : "When a signed-in reader claps, their name appears here."}</p>
         ) : (
-          <ul className="flex flex-wrap gap-2">
+          <ul className="flex flex-col divide-y divide-line/70">
             {fans.map((f, i) => (
-              <li key={i} className="flex items-center gap-2 rounded-full border border-line py-1 pr-3 pl-1 text-[14px]">
-                <span className="flex size-7 items-center justify-center rounded-full bg-soft text-[12px] font-semibold">{f.name.trim().charAt(0).toUpperCase()}</span>
-                {f.name}
-                <span className="text-mute">👏 {f.count}</span>
+              <li key={i} className="flex items-center gap-3 py-2.5">
+                {f.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- the reader's Google photo, small
+                  <img src={f.image} alt="" width={32} height={32} referrerPolicy="no-referrer" className="size-8 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-soft text-[13px] font-semibold">{f.name.trim().charAt(0).toUpperCase()}</span>
+                )}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[14px] font-medium">{f.name}</span>
+                  <span className="truncate text-[12px] text-mute">
+                    {f.email} · {new Date(f.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}
+                  </span>
+                </span>
+                <span className="flex w-28 shrink-0 items-center gap-2 max-sm:w-16">
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-soft max-sm:hidden">
+                    <span className="block h-full rounded-full" style={{ width: `${(f.count / MAX_CLAPS) * 100}%`, background: "var(--studio-blue)" }} />
+                  </span>
+                  <span className="w-8 text-right text-[14px] font-semibold">{f.count}</span>
+                </span>
               </li>
             ))}
           </ul>
+        )}
+        {cl.people > cl.signedIn && fans.length > 0 && (
+          <p className="text-[12px] text-mute">
+            {fmt(cl.people - cl.signedIn)} more clapped before sign-in was required, so they have no name.
+          </p>
         )}
       </section>
 
