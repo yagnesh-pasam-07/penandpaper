@@ -22,8 +22,12 @@ export type VoiceState =
   | { kind: "transcribing" }
   | { kind: "failed"; message: string; canRetry: boolean };
 
-/** "speech" is the browser's own recogniser (no key); "recorder" records and sends the audio to the server. */
-export type VoiceEngine = "speech" | "recorder";
+/**
+ * "whisper": records and sends to the server's Whisper (accurate, knows names),
+ * while the browser's recogniser shows words live as a preview. "speech": the
+ * browser's recogniser alone (no server key). "recorder": recording only.
+ */
+export type VoiceEngine = "whisper" | "speech" | "recorder";
 
 const noSubscribe = () => () => {};
 
@@ -37,6 +41,33 @@ function recorderMime(): string | null {
 function detectEngine(): VoiceEngine | null {
   if (speechCtor(window as never)) return "speech";
   return recorderMime() ? "recorder" : null;
+}
+
+/** Whether the server has a Whisper key: asked once per page, shared by every voice box. */
+let whisperKnown: boolean | null = null;
+const whisperListeners = new Set<() => void>();
+function subscribeWhisper(onChange: () => void) {
+  whisperListeners.add(onChange);
+  if (whisperKnown === null) {
+    whisperKnown = false;
+    void fetch("/api/drop/transcribe", { cache: "force-cache" })
+      .then((r) => r.json())
+      .then((b: { whisper?: boolean }) => {
+        whisperKnown = !!b.whisper;
+        whisperListeners.forEach((f) => f());
+      })
+      .catch(() => {});
+  }
+  return () => whisperListeners.delete(onChange);
+}
+
+/**
+ * Words on the paper, for Whisper to know which names to expect. The page
+ * sets it (the paper's thoughts); a voice box reads it when it sends.
+ */
+let vocabulary = "";
+export function setVoiceVocabulary(words: string) {
+  vocabulary = words.slice(0, 4000);
 }
 
 const LANG_EVENT = "pp-voice-lang";
@@ -73,8 +104,11 @@ function readLang(): SpeechLang {
  * Space on the canvas), so a pause mid-sentence doesn't end it.
  */
 export function useVoice(onText: (text: string) => void, { hold = false }: { hold?: boolean } = {}) {
-  const engine = useSyncExternalStore<VoiceEngine | null>(noSubscribe, detectEngine, () => null);
+  const base = useSyncExternalStore<VoiceEngine | null>(noSubscribe, detectEngine, () => null);
   const mime = useSyncExternalStore(noSubscribe, recorderMime, () => null);
+  const whisper = useSyncExternalStore(subscribeWhisper, () => !!whisperKnown, () => false);
+  // With a Whisper key and a microphone, Whisper writes the words; the browser only previews them.
+  const engine: VoiceEngine | null = whisper && mime ? "whisper" : base;
   const lang = useSyncExternalStore<SpeechLang>(subscribeLang, readLang, () => "en");
   const [state, setState] = useState<VoiceState>({ kind: "idle" });
   const [elapsed, setElapsed] = useState(0);
@@ -89,6 +123,9 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const recognizer = useRef<SpeechRecognizerLike | null>(null);
   const heard = useRef("");
+  // In "whisper" mode, what the browser heard live (shown while recording; a fallback if the server fails).
+  const preview = useRef("");
+  const previewRec = useRef<SpeechRecognizerLike | null>(null);
   const failure = useRef<string | null>(null);
   const onTextRef = useRef(onText);
   useEffect(() => {
@@ -180,13 +217,26 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
       const ext = audioExtension(blob.type) ?? "webm";
       const form = new FormData();
       form.append("audio", blob, `voice.${ext}`);
+      if (vocabulary) form.append("hints", vocabulary);
       const res = await fetch("/api/drop/transcribe", { method: "POST", body: form, cache: "no-store" });
       const body = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
       if (res.ok && body.text) {
         kept.current = null;
         retried.current = false;
+        preview.current = "";
+        setInterim("");
         setState({ kind: "idle" });
         onTextRef.current(body.text);
+        return;
+      }
+      // Whisper couldn't: the browser's own words, if it heard any, are better than nothing.
+      if (preview.current.trim() && res.status !== 401) {
+        const words = preview.current.trim();
+        preview.current = "";
+        setInterim("");
+        kept.current = null;
+        setState({ kind: "idle" });
+        onTextRef.current(words);
         return;
       }
       if (res.status === 401) setState({ kind: "failed", message: "Sign in again to use your voice.", canRetry: false });
@@ -198,7 +248,7 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
     }
   }, []);
 
-  const startRecorder = useCallback(async () => {
+  const startRecorder = useCallback(async (withPreview = false) => {
     if (!mime || recorder.current) return;
     cancelled.current = false;
     kept.current = null;
@@ -218,9 +268,16 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
     rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
     rec.onstop = () => {
       recorder.current = null;
+      const live = previewRec.current;
+      previewRec.current = null;
+      try {
+        live?.stop();
+      } catch {}
       release();
       if (cancelled.current) {
         chunks.current = [];
+        preview.current = "";
+        setInterim("");
         setState({ kind: "idle" });
         return;
       }
@@ -229,6 +286,35 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
       void send(blob);
     };
     rec.start();
+    // Live words while you speak (the browser's quick guess); Whisper's answer replaces them.
+    preview.current = "";
+    setInterim("");
+    const Ctor: SpeechRecognizerCtor | null = withPreview ? speechCtor(window as never) : null;
+    if (Ctor) {
+      try {
+        const live = new Ctor();
+        live.lang = speechTag(lang, navigator.language);
+        live.continuous = true;
+        live.interimResults = true;
+        live.onresult = (event) => {
+          preview.current = spokenSoFar(resultsFrom(event.results));
+          setInterim(preview.current);
+        };
+        live.onerror = () => {};
+        live.onend = () => {
+          // Chrome ends a recogniser after a pause; keep it going while still recording.
+          if (previewRec.current === live && recorder.current?.state === "recording") {
+            try {
+              live.start();
+            } catch {}
+          }
+        };
+        previewRec.current = live;
+        live.start();
+      } catch {
+        previewRec.current = null;
+      }
+    }
     const startedAt = Date.now();
     setElapsed(0);
     setState({ kind: "recording" });
@@ -237,7 +323,7 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
       setElapsed(ms);
       if (ms >= MAX_RECORDING_MS && rec.state === "recording") rec.stop();
     }, 200);
-  }, [mime, release, send]);
+  }, [mime, release, send, lang]);
 
   /* ---------- Shared controls ---------- */
 
@@ -262,10 +348,15 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
       release();
       setState({ kind: "idle" });
     }
+    try {
+      previewRec.current?.abort();
+    } catch {}
+    previewRec.current = null;
   }, [release]);
 
   const toggle = useCallback(() => {
     if (recognizer.current || recorder.current) stop();
+    else if (engine === "whisper") void startRecorder(true);
     else if (engine === "speech") startSpeech();
     else if (engine === "recorder") void startRecorder();
   }, [engine, startRecorder, startSpeech, stop]);
@@ -273,7 +364,8 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
   /** Starts listening if it isn't already (for push-to-talk). */
   const start = useCallback(() => {
     if (recognizer.current || recorder.current) return;
-    if (engine === "speech") startSpeech();
+    if (engine === "whisper") void startRecorder(true);
+    else if (engine === "speech") startSpeech();
     else if (engine === "recorder") void startRecorder();
   }, [engine, startRecorder, startSpeech]);
 
@@ -290,6 +382,10 @@ export function useVoice(onText: (text: string) => void, { hold = false }: { hol
       recognizer.current?.abort();
       recognizer.current = null;
       if (recorder.current?.state === "recording") recorder.current.stop();
+      try {
+        previewRec.current?.abort();
+      } catch {}
+      previewRec.current = null;
       release();
     },
     [release],

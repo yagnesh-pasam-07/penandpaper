@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MODELS, transcribeAudio } from "./transcribe";
+import { GROQ_MODEL, MODELS, transcribeAudio, transcribeBest, vocabularyPrompt } from "./transcribe";
 import { audioExtension, baseType, checkAudio, cleanTranscript, failureResponse, formatElapsed, insertAtCursor, MAX_AUDIO_BYTES, pickRecorderMime } from "./voice";
 
 describe("audio types and limits", () => {
@@ -57,7 +57,7 @@ describe("recorder type", () => {
 describe("failure responses", () => {
   it("never carries the provider's own words", () => {
     expect(failureResponse("not_configured")).toEqual({ status: 503, error: "Voice isn't set up on this server yet." });
-    expect(failureResponse("key_refused")).toEqual({ status: 503, error: "Voice is set up, but the server's OpenAI key was refused. Check the key." });
+    expect(failureResponse("key_refused")).toEqual({ status: 503, error: "Voice is set up, but the server's speech key was refused. Check GROQ_API_KEY." });
     expect(failureResponse("bad_audio").status).toBe(422);
     expect(failureResponse("timeout").status).toBe(504);
     expect(failureResponse("upstream").status).toBe(502);
@@ -109,5 +109,43 @@ describe("transcribeAudio", () => {
     expect(await transcribeAudio(audio, "webm", "k", vi.fn().mockRejectedValue(timeout))).toEqual({ ok: false, reason: "timeout" });
     expect(JSON.stringify(err.mock.calls)).not.toContain("sk-secret");
     err.mockRestore();
+  });
+});
+
+describe("transcribeBest", () => {
+  it("uses Groq's Whisper first, with the vocabulary as the prompt", async () => {
+    const f = vi.fn().mockResolvedValue(reply(200, { text: "call Teja" }));
+    expect(await transcribeBest(audio, "webm", { groq: "gsk", openai: "sk" }, "Teja, Manikanta.", f)).toEqual({ ok: true, text: "call Teja" });
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("https://api.groq.com/openai/v1/audio/transcriptions");
+    expect((init.body as FormData).get("model")).toBe(GROQ_MODEL);
+    expect((init.body as FormData).get("prompt")).toBe("Teja, Manikanta.");
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+  it("falls back to OpenAI when Groq is down or not set up, never for a bad recording", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const down = vi.fn().mockResolvedValueOnce(reply(503, "x")).mockResolvedValueOnce(reply(200, { text: "hi" }));
+    expect(await transcribeBest(audio, "webm", { groq: "gsk", openai: "sk" }, undefined, down)).toEqual({ ok: true, text: "hi" });
+    expect(down.mock.calls[1][0]).toBe("https://api.openai.com/v1/audio/transcriptions");
+    const none = vi.fn().mockResolvedValue(reply(200, { text: "yo" }));
+    expect(await transcribeBest(audio, "webm", { openai: "sk" }, undefined, none)).toEqual({ ok: true, text: "yo" });
+    const bad = vi.fn().mockResolvedValue(reply(400, "bad"));
+    expect(await transcribeBest(audio, "webm", { groq: "gsk", openai: "sk" }, undefined, bad)).toEqual({ ok: false, reason: "bad_audio" });
+    expect(bad).toHaveBeenCalledTimes(1);
+    err.mockRestore();
+  });
+});
+
+describe("vocabularyPrompt", () => {
+  it("lists names from the paper, mentions and given words first", () => {
+    const p = vocabularyPrompt(["get the KT from Rohan and insights from Sravanthi", "ask @teja and Manikanta", "Payroll testing with Manikanta"], ["Yagnesh"]);
+    expect(p?.startsWith("Yagnesh, ")).toBe(true);
+    expect(p).toContain("Manikanta");
+    expect(p).toContain("Rohan");
+    expect(p).toContain("teja");
+    expect(p).not.toContain("Payroll"); // a sentence start, not a name
+  });
+  it("is nothing when there are no names", () => {
+    expect(vocabularyPrompt(["all lower case here"])).toBeUndefined();
   });
 });

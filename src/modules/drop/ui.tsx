@@ -26,7 +26,7 @@ import { TonightButton } from "./tonight-button";
 import { importTryPaper } from "./try-import";
 import { Toolbar, TOOL_ORDER, type Tool } from "./tools";
 import { useCanvasView, ViewControls } from "./use-view";
-import { useVoice } from "./use-voice";
+import { setVoiceVocabulary, useVoice } from "./use-voice";
 import { PenButton, Writer } from "./writer";
 
 /* ---------- A paper ---------- */
@@ -118,6 +118,10 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   const tz = useViewerTz();
   // Who "@" can suggest and notify: the people this paper is shared with.
   const people = usePeople(paperId);
+  // Whisper is told the names on this paper (and of the people it's shared with), so it spells them right.
+  useEffect(() => {
+    setVoiceVocabulary([...paper.thoughts.map((t) => t.text), ...people.map((p) => (p.name ? `with ${p.name}` : ""))].join("\n"));
+  }, [paper.thoughts, people]);
   // The tool in hand (desktop canvas): Select, Text, Draw or the eraser.
   const [tool, setTool] = useState<Tool>("select");
   // Text just placed with the Text tool, open for writing.

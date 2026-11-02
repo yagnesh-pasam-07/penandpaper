@@ -3,7 +3,7 @@ import { noStore, userFromRequest } from "@/modules/drop/http";
 import { allowWithin } from "@/modules/drop/rate";
 import { canCapture, captureText } from "@/modules/drop/share";
 import { captureThought } from "@/modules/drop/server";
-import { transcribeAudio } from "@/modules/drop/transcribe";
+import { transcribeBest, vocabularyPrompt } from "@/modules/drop/transcribe";
 import { checkAudio, failureResponse, MAX_AUDIO_BYTES, VOICE_PER_WINDOW, VOICE_WINDOW_MS } from "@/modules/drop/voice";
 
 const id = z.string().regex(/^[a-z0-9-]{6,40}$/);
@@ -11,10 +11,19 @@ const id = z.string().regex(/^[a-z0-9-]{6,40}$/);
 const fail = (status: number, error: string, extra?: Record<string, string>) =>
   Response.json({ error }, { status, headers: { "Cache-Control": "no-store", ...extra } });
 
+/** Whether the server can transcribe (a Whisper key is set): the page then records and sends, instead of trusting the browser's recogniser. */
+export async function GET() {
+  return Response.json({ whisper: Boolean(process.env.GROQ_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim()) }, { headers: { "Cache-Control": "public, max-age=300" } });
+}
+
 /**
  * Turns a recording into words. Two kinds of sender, like the quick box:
  * this site's own pages (and the browser extension) with the session cookie,
  * or an app holding a personal access token in `Authorization: Bearer pp_…`.
+ *
+ * Groq's Whisper large-v3-turbo first (free), OpenAI if Groq isn't set up.
+ * `hints` (optional): words from the paper; the names in it are given to
+ * Whisper so they're spelt right.
  *
  * Multipart form: `audio` (the recording), and optionally `save=1` with an `id`
  * (6–40 of a–z, 0–9, hyphen): then the words are also saved as a thought on
@@ -45,7 +54,10 @@ export async function POST(request: Request) {
   const thoughtId = save ? id.safeParse(form.get("id")) : null;
   if (save && !thoughtId?.success) return fail(400, "A saved recording needs an `id`.");
 
-  const result = await transcribeAudio(audio, checked.ext, process.env.OPENAI_API_KEY);
+  // Names to expect: what the page sent (words on this paper), and the speaker's own name.
+  const hints = String(form.get("hints") ?? "").slice(0, 4000);
+  const prompt = vocabularyPrompt(hints ? [hints] : [], [who.user.name?.split(/\s+/)[0] ?? ""].filter(Boolean));
+  const result = await transcribeBest(audio, checked.ext, { groq: process.env.GROQ_API_KEY, openai: process.env.OPENAI_API_KEY }, prompt);
   if (!result.ok) {
     const f = failureResponse(result.reason);
     return fail(f.status, f.error);

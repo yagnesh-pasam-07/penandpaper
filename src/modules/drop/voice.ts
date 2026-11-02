@@ -93,7 +93,7 @@ export function failureResponse(reason: VoiceFailure): { status: number; error: 
     case "not_configured":
       return { status: 503, error: "Voice isn't set up on this server yet." };
     case "key_refused":
-      return { status: 503, error: "Voice is set up, but the server's OpenAI key was refused. Check the key." };
+      return { status: 503, error: "Voice is set up, but the server's speech key was refused. Check GROQ_API_KEY." };
     case "bad_audio":
       return { status: 422, error: "Couldn't read that recording. Try again." };
     case "timeout":
