@@ -454,9 +454,9 @@ function TextEditor({
                   aria-selected={i === row}
                   onMouseEnter={() => setLit(i)}
                   onClick={() => choose(i)}
-                  className={`flex w-full items-center gap-3 px-3 py-1.5 text-left text-[14px] ${i === row ? "bg-soft text-ink" : "text-ink"}`}
+                  className={`flex w-full items-center gap-3 px-3 py-1.5 text-left text-[14px] text-ink ${i === row ? "bg-soft" : ""}`}
                 >
-                  <span className="flex size-7 items-center justify-center rounded-md border border-line bg-sheet text-[13px] text-mute">{c.icon}</span>
+                  <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors ${i === row ? "bg-red-soft text-red-text" : "text-mute"}`}>{ICONS[c.id]}</span>
                   <span className="flex-1">
                     <span className="block leading-tight">{c.label}</span>
                     <span className="block text-[11px] leading-tight text-graphite">{c.hint}</span>
@@ -555,10 +555,46 @@ function slashAt(text: string, cursor: number): { start: number; query: string }
  * thinker does (decide, remember, structure, bring someone in), and each is
  * also a thing you can just type ("[ ] ", "• ", "remind me …", "@").
  */
-const COMMANDS: { id: "todo" | "remind" | "heading" | "list" | "mention"; label: string; hint: string; keys: string[]; icon: string }[] = [
-  { id: "todo", label: "To-do", hint: "A box to tick · or type [ ]", keys: ["todo", "task", "check"], icon: "☐" },
-  { id: "remind", label: "Remind me", hint: "…tomorrow at 5, friday, in 2 hours", keys: ["remind", "date", "due", "reminder"], icon: "⏰" },
-  { id: "heading", label: "Heading", hint: "Bigger words, to name a part", keys: ["heading", "title", "h1", "big"], icon: "H" },
-  { id: "list", label: "List", hint: "Points · Enter for the next", keys: ["list", "bullet", "points"], icon: "•" },
-  { id: "mention", label: "Mention someone", hint: "Someone this paper is shared with", keys: ["mention", "person", "people", "@"], icon: "@" },
+/** Drawn like the tool bar's icons: one ink, round ends, a hand's slight wobble, never an emoji. */
+const ink = { width: 18, height: 18, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+const ICONS = {
+  todo: (
+    <svg {...ink}>
+      <path d="M4.2 4.6c3.6-.4 7.7-.5 11.4-.1.3 3.6.4 7.3 0 10.9-3.7.4-7.5.4-11.2 0-.4-3.6-.5-7.2-.2-10.8z" />
+      <path d="M7 10.2l2.3 2.4 4.6-5.4" />
+    </svg>
+  ),
+  remind: (
+    <svg {...ink}>
+      <path d="M10 4.4c3.5-.1 6 2.5 6 5.9 0 3.3-2.6 5.8-6 5.8s-6-2.5-6-5.8c0-3.4 2.5-5.8 6-5.9z" />
+      <path d="M10 7.2v3.3l2.2 1.4M3.6 5.4l2-1.7M16.4 5.4l-2-1.7" />
+    </svg>
+  ),
+  heading: (
+    <svg {...ink}>
+      <path d="M5 4.6c-.2 3.7-.1 7.4.1 11M5.1 10.2c2-.2 4-.2 6 0M11.2 4.5c-.1 3.8 0 7.4.2 11.1" />
+      <path d="M14.2 9.2l1.8-1.2v7.6" />
+    </svg>
+  ),
+  list: (
+    <svg {...ink}>
+      <circle cx="4.6" cy="6" r=".9" fill="currentColor" />
+      <circle cx="4.6" cy="10.2" r=".9" fill="currentColor" />
+      <circle cx="4.6" cy="14.4" r=".9" fill="currentColor" />
+      <path d="M8 6.1c2.6-.2 5.3-.2 8 0M8 10.2c2.4-.1 4.9-.1 7.2.1M8 14.4c2.6-.2 5.2-.2 7.8 0" />
+    </svg>
+  ),
+  mention: (
+    <svg {...ink}>
+      <path d="M13.2 10.1c0 1.9-1.4 3.2-3.2 3.2s-3.1-1.4-3.1-3.2S8.3 6.9 10 6.9s3.2 1.3 3.2 3.2zM13.2 7.4v3.8c0 1.4.8 2.1 1.7 2.1s1.6-.9 1.6-2.9c0-3.8-2.8-6.4-6.5-6.4S3.5 6.7 3.5 10.3s2.8 6.3 6.5 6.3c1.3 0 2.4-.3 3.3-.8" />
+    </svg>
+  ),
+};
+
+const COMMANDS: { id: keyof typeof ICONS; label: string; hint: string; keys: string[] }[] = [
+  { id: "todo", label: "To-do", hint: "A box to tick · or type [ ]", keys: ["todo", "task", "check"] },
+  { id: "remind", label: "Remind me", hint: "…tomorrow at 5, friday, in 2 hours", keys: ["remind", "date", "due", "reminder"] },
+  { id: "heading", label: "Heading", hint: "Bigger words, to name a part", keys: ["heading", "title", "h1", "big"] },
+  { id: "list", label: "List", hint: "Points · Enter for the next", keys: ["list", "bullet", "points"] },
+  { id: "mention", label: "Mention someone", hint: "Someone this paper is shared with", keys: ["mention", "person", "people", "@"] },
 ];
