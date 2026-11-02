@@ -176,6 +176,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 
 ## Decision log
 
+### 2026-11-02 13:35 IST · design · Carrying a ring moves the ring, never the paper
+Why: dragging a ring (or a shape or line) with Select also panned the whole canvas, so everything slid together and the move looked hectic. The page's pan listener is a native one that runs before React's, so the ring's own stopPropagation came too late; pressing a picked line, shape or corner handle now never pans (dragging bare paper still does). Notes carried inside a ring also lost their 200 ms easing while carried, so they stay locked to the ring instead of trailing it. Moving the paper and moving a thing are now separate gestures. Decision tree: a fix, no new control (steps 1-2), no data change (step 4).
+Replaces: nothing
+
 ### 2026-11-02 13:31 IST · tech · Google sign-in is on; the reader sign-in sheet opens on the page, not inside the header
 Why: Google keys are now set on Vercel (production) and `.env.local`, so "Continue with Google" shows on /login and on the clap sheet. The clap sheet was rendered inside the frosted stories header, and a backdrop-filter makes a fixed child position against that 65 px header instead of the window: on a computer the sheet centred on the header and its top, with the Google button, ran off the screen. It now renders on the page body and scrolls if a window is short. Google sends people back to penandpaper-app.vercel.app from every address (BETTER_AUTH_URL), so the other domains need no extra redirect URIs. Decision tree: a fix and a setting, no new control (steps 1-2); no data change (step 4).
 Replaces: nothing

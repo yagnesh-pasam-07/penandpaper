@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { boundsOf, fitView, HOME, isHome, MAX_ZOOM, MIN_ZOOM, parseView, PATTERN_MIN_ZOOM, wheelFactor, zoomAround, ZOOM_STEP, type Rect, type View } from "@/components/canvas/view";
 
-/** Presses on these never start a pan: they have their own jobs. */
-const OWN = "button, a, input, textarea, select, summary, header, [data-note], [role='dialog'], [role='menu'], [data-no-pan]";
+/**
+ * Presses on these never start a pan: they have their own jobs. This listener is
+ * native and runs before React's, so a component's stopPropagation can't stop it:
+ * anything draggable (a note, a line or shape picked with Select) must be listed here.
+ */
+const OWN = "button, a, input, textarea, select, summary, header, [data-note], [data-ink-hit], [role='dialog'], [role='menu'], [data-no-pan]";
 
 /** A screen point relative to the sheet's origin. */
 function localPoint(origin: HTMLElement | null, clientX: number, clientY: number) {

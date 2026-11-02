@@ -372,6 +372,7 @@ export function InkLayer({
                   width={handle}
                   height={handle}
                   rx={2 / zoom}
+                  data-ink-hit=""
                   onPointerDown={corner(picked, i)}
                   style={{ pointerEvents: "all", cursor: i % 2 === 0 ? "nwse-resize" : "nesw-resize" }}
                   className="fill-sheet stroke-red-text"

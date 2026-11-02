@@ -354,6 +354,8 @@ export function FreeCanvas<T extends Item>({
       {items.map((it) => {
         const b = boxes.get(it.id);
         const dragging = drag?.moving && drag.id === it.id;
+        // Carried inside a ring: follows the pointer exactly, no easing (eased, it trails the ring and looks jittery).
+        const carried = !!offset && (offset.dx !== 0 || offset.dy !== 0) && offset.ids.has(it.id);
         return (
           <div
             key={it.id}
@@ -378,7 +380,9 @@ export function FreeCanvas<T extends Item>({
               dragging
                 ? // Lifted off the sheet: a pencil thought rides on a scrap of white paper.
                   "z-30 cursor-grabbing opacity-95 drop-shadow-[0_18px_22px_var(--shadow)] [&_.is-pencil]:rounded-md! [&_.is-pencil]:bg-sheet!"
-                : `z-0 transition-transform duration-200 ease-out motion-reduce:transition-none`
+                : carried
+                  ? "z-0"
+                  : `z-0 transition-transform duration-200 ease-out motion-reduce:transition-none`
             }`}
           >
             {render(it)}
