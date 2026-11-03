@@ -60,13 +60,13 @@ function clack(hard: boolean, speed = 0) {
 const SOUND_KEY = "pp-reel-sound";
 
 
-/** Sound on or off, remembered on this device; on until someone turns it off. */
+/** Sound on or off, remembered on this device. Off until the visitor turns it on (browsers block sound before a click anyway). */
 const soundListeners = new Set<() => void>();
 const readSound = () => {
   try {
-    return localStorage.getItem(SOUND_KEY) !== "off";
+    return localStorage.getItem(SOUND_KEY) === "on";
   } catch {
-    return true;
+    return false;
   }
 };
 const subscribeSound = (f: () => void) => {
@@ -87,8 +87,8 @@ function writeSound(on: boolean) {
  */
 export function ReelStrip({ children, label }: { children: ReactNode; label: string }) {
   const track = useRef<HTMLUListElement>(null);
-  const sound = useSyncExternalStore(subscribeSound, readSound, () => true);
-  const soundRef = useRef(true);
+  const sound = useSyncExternalStore(subscribeSound, readSound, () => false);
+  const soundRef = useRef(false);
   useEffect(() => {
     soundRef.current = sound;
   }, [sound]);
@@ -199,9 +199,9 @@ export function ReelStrip({ children, label }: { children: ReactNode; label: str
     soundRef.current = on;
     writeSound(on);
     if (on) {
+      // This click is what lets the browser play sound: wake it, then one clack to say it's on.
       const a = audio();
-      if (a?.state === "suspended") void a.resume();
-      clack(true);
+      if (a) void (a.state === "running" ? Promise.resolve() : a.resume()).then(() => clack(true));
     }
   };
 
@@ -229,10 +229,11 @@ export function ReelStrip({ children, label }: { children: ReactNode; label: str
         onClick={toggle}
         aria-pressed={sound}
         aria-label={sound ? "Projector sound on. Turn it off" : "Projector sound off. Turn it on"}
-        title={sound ? "Sound on" : "Sound off"}
-        className="absolute -top-1 right-[max(1.25rem,calc((100vw-1120px)/2+2rem))] flex size-8 items-center justify-center rounded-full text-mute hover:bg-soft hover:text-ink"
+        className={`absolute top-1 right-[max(1.25rem,calc((100vw-1120px)/2+2rem))] z-10 flex h-8 items-center gap-1.5 rounded-full border px-3 font-sans text-[12px] font-medium transition-colors ${
+          sound ? "border-line-strong bg-soft text-ink" : "border-line text-mute hover:border-line-strong hover:text-ink"
+        }`}
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M2.5 6h2.2L8 3.2v9.6L4.7 10H2.5z" />
           {sound ? (
             <>
@@ -243,6 +244,7 @@ export function ReelStrip({ children, label }: { children: ReactNode; label: str
             <path d="M10.5 6l3.5 4M14 6l-3.5 4" />
           )}
         </svg>
+        {sound ? "Sound on" : "Sound off"}
       </button>
     </div>
   );
