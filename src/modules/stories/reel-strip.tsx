@@ -59,19 +59,6 @@ function clack(hard: boolean, speed = 0) {
 
 const SOUND_KEY = "pp-reel-sound";
 
-/**
- * The film's edges: sprocket holes along the top and bottom, drawn on the
- * scrolling strip and attached to its content, so they slide past as it's
- * pulled, like 35 mm film through a gate.
- */
-const HOLE = "radial-gradient(ellipse 5px 3.5px at 50% 50%, color-mix(in srgb, var(--ink) 22%, transparent) 96%, transparent 100%)";
-const FILM = {
-  backgroundImage: `${HOLE}, ${HOLE}`,
-  backgroundSize: "22px 10px, 22px 10px",
-  backgroundRepeat: "repeat-x, repeat-x",
-  backgroundPosition: "0 16px, 0 calc(100% - 24px)",
-  backgroundAttachment: "local, local",
-} as const;
 
 /** Sound on or off, remembered on this device; on until someone turns it off. */
 const soundListeners = new Set<() => void>();
@@ -95,8 +82,7 @@ function writeSound(on: boolean) {
 
 /**
  * A strip of clippings that runs like film through a projector: no scrollbar,
- * sprocket holes along both edges, a clack as each frame passes, and grab-and-
- * pull with the mouse. Swipe and trackpad work as usual; the page's own
+ * a clack as each frame passes, and grab-and-pull with the mouse. Swipe and trackpad work as usual; the page's own
  * up-and-down scroll is never taken over.
  */
 export function ReelStrip({ children, label }: { children: ReactNode; label: string }) {
@@ -233,7 +219,6 @@ export function ReelStrip({ children, label }: { children: ReactNode; label: str
           }
         }}
         onDragStart={(e) => e.preventDefault()}
-        style={FILM}
         data-reel=""
         className="relative flex cursor-grab snap-x snap-mandatory gap-10 overflow-x-auto scroll-px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] pt-12 pb-12 select-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
