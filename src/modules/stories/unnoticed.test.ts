@@ -51,3 +51,29 @@ describe("shelves and rating", () => {
     expect([short(34), short(1234), short(15_400), short(2_300_000)]).toEqual(["34", "1.2k", "15k", "2.3M"]);
   });
 });
+
+describe("the catalogue", () => {
+  it("numbers entries in the order posted (No. 1 is the first) and lists the newest first", async () => {
+    const { catalogue, CATALOGUE } = await import("./unnoticed");
+    const all = catalogue();
+    expect(all[0].no).toBe(CATALOGUE.length);
+    expect(all[all.length - 1].no).toBe(1);
+  });
+  it("rates the most-loved entry 10 and uses live hearts when Instagram gives them", async () => {
+    const { catalogue, CATALOGUE } = await import("./unnoticed");
+    const top = catalogue().reduce((a, b) => (b.likes > a.likes ? b : a));
+    expect(top.rating).toBe(10);
+    const boosted = catalogue({ [CATALOGUE[0].code]: 10_000 });
+    expect(boosted[0]).toMatchObject({ likes: 10_000, rating: 10 });
+    expect(boosted[1].rating).toBeLessThan(2);
+  });
+  it("has a cover file for every entry", async () => {
+    const fs = await import("node:fs");
+    const { CATALOGUE } = await import("./unnoticed");
+    for (const e of CATALOGUE) expect(fs.existsSync(`public/unnoticed/${e.code}.webp`)).toBe(true);
+  });
+  it("keeps every entry's code a real post code", async () => {
+    const { CATALOGUE, shortcode } = await import("./unnoticed");
+    for (const e of CATALOGUE) expect(shortcode(`https://www.instagram.com/p/${e.code}/`)).toBe(e.code);
+  });
+});

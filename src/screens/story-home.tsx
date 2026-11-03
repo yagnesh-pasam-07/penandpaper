@@ -4,6 +4,44 @@ import { PenIcon } from "@/components/icons";
 import { TimelineStrip } from "@/modules/home/timeline-strip";
 import { Picture } from "@/modules/stories/reader";
 import { lovedThisMonth, publishedStories, type StoryCard } from "@/modules/stories/server";
+import { Clipping } from "@/modules/stories/clipping";
+import { catalogue } from "@/modules/stories/unnoticed";
+
+/**
+ * Unnoticed on the homepage: the newest clippings pasted along the page like
+ * a scrapbook spread, scrolled sideways like a reel. Each opens its own page.
+ */
+function Clippings() {
+  const all = catalogue();
+  if (!all.length) return null;
+  return (
+    <section aria-labelledby="clippings-title" className="flex flex-col gap-3 pb-16 md:pb-24">
+      <div className="mx-auto flex w-full max-w-[1120px] flex-wrap items-end justify-between gap-3 px-5 sm:px-8">
+        <div className="flex flex-col gap-1">
+          <h2 id="clippings-title" className="font-hand text-[34px] leading-none font-bold text-ink sm:text-[40px]">
+            pen &amp; paper <span className="text-red-text">unnoticed</span>
+          </h2>
+          <p className="story-serif max-w-[520px] text-[17px] leading-snug text-mute">Small moments nobody noticed, cut out and kept. In Telugu, with a straight face.</p>
+        </div>
+        <Link href="/stories/unnoticed" className="font-sans text-[15px] text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+          Open the library →
+        </Link>
+      </div>
+      <ul className="flex snap-x snap-mandatory gap-10 overflow-x-auto scroll-px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] pt-8 pb-6 [scrollbar-width:thin]">
+        {all.map((e) => (
+          <li key={e.code} className="snap-start">
+            <Clipping entry={e} no={e.no} width={210} />
+          </li>
+        ))}
+        <li className="flex w-[180px] shrink-0 snap-start items-center">
+          <Link href="/stories/unnoticed" className="font-hand text-[26px] leading-tight text-mute hover:text-ink">
+            the whole library →
+          </Link>
+        </li>
+      </ul>
+    </section>
+  );
+}
 
 const link = "rounded-sm underline-offset-4 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text";
 
@@ -157,6 +195,8 @@ export async function StoryHome() {
           <p className="max-w-[520px] font-sans text-[17px] leading-relaxed text-mute sm:text-[19px]">Other people&apos;s, in our stories. Your own, on your desk.</p>        </section>
 
         <Doors lead={lead} />
+
+        <Clippings />
 
         <FounderNote />
       </main>

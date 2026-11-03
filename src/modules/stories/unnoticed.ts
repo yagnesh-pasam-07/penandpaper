@@ -17,18 +17,127 @@ export const UNNOTICED = { handle: "unnoticed.moment", url: "https://www.instagr
 export const UNNOTICED_TAG = "unnoticed";
 
 /**
- * Posts picked by hand, newest first: they show at once, token or not, through
- * Instagram's own embed. Paste a post's address here to add it (the ?hl=… and
- * img_index bits are ignored). With INSTAGRAM_TOKEN set, every post comes in
- * by itself and these just make sure nothing listed is missed.
+ * The shelves, like Netflix rows: one post connects with one person, the next
+ * with someone else. A post goes on a shelf when its caption carries one of
+ * its tags (English or Telugu), so tagging on Instagram is all it takes.
  */
-export const PINNED: string[] = [
-  "https://www.instagram.com/p/DfRAHymlMQP/",
-  "https://www.instagram.com/p/DfQyL-TGGP3/",
-  "https://www.instagram.com/p/DfPd70ClC6F/",
-  "https://www.instagram.com/p/DfOrzOxlFkJ/",
-  "https://www.instagram.com/p/DfMdY1TFH7l/",
+export const SHELVES = [
+  { key: "humans", title: "Manushulu", sub: "people, as they are", tags: ["humans", "human", "people", "family", "amma", "nanna", "friends", "manushulu", "మనుషులు"] },
+  { key: "behaviour", title: "Alavaatlu", sub: "the little things we all do", tags: ["behaviour", "behavior", "habits", "relatable", "middleclass", "alavaatlu", "అలవాట్లు"] },
+  { key: "nature", title: "Prakruti", sub: "nature, noticed", tags: ["nature", "rain", "sky", "trees", "animals", "village", "prakruti", "ప్రకృతి"] },
+] as const;
+export type Shelf = (typeof SHELVES)[number]["key"];
+
+
+/**
+ * The catalogue: each post written down once, like a library card. The cover
+ * is the post's first slide, kept in /public/unnoticed (Instagram's own picture
+ * links expire within days). To add one: save its first slide as
+ * public/unnoticed/<code>.webp (720 px wide) and add an entry here, newest first.
+ * Likes are as of the date in `counted`; with INSTAGRAM_TOKEN set they're live.
+ */
+export type Entry = {
+  code: string;
+  /** The words on the slide, in the post's own two lines. */
+  title: [string, string];
+  /** The little note on the slide ("manalo okadu", "on time."), if any. */
+  aside?: string;
+  /** Its chapter on the slide ("01 — The wish"), if any. */
+  chapter?: string;
+  /** The caption, as posted, without hashtags. */
+  caption: string;
+  shelves: Shelf[];
+  /** What it's about, for the entry page (one line). */
+  logline: string;
+  likes: number;
+  /** Width / height of the cover. */
+  ratio: number;
+};
+
+export const COUNTED = "2026-11-03";
+
+export const CATALOGUE: Entry[] = [
+  {
+    code: "DfRAHymlMQP",
+    title: ["Nannu kuda", "layoff chesendi ra."],
+    aside: "manalo okadu",
+    chapter: "The wish",
+    caption: "Praying for a layoff. Scared of the EMI. 🙃\nEvery corporate guy's 9 AM, in 8 slides.\nSend this to the colleague who says \"I'll resign next month\" every month. 👇",
+    shelves: ["behaviour", "humans"],
+    logline: "A night bus, a tired head, and the one prayer every corporate guy whispers: please, let them fire me. (Then the EMI remembers him.)",
+    likes: 9,
+    ratio: 720 / 900,
+  },
+  {
+    code: "DfQyL-TGGP3",
+    title: ["Lechava?", "Sooryudu vachesadu."],
+    aside: "on time.",
+    chapter: "The morning",
+    caption: "Good morning 🌞\nRaatri 2 ki \"repatinunchi start\" anukunnav.\nPodduna snooze kottav.\nSooryudu matram on time. ☀️",
+    shelves: ["nature", "behaviour"],
+    logline: "At 2 AM you swore it starts tomorrow. At 7 you hit snooze. The sun, as usual, showed up on time.",
+    likes: 11,
+    ratio: 720 / 900,
+  },
+  {
+    code: "DfPd70ClC6F",
+    title: ["Neeku ee gorre ki", "theda ledu."],
+    aside: "nuvvu",
+    chapter: "The flock",
+    caption: "Idhi ela miss ayyav?",
+    shelves: ["nature", "humans"],
+    logline: "A shepherd, a road full of sheep, and the scooters stuck behind them. Spot yourself in the flock.",
+    likes: 22,
+    ratio: 720 / 900,
+  },
+  {
+    code: "DfOrzOxlFkJ",
+    title: ["Jeetham vachindi.", "Vachinatte vellipoyindi."],
+    caption: "situation rn 🥲",
+    shelves: ["behaviour", "humans"],
+    logline: "Salary day, a street corner, and a man watching the month's money leave as fast as it came.",
+    likes: 20,
+    ratio: 720 / 900,
+  },
+  {
+    code: "DfMdY1TFH7l",
+    title: ["November 1st ochchesindi.", "Inka em peekaledu."],
+    caption: "Depressionnnnnn....",
+    shelves: ["behaviour", "humans"],
+    logline: "A tiffin centre, a clock on the wall, and a man realising the year is almost over and the list isn't.",
+    likes: 13,
+    ratio: 720 / 965,
+  },
 ];
+
+/** The cover's address on our own site. */
+export const coverOf = (code: string) => `/unnoticed/${code}.webp`;
+
+/**
+ * Like IMDB's rating: how loved an entry is against the page's own entries, out
+ * of 10, so it reads the same at 20 likes or 20,000. A square root, so one
+ * viral post doesn't make every other one look like a 2. 10 is the most loved.
+ */
+export function entryRating(likes: number, all: number[]): number {
+  const best = Math.max(1, ...all);
+  return Math.max(1, Math.round(Math.sqrt(likes / best) * 100) / 10);
+}
+
+/** The catalogue, numbered in the order it was posted (No. 1 is the first), newest first. */
+export function catalogue(live: Record<string, number> = {}): (Entry & { no: number; rating: number })[] {
+  // Live hearts from Instagram when the token is set; else the counts written down above.
+  const withLikes = CATALOGUE.map((e) => ({ ...e, likes: live[e.code] ?? e.likes }));
+  const likes = withLikes.map((e) => e.likes);
+  return withLikes.map((e, i) => ({ ...e, no: CATALOGUE.length - i, rating: entryRating(e.likes, likes) }));
+}
+
+/** One entry with its number and rating, or null. */
+export function entry(code: string, live: Record<string, number> = {}) {
+  return catalogue(live).find((e) => e.code === code) ?? null;
+}
+
+/** Posts picked by hand: the catalogue, for the embed fallback and the API merge. */
+export const PINNED: string[] = CATALOGUE.map((e) => `https://www.instagram.com/p/${e.code}/`);
 
 /** A post's short code from any of its addresses (/p/…, /reel/…, with or without ?hl=…), or null if it isn't one. */
 export function shortcode(url: string): string | null {
@@ -54,18 +163,6 @@ export type Post = {
   /** Which shelves it sits on, from its hashtags. */
   shelves: Shelf[];
 };
-
-/**
- * The shelves, like Netflix rows: one post connects with one person, the next
- * with someone else. A post goes on a shelf when its caption carries one of
- * its tags (English or Telugu), so tagging on Instagram is all it takes.
- */
-export const SHELVES = [
-  { key: "humans", title: "Manushulu", sub: "people, as they are", tags: ["humans", "human", "people", "family", "amma", "nanna", "friends", "manushulu", "మనుషులు"] },
-  { key: "behaviour", title: "Alavaatlu", sub: "the little things we all do", tags: ["behaviour", "behavior", "habits", "relatable", "middleclass", "alavaatlu", "అలవాట్లు"] },
-  { key: "nature", title: "Prakruti", sub: "nature, noticed", tags: ["nature", "rain", "sky", "trees", "animals", "village", "prakruti", "ప్రకృతి"] },
-] as const;
-export type Shelf = (typeof SHELVES)[number]["key"];
 
 /** The shelves a caption puts a post on, from its hashtags. */
 export function shelvesOf(caption: string): Shelf[] {
