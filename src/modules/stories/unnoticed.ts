@@ -34,7 +34,6 @@ export type Shelf = (typeof SHELVES)[number]["key"];
  * is the post's first slide, kept in /public/unnoticed (Instagram's own picture
  * links expire within days). To add one: save its first slide as
  * public/unnoticed/<code>.webp (720 px wide) and add an entry here, newest first.
- * Likes are as of the date in `counted`; with INSTAGRAM_TOKEN set they're live.
  */
 export type Entry = {
   code: string;
@@ -49,14 +48,21 @@ export type Entry = {
   shelves: Shelf[];
   /** What it's about, for the entry page (one line). */
   logline: string;
-  likes: number;
   /** Width / height of the cover. */
   ratio: number;
 };
 
-export const COUNTED = "2026-11-03";
-
 export const CATALOGUE: Entry[] = [
+  {
+    code: "DfSFR6gGC1Y",
+    title: ["Roju anta varsham padithe,", "ela untundo telusa?"],
+    aside: "Varsham ishtam unna vallaki matrame.",
+    chapter: "For rain lovers",
+    caption: "A whole day of rain.\nBlanket. Chai. Amma's food. Window seat.\nThat's enough for this life. 🌧️\nSend this to the one you thought of today.",
+    shelves: ["nature", "humans"],
+    logline: "A grey city through a window, and a whole day of rain. Blanket, chai, amma's food: enough for this life.",
+    ratio: 720 / 901,
+  },
   {
     code: "DfRAHymlMQP",
     title: ["Nannu kuda", "layoff chesendi ra."],
@@ -65,7 +71,6 @@ export const CATALOGUE: Entry[] = [
     caption: "Praying for a layoff. Scared of the EMI. 🙃\nEvery corporate guy's 9 AM, in 8 slides.\nSend this to the colleague who says \"I'll resign next month\" every month. 👇",
     shelves: ["behaviour", "humans"],
     logline: "A night bus, a tired head, and the one prayer every corporate guy whispers: please, let them fire me. (Then the EMI remembers him.)",
-    likes: 9,
     ratio: 720 / 900,
   },
   {
@@ -76,7 +81,6 @@ export const CATALOGUE: Entry[] = [
     caption: "Good morning 🌞\nRaatri 2 ki \"repatinunchi start\" anukunnav.\nPodduna snooze kottav.\nSooryudu matram on time. ☀️",
     shelves: ["nature", "behaviour"],
     logline: "At 2 AM you swore it starts tomorrow. At 7 you hit snooze. The sun, as usual, showed up on time.",
-    likes: 11,
     ratio: 720 / 900,
   },
   {
@@ -87,7 +91,6 @@ export const CATALOGUE: Entry[] = [
     caption: "Idhi ela miss ayyav?",
     shelves: ["nature", "humans"],
     logline: "A shepherd, a road full of sheep, and the scooters stuck behind them. Spot yourself in the flock.",
-    likes: 22,
     ratio: 720 / 900,
   },
   {
@@ -96,7 +99,6 @@ export const CATALOGUE: Entry[] = [
     caption: "situation rn 🥲",
     shelves: ["behaviour", "humans"],
     logline: "Salary day, a street corner, and a man watching the month's money leave as fast as it came.",
-    likes: 20,
     ratio: 720 / 900,
   },
   {
@@ -105,7 +107,6 @@ export const CATALOGUE: Entry[] = [
     caption: "Depressionnnnnn....",
     shelves: ["behaviour", "humans"],
     logline: "A tiffin centre, a clock on the wall, and a man realising the year is almost over and the list isn't.",
-    likes: 13,
     ratio: 720 / 965,
   },
 ];
@@ -113,27 +114,14 @@ export const CATALOGUE: Entry[] = [
 /** The cover's address on our own site. */
 export const coverOf = (code: string) => `/unnoticed/${code}.webp`;
 
-/**
- * Like IMDB's rating: how loved an entry is against the page's own entries, out
- * of 10, so it reads the same at 20 likes or 20,000. A square root, so one
- * viral post doesn't make every other one look like a 2. 10 is the most loved.
- */
-export function entryRating(likes: number, all: number[]): number {
-  const best = Math.max(1, ...all);
-  return Math.max(1, Math.round(Math.sqrt(likes / best) * 100) / 10);
+/** The catalogue, newest first, each numbered in the order it was posted. */
+export function catalogue(): (Entry & { no: number })[] {
+  return CATALOGUE.map((e, i) => ({ ...e, no: CATALOGUE.length - i }));
 }
 
-/** The catalogue, numbered in the order it was posted (No. 1 is the first), newest first. */
-export function catalogue(live: Record<string, number> = {}): (Entry & { no: number; rating: number })[] {
-  // Live hearts from Instagram when the token is set; else the counts written down above.
-  const withLikes = CATALOGUE.map((e) => ({ ...e, likes: live[e.code] ?? e.likes }));
-  const likes = withLikes.map((e) => e.likes);
-  return withLikes.map((e, i) => ({ ...e, no: CATALOGUE.length - i, rating: entryRating(e.likes, likes) }));
-}
-
-/** One entry with its number and rating, or null. */
-export function entry(code: string, live: Record<string, number> = {}) {
-  return catalogue(live).find((e) => e.code === code) ?? null;
+/** One entry, or null. */
+export function entry(code: string) {
+  return catalogue().find((e) => e.code === code) ?? null;
 }
 
 /** Posts picked by hand: the catalogue, for the embed fallback and the API merge. */

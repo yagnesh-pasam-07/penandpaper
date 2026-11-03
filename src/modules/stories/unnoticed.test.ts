@@ -59,14 +59,6 @@ describe("the catalogue", () => {
     expect(all[0].no).toBe(CATALOGUE.length);
     expect(all[all.length - 1].no).toBe(1);
   });
-  it("rates the most-loved entry 10 and uses live hearts when Instagram gives them", async () => {
-    const { catalogue, CATALOGUE } = await import("./unnoticed");
-    const top = catalogue().reduce((a, b) => (b.likes > a.likes ? b : a));
-    expect(top.rating).toBe(10);
-    const boosted = catalogue({ [CATALOGUE[0].code]: 10_000 });
-    expect(boosted[0]).toMatchObject({ likes: 10_000, rating: 10 });
-    expect(boosted[1].rating).toBeLessThan(2);
-  });
   it("has a cover file for every entry", async () => {
     const fs = await import("node:fs");
     const { CATALOGUE } = await import("./unnoticed");

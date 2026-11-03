@@ -15,15 +15,14 @@ function tear(code: string): string {
 
 /**
  * One post as a clipping pasted into a scrapbook: the cover cut out with a
- * torn edge, held by a strip of tape, its catalogue number written beside it
- * in red ink. Opens its own page (like a film's page on IMDb).
+ * torn edge, held by a strip of tape. Opens the post.
  */
-export function Clipping({ entry, no, rating, width = 220, showMeta = true }: { entry: Entry; no: number; rating?: number; width?: number; showMeta?: boolean }) {
+export function Clipping({ entry, width = 220 }: { entry: Entry; width?: number }) {
   const t = tiltOf(entry.code);
   return (
     <Link
       href={`/stories/unnoticed/${entry.code}`}
-      aria-label={`No. ${no}: ${entry.title.join(" ")}${rating ? `, rated ${rating} out of 10` : ""}`}
+      aria-label={entry.title.join(" ")}
       className="group relative block shrink-0 focus-visible:outline-none"
       style={{ width }}
     >
@@ -39,16 +38,6 @@ export function Clipping({ entry, no, rating, width = 220, showMeta = true }: { 
           <img src={coverOf(entry.code)} alt={entry.title.join(" ")} width={720} height={Math.round(720 / entry.ratio)} loading="lazy" className="block h-auto w-full" />
         </span>
       </span>
-      {showMeta && (
-        <span className="mt-3 flex items-baseline gap-2 px-1">
-          <span className="font-hand text-[22px] leading-none font-bold text-red-text">No. {no}</span>
-          {rating !== undefined && (
-            <span className="ml-auto font-sans text-[12px] text-mute tabular-nums">
-              <span className="font-hand text-[19px] font-bold text-ink">{rating.toFixed(1)}</span>/10
-            </span>
-          )}
-        </span>
-      )}
     </Link>
   );
 }

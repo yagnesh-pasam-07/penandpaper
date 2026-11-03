@@ -21,21 +21,21 @@ function Clippings() {
           <h2 id="clippings-title" className="font-hand text-[34px] leading-none font-bold text-ink sm:text-[40px]">
             pen &amp; paper <span className="text-red-text">unnoticed</span>
           </h2>
-          <p className="story-serif max-w-[520px] text-[17px] leading-snug text-mute">Small moments nobody noticed, cut out and kept. In Telugu, with a straight face.</p>
+          <p className="story-serif max-w-[520px] text-[17px] leading-snug text-mute">Small moments nobody noticed. In Telugu.</p>
         </div>
         <Link href="/stories/unnoticed" className="font-sans text-[15px] text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
-          Open the library →
+          See them all →
         </Link>
       </div>
       <ul className="flex snap-x snap-mandatory gap-10 overflow-x-auto scroll-px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] pt-8 pb-6 [scrollbar-width:thin]">
         {all.map((e) => (
           <li key={e.code} className="snap-start">
-            <Clipping entry={e} no={e.no} width={210} />
+            <Clipping entry={e} width={210} />
           </li>
         ))}
         <li className="flex w-[180px] shrink-0 snap-start items-center">
           <Link href="/stories/unnoticed" className="font-hand text-[26px] leading-tight text-mute hover:text-ink">
-            the whole library →
+            see them all →
           </Link>
         </li>
       </ul>
