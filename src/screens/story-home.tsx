@@ -5,6 +5,7 @@ import { TimelineStrip } from "@/modules/home/timeline-strip";
 import { Picture } from "@/modules/stories/reader";
 import { lovedThisMonth, publishedStories, type StoryCard } from "@/modules/stories/server";
 import { Clipping } from "@/modules/stories/clipping";
+import { ReelStrip } from "@/modules/stories/reel-strip";
 import { catalogue } from "@/modules/stories/unnoticed";
 
 /**
@@ -15,7 +16,7 @@ function Clippings() {
   const all = catalogue();
   if (!all.length) return null;
   return (
-    <section aria-labelledby="clippings-title" className="flex flex-col gap-3 pb-16 md:pb-24">
+    <section aria-labelledby="clippings-title" className="flex flex-col gap-1 pb-16 md:pb-24">
       <div className="mx-auto flex w-full max-w-[1120px] flex-wrap items-end justify-between gap-3 px-5 sm:px-8">
         <div className="flex flex-col gap-1">
           <h2 id="clippings-title" className="font-hand text-[34px] leading-none font-bold text-ink sm:text-[40px]">
@@ -27,7 +28,7 @@ function Clippings() {
           See them all →
         </Link>
       </div>
-      <ul className="flex snap-x snap-mandatory gap-10 overflow-x-auto scroll-px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] px-[max(1.25rem,calc((100vw-1120px)/2+2rem))] pt-8 pb-6 [scrollbar-width:thin]">
+      <ReelStrip label="Unnoticed: the newest moments">
         {all.map((e) => (
           <li key={e.code} className="snap-start">
             <Clipping entry={e} width={210} />
@@ -38,7 +39,7 @@ function Clippings() {
             see them all →
           </Link>
         </li>
-      </ul>
+      </ReelStrip>
     </section>
   );
 }
