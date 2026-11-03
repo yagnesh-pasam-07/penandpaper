@@ -50,6 +50,8 @@ function toThought(r: ThoughtRow): Thought {
     color: isInk(r.color) ? r.color : "ink",
     dueAt: r.dueAt ? iso(r.dueAt) : null,
     dueHasTime: r.dueHasTime,
+    happensOn: r.happensOn ?? null,
+    happensUntil: r.happensUntil ?? null,
   };
 }
 
@@ -58,12 +60,14 @@ function toThought(r: ThoughtRow): Thought {
 const metaCols = {
   id: dropPapers.id,
   name: dropPapers.name,
+  happensOn: dropPapers.happensOn,
+  happensUntil: dropPapers.happensUntil,
   createdAt: dropPapers.createdAt,
   updatedAt: dropPapers.updatedAt,
   archivedAt: dropPapers.archivedAt,
 };
 
-type MetaRow = { id: string; name: string | null; createdAt: Date; updatedAt: Date; archivedAt: Date | null };
+type MetaRow = { id: string; name: string | null; createdAt: Date; updatedAt: Date; archivedAt: Date | null; happensOn?: string | null; happensUntil?: string | null };
 
 const toMeta = (r: MetaRow, count: number): PaperMeta => ({
   id: r.id,
@@ -71,6 +75,8 @@ const toMeta = (r: MetaRow, count: number): PaperMeta => ({
   createdAt: iso(r.createdAt),
   updatedAt: iso(r.updatedAt),
   archivedAt: r.archivedAt ? iso(r.archivedAt) : null,
+  happensOn: r.happensOn ?? null,
+  happensUntil: r.happensUntil ?? null,
   count,
 });
 
@@ -111,14 +117,14 @@ async function touch(paperId: string, ownerId?: string, actor?: string): Promise
 }
 
 /** A paper's thoughts, leaving out crumpled ones. */
-async function contentsOf(paper: { id: string; name: string | null; createdAt: Date; archivedAt: Date | null }): Promise<DropPaper> {
+async function contentsOf(paper: { id: string; name: string | null; createdAt: Date; archivedAt: Date | null; happensOn?: string | null; happensUntil?: string | null }): Promise<DropPaper> {
   const rows = await db
     .select()
     .from(dropThoughts)
     .where(and(eq(dropThoughts.paperId, paper.id), isNull(dropThoughts.crumpledAt)))
     .orderBy(asc(dropThoughts.createdAt), asc(dropThoughts.id));
   const strokes = await strokesOf(paper.id);
-  return { id: paper.id, name: paper.name, createdAt: iso(paper.createdAt), archivedAt: paper.archivedAt ? iso(paper.archivedAt) : null, thoughts: rows.map(toThought), strokes };
+  return { id: paper.id, name: paper.name, createdAt: iso(paper.createdAt), archivedAt: paper.archivedAt ? iso(paper.archivedAt) : null, happensOn: paper.happensOn ?? null, happensUntil: paper.happensUntil ?? null, thoughts: rows.map(toThought), strokes };
 }
 
 /** A paper's lines and connectors, oldest first, leaving out erased ones. Empty before the migration has run. */
@@ -247,6 +253,16 @@ export async function renamePaper(userId: string, paperId: string, name: string 
   return rows.length > 0;
 }
 
+/** The paper's own dates (a trip), or null to take them off. False if it isn't theirs. */
+export async function setPaperDates(userId: string, paperId: string, happens: { on: string; until: string | null } | null): Promise<boolean> {
+  const rows = await db
+    .update(dropPapers)
+    .set({ happensOn: happens?.on ?? null, happensUntil: happens?.until ?? null })
+    .where(and(eq(dropPapers.id, paperId), eq(dropPapers.userId, userId), isNull(dropPapers.deletedAt)))
+    .returning({ id: dropPapers.id });
+  return rows.length > 0;
+}
+
 /** Puts a paper away (or brings it back). */
 export async function archivePaper(userId: string, paperId: string, archived: boolean): Promise<boolean> {
   const rows = await db
@@ -335,7 +351,7 @@ export async function updateThought(
   userId: string,
   paperId: string,
   id: string,
-  patch: { text?: string; status?: "open" | "done"; size?: number; color?: Thought["color"]; due?: { at: string; hasTime: boolean } | null },
+  patch: { text?: string; status?: "open" | "done"; size?: number; color?: Thought["color"]; due?: { at: string; hasTime: boolean } | null; happens?: { on: string; until: string | null } | null },
   actor?: string,
 ): Promise<Thought | null> {
   const [row] = await db
@@ -347,6 +363,8 @@ export async function updateThought(
       // A new date is a new reminder.
       ...(patch.due !== undefined ? { dueAt: patch.due?.at ?? null, dueHasTime: patch.due?.hasTime ?? false, remindedAt: null } : {}),
       ...(patch.status ? { status: patch.status, doneAt: patch.status === "done" ? sql`now()` : null } : {}),
+      // A countdown can go on anything (a picture too): it isn't a to-do's date.
+      ...(patch.happens !== undefined ? { happensOn: patch.happens?.on ?? null, happensUntil: patch.happens?.until ?? null } : {}),
     })
     .where(
       and(

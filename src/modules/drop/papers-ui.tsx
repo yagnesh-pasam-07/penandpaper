@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CaretIcon, CloseIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { call, useViewerTz } from "./chrome";
+import { CountdownPicker, CountdownStub, useToday } from "./countdown";
 import { madeOn, MAX_PAPER_NAME, MIN_SEARCH, paperTitle, snippetAround, splitMatch, type PaperMeta, type SearchHit } from "./logic";
 
 /** Where a deleted paper waits for its Undo, across the move to the next paper. */
@@ -29,7 +30,43 @@ function useDismiss(ref: React.RefObject<HTMLElement | null>, open: boolean, clo
   }, [ref, open, close]);
 }
 
-type Head = { id: string; name: string | null; createdAt: string; archivedAt: string | null };
+type Head = { id: string; name: string | null; createdAt: string; archivedAt: string | null; happensOn?: string | null; happensUntil?: string | null };
+
+/**
+ * The paper's own dates (a trip): "13–17 Nov ┆ 10 days to go" beside its name.
+ * Without dates, the day it was made, with a quiet "+ dates" on hover. Set here,
+ * shown to everyone it's shared with.
+ */
+function PaperDates({ paper, tz }: { paper: Head; tz: string }) {
+  const router = useRouter();
+  const today = useToday(tz);
+  const [open, setOpen] = useState(false);
+  const [dates, setDates] = useState<{ on: string | null; until: string | null }>({ on: paper.happensOn ?? null, until: paper.happensUntil ?? null });
+  const save = async (h: { on: string; until: string | null } | null) => {
+    setOpen(false);
+    const before = dates;
+    setDates({ on: h?.on ?? null, until: h?.until ?? null });
+    try {
+      await call(`/api/drop/papers/${paper.id}`, { method: "PATCH", body: JSON.stringify({ dates: h }) });
+      router.refresh();
+    } catch {
+      setDates(before);
+    }
+  };
+  return (
+    <span className="relative flex items-center max-sm:hidden">
+      {dates.on ? (
+        <CountdownStub on={dates.on} until={dates.until} today={today} onClick={() => setOpen(true)} />
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} title="Set the dates (a trip, an event): a countdown shows here" className="group/dates flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] text-mute hover:bg-soft hover:text-ink">
+          <span>{madeOn(paper.createdAt, tz)}</span>
+          <span className="text-[12px] font-medium opacity-0 transition-opacity group-hover/dates:opacity-100">+ dates</span>
+        </button>
+      )}
+      {open && <CountdownPicker on={dates.on} until={dates.until} tz={tz} title="This paper is for" onClose={() => setOpen(false)} onSave={(h) => void save(h)} />}
+    </span>
+  );
+}
 
 const item = "flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-soft focus-visible:bg-soft";
 
@@ -195,7 +232,8 @@ export function PaperBar({ paper, papers }: { paper: Head; papers: PaperMeta[] }
           </>
         )}
       </span>
-      <span className="truncate text-[13px] text-mute max-sm:hidden">{madeOn(paper.createdAt, tz)}</span>
+      {/* The trip's dates as a countdown; until there are some, the day the paper was made (a tap sets them). */}
+      <PaperDates paper={paper} tz={tz} />
       <span ref={newRef} className="relative">
         <button
           type="button"

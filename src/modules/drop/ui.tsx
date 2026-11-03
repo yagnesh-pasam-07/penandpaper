@@ -31,6 +31,7 @@ import { PenButton, Writer } from "./writer";
 import { applyLive } from "./live";
 import { LiveCursors, LiveFaces } from "./live-ui";
 import { useLive } from "./use-live";
+import { CountdownPicker, CountdownStub, useToday } from "./countdown";
 
 /* ---------- A paper ---------- */
 
@@ -181,6 +182,8 @@ export function DropCanvas({
   const [carry, setCarry] = useState<{ strokeIds: Set<string>; noteIds: Set<string>; dx: number; dy: number } | null>(null);
   const [labelling, setLabelling] = useState<string | null>(null);
   const [dueFor, setDueFor] = useState<string | null>(null);
+  // Which thought's countdown picker is open.
+  const [countFor, setCountFor] = useState<string | null>(null);
   const canvasApi = useRef<CanvasApi | null>(null);
   const boxesRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
   // A tool change puts down whatever was picked.
@@ -748,6 +751,20 @@ export function DropCanvas({
     record({ label, undo: () => patch(id, back), redo: () => patch(id, change) });
   };
 
+  /** When it happens (a countdown), on any thought; null takes it off. Anyone who can edit the paper can set it. */
+  const setHappens = (id: string, happens: { on: string; until: string | null } | null) => {
+    const before = live.current.thoughts.find((t) => t.id === id);
+    if (!before) return;
+    const after: Thought = { ...before, happensOn: happens?.on ?? null, happensUntil: happens?.until ?? null };
+    update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? after : t)) }));
+    void save(
+      () => call(`/api/drop/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ paperId, happens }) }),
+      () => update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? before : t)) })),
+    );
+    const back = before.happensOn ? { on: before.happensOn, until: before.happensUntil ?? null } : null;
+    record({ label: "countdown", undo: () => setHappens(id, back), redo: () => setHappens(id, happens) });
+  };
+
   /** Written text ⇄ a to-do with a box in front (the same words, the same place). */
   const setKind = (id: string, kind: "text" | "todo") => {
     const before = live.current.thoughts.find((t) => t.id === id);
@@ -1025,6 +1042,26 @@ export function DropCanvas({
   const onSheet = items;
 
   const todo = (t: Thought) => !isDrop(t);
+  const viewerDay = useToday(tz);
+  /** The countdown stub, and its picker while open: under any thought that has (or is getting) a date. */
+  const countdownOf = (t: Thought) =>
+    t.happensOn || countFor === t.id ? (
+      <span className="relative inline-block">
+        {t.happensOn && <CountdownStub on={t.happensOn} until={t.happensUntil} today={viewerDay} onClick={() => setCountFor(t.id)} />}
+        {countFor === t.id && (
+          <CountdownPicker
+            on={t.happensOn ?? null}
+            until={t.happensUntil ?? null}
+            tz={tz}
+            onClose={() => setCountFor(null)}
+            onSave={(h) => {
+              setCountFor(null);
+              setHappens(t.id, h);
+            }}
+          />
+        )}
+      </span>
+    ) : null;
   const bubble = (t: Thought, extra: { stream?: boolean; movable?: boolean } = {}) => (
     <ThoughtBubble
       {...bubbleProps(t, tz, fresh.has(t.id))}
@@ -1035,7 +1072,15 @@ export function DropCanvas({
       {...extra}
       {...handlers(t)}
       onDue={todo(t) && !guest ? () => setDueFor(t.id) : undefined}
-      footer={t.dueAt && todo(t) && !guest ? <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} /> : undefined}
+      onCountdown={extra.stream ? undefined : () => setCountFor(t.id)}
+      footer={
+        (t.dueAt && todo(t) && !guest) || t.happensOn || countFor === t.id ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {t.dueAt && todo(t) && !guest && <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} />}
+            {countdownOf(t)}
+          </span>
+        ) : undefined
+      }
       popover={
         dueFor === t.id ? (
           <DuePicker
@@ -1076,8 +1121,14 @@ export function DropCanvas({
       done={t.status === "done"}
       onToggle={() => patch(t.id, { status: t.status === "done" ? "open" : "done" })}
       onMakeTodo={t.text && !stream ? () => setKind(t.id, t.kind === "todo" ? "text" : "todo") : undefined}
+      // Only text with words is saved, so only it can carry a date.
+      onCountdown={t.text && !stream ? () => setCountFor(t.id) : undefined}
       footer={
-        t.kind === "todo" ? (
+        t.happensOn || countFor === t.id ? (
+          <span className="flex flex-wrap items-center gap-1.5 text-[13px] leading-normal">
+            {countdownOf(t)}
+          </span>
+        ) : t.kind === "todo" ? (
           <span className="relative inline-block text-[13px] leading-normal">
             {t.dueAt ? (
               <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} />
@@ -1119,9 +1170,10 @@ export function DropCanvas({
             <span className="flex items-center gap-2">
               <span className="font-hand text-[20px] text-ink">{paperTitle(initial)}</span>
               <span className="rounded-full bg-soft px-2 py-0.5 text-[12px] whitespace-nowrap text-mute">{guest.owner}&apos;s paper · you can edit</span>
+              {paper.happensOn && <CountdownStub on={paper.happensOn} until={paper.happensUntil} today={viewerDay} />}
             </span>
           ) : (
-            <PaperBar paper={{ id: paperId, name: initial.name, createdAt: initial.createdAt, archivedAt: initial.archivedAt }} papers={papers} />
+            <PaperBar paper={{ id: paperId, name: initial.name, createdAt: initial.createdAt, archivedAt: initial.archivedAt, happensOn: paper.happensOn, happensUntil: paper.happensUntil }} papers={papers} />
           )
         }
         right={

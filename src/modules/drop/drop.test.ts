@@ -4,6 +4,9 @@ import { digestItems } from "./digest";
 import { viewKey } from "@/components/canvas/view";
 import {
   cleanName,
+  countdown,
+  dayRange,
+  isDay,
   digestTitle,
   escapeLike,
   firstLink,
@@ -323,5 +326,34 @@ describe("@ suggestions", () => {
     expect(matchPeople(people, "").length).toBe(3);
     expect(mentionText(people[0])).toBe("@Teja");
     expect(mentionText(people[1])).toBe("@ravi@x.co");
+  });
+});
+
+describe("countdowns", () => {
+  const today = "2026-11-03";
+  it("counts down to a day, in words a traveller says", () => {
+    expect(countdown("2026-11-13", null, today)).toMatchObject({ left: "10 days to go", phase: "ahead", days: 10 });
+    expect(countdown("2026-11-05", null, today)).toMatchObject({ left: "2 days to go", phase: "soon" });
+    expect(countdown("2026-11-04", null, today).left).toBe("Tomorrow");
+    expect(countdown("2026-12-01", null, today).left).toBe("4 weeks to go");
+    expect(countdown("2027-04-01", null, today).left).toBe("5 months to go");
+  });
+  it("during a trip, says which day it is", () => {
+    expect(countdown("2026-11-03", null, today)).toMatchObject({ left: "Today", phase: "now" });
+    expect(countdown("2026-11-02", "2026-11-06", today)).toMatchObject({ left: "Day 2 of 5", phase: "now" });
+  });
+  it("afterwards, how long ago", () => {
+    expect(countdown("2026-11-02", null, today)).toMatchObject({ left: "Yesterday", phase: "past" });
+    expect(countdown("2026-10-10", "2026-10-13", today).left).toBe("3 weeks ago");
+  });
+  it("writes the dates short, with the year only when it isn't this year", () => {
+    expect(dayRange("2026-11-13", null, today)).toBe("13 Nov");
+    expect(dayRange("2026-11-13", "2026-11-17", today)).toBe("13–17 Nov");
+    expect(dayRange("2026-11-30", "2026-12-02", today)).toBe("30 Nov – 2 Dec");
+    expect(dayRange("2027-01-05", null, today)).toBe("5 Jan 2027");
+  });
+  it("only takes real days", () => {
+    expect(isDay("2026-11-13")).toBe(true);
+    for (const v of ["2026-13-01", "13-11-2026", "", null, "2026-11-13T00:00"]) expect(isDay(v)).toBe(false);
   });
 });

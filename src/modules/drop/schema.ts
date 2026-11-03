@@ -21,6 +21,9 @@ export const dropPapers = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     /** Anyone with /p/<token> can view it, read-only. Null = the link is off. Random, never the paper id. */
     publicToken: text("public_token"),
+    /** The paper's own dates (a trip): shown beside its name as a countdown. */
+    happensOn: date("happens_on", { mode: "string" }),
+    happensUntil: date("happens_until", { mode: "string" }),
   },
   (t) => [index("drop_papers_user_idx").on(t.userId), uniqueIndex("drop_papers_public_token_idx").on(t.publicToken)],
 );
@@ -119,6 +122,14 @@ export const dropThoughts = pgTable(
     dueHasTime: boolean("due_has_time").notNull().default(false),
     /** When the reminder for `dueAt` went out; null until sent (cleared when the date changes). */
     remindedAt: timestamp("reminded_at", { withTimezone: true, mode: "string" }),
+    /**
+     * When it happens (a countdown), on anything: a picture, words, a note. A day
+     * ("2026-11-13"), and optionally the last day ("…to 17 Nov"). Not a to-do's
+     * date: it's never struck, never reviewed, never a reminder. Days, not times,
+     * so "10 days to go" is the same wherever you are.
+     */
+    happensOn: date("happens_on", { mode: "string" }),
+    happensUntil: date("happens_until", { mode: "string" }),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

@@ -76,14 +76,14 @@ export async function setPublicLink(userId: string, paperId: string, on: boolean
 }
 
 /** The view a shared reader gets: thoughts and lines, nothing about the owner. */
-export type SharedPaper = Pick<DropPaper, "id" | "name" | "createdAt" | "thoughts" | "strokes"> & { owner: string; role: ShareRole };
+export type SharedPaper = Pick<DropPaper, "id" | "name" | "createdAt" | "thoughts" | "strokes" | "happensOn" | "happensUntil"> & { owner: string; role: ShareRole };
 
 async function asShared(paperId: string, ownerId: string, ownerName: string, role: ShareRole = "view"): Promise<SharedPaper | null> {
   const paper = await getPaper(ownerId, paperId);
   if (!paper) return null;
   // Due dates are the owner's own planning; the rest is what's on the paper.
   const thoughts = paper.thoughts.map((t) => ({ ...t, dueAt: null, dueHasTime: false }));
-  return { id: paper.id, name: paper.name, createdAt: paper.createdAt, thoughts, strokes: paper.strokes, owner: ownerName.split(" ")[0] || "Someone", role };
+  return { id: paper.id, name: paper.name, createdAt: paper.createdAt, happensOn: paper.happensOn ?? null, happensUntil: paper.happensUntil ?? null, thoughts, strokes: paper.strokes, owner: ownerName.split(" ")[0] || "Someone", role };
 }
 
 /** A paper shared with this email (or the owner's own, which goes to the editor instead). */

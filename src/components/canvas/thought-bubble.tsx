@@ -39,6 +39,8 @@ type Props = {
   footer?: ReactNode;
   /** A to-do's date: the clock button opens this. */
   onDue?: () => void;
+  /** A countdown (when it happens), on any note or picture: the calendar button opens this. */
+  onCountdown?: () => void;
   /** Floating beside the note (the date picker). */
   popover?: ReactNode;
 };
@@ -219,6 +221,7 @@ export function ThoughtBubble({
   onDelete,
   footer,
   onDue,
+  onCountdown,
   popover,
 }: Props) {
   const [editing, setEditing] = useState(false);
@@ -457,6 +460,14 @@ export function ThoughtBubble({
               <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
                 <circle cx="6" cy="6" r="4.8" />
                 <path d="M6 3.4V6l1.8 1.1" />
+              </svg>
+            </button>
+          )}
+          {onCountdown && (
+            <button type="button" onClick={onCountdown} aria-label={`Count down to a day for "${text || "this picture"}"`} title="Count down to a day" className={`${toolButton} text-ink`}>
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                <rect x="1.5" y="2.5" width="9" height="8" rx="1.5" />
+                <path d="M1.5 5h9M4 1.2v2.4M8 1.2v2.4" />
               </svg>
             </button>
           )}

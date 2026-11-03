@@ -23,6 +23,9 @@ export type Thought = {
   /** A to-do's day (ISO); with `dueHasTime`, a reminder at that moment. */
   dueAt?: string | null;
   dueHasTime?: boolean;
+  /** When it happens (a countdown): a day, and optionally the last day. Any kind of thought. */
+  happensOn?: string | null;
+  happensUntil?: string | null;
 };
 
 /** "note": a hand-cut note (a to-do). "text": words written on the paper (a drop). "todo": written text with a checkbox (a to-do that keeps its handwriting). */
@@ -71,6 +74,9 @@ export type DropPaper = {
   createdAt: string;
   /** Set while it is put away (archived). */
   archivedAt: string | null;
+  /** The paper's own dates (a trip), shown as a countdown beside its name. */
+  happensOn?: string | null;
+  happensUntil?: string | null;
   thoughts: Thought[];
   /** Lines and connectors drawn on it. */
   strokes?: Stroke[];
@@ -83,6 +89,8 @@ export type PaperMeta = {
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
+  happensOn?: string | null;
+  happensUntil?: string | null;
   count: number;
 };
 
@@ -373,4 +381,45 @@ export function groupDigest(rows: DigestRow[], tz: string): { groups: DigestGrou
     groups.set(r.paperId, g);
   }
   return { groups: [...groups.values()], latestPaperId: rows.length ? rows[rows.length - 1].paperId : null };
+}
+
+
+/* ---------- Countdowns ---------- */
+
+/** A calendar day, YYYY-MM-DD. */
+export const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+
+/** Whole days from `a` to `b` (both YYYY-MM-DD): calendar days, so no clock or zone can make it 9.6. */
+export const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+
+/** "13 Nov", "13–17 Nov", "30 Nov – 2 Dec"; with the year only when it isn't this year. */
+export function dayRange(on: string, until: string | null | undefined, today: string): string {
+  const f = (d: string, month = true, year = false) =>
+    new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", ...(month ? { month: "short" } : {}), ...(year ? { year: "numeric" } : {}), timeZone: "UTC" });
+  const yearOf = (d: string) => d.slice(0, 4);
+  const showYear = yearOf(on) !== yearOf(today) || (!!until && yearOf(until) !== yearOf(today));
+  if (!until || until === on) return f(on, true, showYear);
+  if (on.slice(0, 7) === until.slice(0, 7)) return `${f(on, false)}–${f(until, true, showYear)}`;
+  return `${f(on, true, showYear && yearOf(on) !== yearOf(until))} – ${f(until, true, showYear)}`;
+}
+
+/**
+ * The countdown, in words, as it stands `today` (the viewer's own day):
+ * before, "in 10 days" / "Tomorrow"; during, "Today" or "Day 2 of 5";
+ * after, "Yesterday" / "3 days ago" / "2 weeks ago". `phase` sets its colour.
+ */
+export function countdown(on: string, until: string | null | undefined, today: string): { left: string; phase: "ahead" | "soon" | "now" | "past"; days: number } {
+  const end = until && until > on ? until : on;
+  const ahead = daysBetween(today, on);
+  if (ahead > 0) {
+    const left = ahead === 1 ? "Tomorrow" : ahead < 14 ? `${ahead} days to go` : ahead < 60 ? `${Math.round(ahead / 7)} weeks to go` : `${Math.round(ahead / 30)} months to go`;
+    return { left, phase: ahead <= 3 ? "soon" : "ahead", days: ahead };
+  }
+  const since = daysBetween(end, today);
+  if (since <= 0) {
+    const total = daysBetween(on, end) + 1;
+    return { left: total === 1 ? "Today" : `Day ${daysBetween(on, today) + 1} of ${total}`, phase: "now", days: 0 };
+  }
+  const left = since === 1 ? "Yesterday" : since < 14 ? `${since} days ago` : since < 60 ? `${Math.round(since / 7)} weeks ago` : `${Math.round(since / 30)} months ago`;
+  return { left, phase: "past", days: -since };
 }

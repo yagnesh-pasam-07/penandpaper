@@ -41,6 +41,7 @@ export function PaperText({
   done = false,
   onToggle,
   onMakeTodo,
+  onCountdown,
   footer,
   people = [],
 }: {
@@ -72,6 +73,8 @@ export function PaperText({
   onToggle?: () => void;
   /** Picked text offers a small box to make it a to-do (or take the box away). */
   onMakeTodo?: () => void;
+  /** Picked text: a "Count down" chip beside "To-do" (when it happens). */
+  onCountdown?: () => void;
   /** Under the words (a to-do's date chip). */
   footer?: React.ReactNode;
   /** Who "@" can suggest: the people this paper is shared with. */
@@ -176,6 +179,23 @@ export function PaperText({
             {!todo && <path d="M3.8 6.2l1.6 1.6 3-3.4" />}
           </svg>
           {todo ? "Plain text" : "To-do"}
+        </button>
+      )}
+      {selected && onCountdown && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCountdown();
+          }}
+          title="Count down to a day"
+          className={`absolute -top-9 ${onMakeTodo ? "left-[92px]" : "left-0"} flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised px-2 font-sans text-[12px] font-medium whitespace-nowrap text-ink shadow-[0_8px_20px_-12px_var(--shadow)] hover:bg-soft`}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+            <rect x="1.5" y="2.5" width="9" height="8" rx="1.5" />
+            <path d="M1.5 5h9M4 1.2v2.4M8 1.2v2.4" />
+          </svg>
+          Count down
         </button>
       )}
       <div className={todo ? "flex items-start" : undefined} style={todo ? { gap: 10 * shown } : undefined}>

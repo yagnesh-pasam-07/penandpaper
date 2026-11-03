@@ -12,6 +12,8 @@ import { LiveCursors, LiveFaces } from "./live-ui";
 import { paperTitle, type DropPaper } from "./logic";
 import type { SharedPaper } from "./share-server";
 import { useLive } from "./use-live";
+import { useViewerTz } from "./chrome";
+import { CountdownStub, useToday } from "./countdown";
 import { useCanvasView, ViewControls } from "./use-view";
 
 const NO_FRESH = new Set<string>();
@@ -28,11 +30,12 @@ export function SharedView({ paper: initial, signedIn, token = null }: { paper: 
   const origin = useRef<HTMLDivElement>(null);
   const spot = useRef<{ x: number; y: number } | null>(null);
   const { view, zoomBy, reset, fit } = useCanvasView(page, origin, viewKey(`shared-${initial.id}`));
-  const [paper, setPaper] = useState<Pick<DropPaper, "thoughts" | "strokes">>({ thoughts: initial.thoughts, strokes: initial.strokes });
+  const [paper, setPaper] = useState<Pick<DropPaper, "thoughts" | "strokes" | "happensOn" | "happensUntil">>({ thoughts: initial.thoughts, strokes: initial.strokes, happensOn: initial.happensOn, happensUntil: initial.happensUntil });
+  const today = useToday(useViewerTz());
   const resync = useCallback(async () => {
     try {
       const next = await call<DropPaper>(`/api/drop/papers/${initial.id}${token ? `?t=${encodeURIComponent(token)}` : ""}`);
-      setPaper({ thoughts: next.thoughts, strokes: next.strokes });
+      setPaper({ thoughts: next.thoughts, strokes: next.strokes, happensOn: next.happensOn, happensUntil: next.happensUntil });
     } catch {
       // Keep what's on screen.
     }
@@ -67,6 +70,7 @@ export function SharedView({ paper: initial, signedIn, token = null }: { paper: 
           <span className="h-5 w-px bg-line" />
           <span className="font-hand text-[20px] text-ink">{paperTitle(initial)}</span>
           <span className="rounded-full bg-soft px-2 py-0.5 text-[12px] text-mute">{initial.owner}&apos;s paper · view only</span>
+          {paper.happensOn && <CountdownStub on={paper.happensOn} until={paper.happensUntil} today={today} />}
         </div>
         <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-line bg-sheet/90 py-1 pr-1 pl-3 shadow-[0_10px_30px_-18px_var(--shadow)] backdrop-blur-md">
           <LiveFaces live={live} />
@@ -97,9 +101,22 @@ export function SharedView({ paper: initial, signedIn, token = null }: { paper: 
                   style={{ fontSize: 22 * (it.thought.size ?? 1), color: `var(--ink-${it.thought.color ?? "ink"})`, maxWidth: 420 * Math.max(1, it.thought.size ?? 1) }}
                 >
                   <HandText text={it.thought.text} seed={it.thought.createdAt} />
+                  {it.thought.happensOn && (
+                    <span className="mt-1 block font-sans text-[13px]">
+                      <CountdownStub on={it.thought.happensOn} until={it.thought.happensUntil} today={today} />
+                    </span>
+                  )}
                 </div>
               ) : (
-                <ThoughtBubble text={it.thought.text} image={it.thought.image} done={it.thought.status === "done"} shape={it.thought.shape} seed={it.thought.createdAt} readOnly />
+                <ThoughtBubble
+                  text={it.thought.text}
+                  image={it.thought.image}
+                  done={it.thought.status === "done"}
+                  shape={it.thought.shape}
+                  seed={it.thought.createdAt}
+                  readOnly
+                  footer={it.thought.happensOn ? <CountdownStub on={it.thought.happensOn} until={it.thought.happensUntil} today={today} /> : undefined}
+                />
               )
             }
           />

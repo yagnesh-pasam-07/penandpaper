@@ -14,12 +14,14 @@ const patch = z
     color: z.enum(INKS).optional(),
     /** A to-do's day, with or without a time (a reminder); null takes it off. */
     due: z.object({ at: z.iso.datetime({ offset: true }), hasTime: z.boolean() }).nullable().optional(),
+    /** When it happens (a countdown, on anything): a day and an optional last day; null takes it off. */
+    happens: z.object({ on: z.iso.date(), until: z.iso.date().nullable() }).refine((h) => !h.until || h.until >= h.on, "The end is before the start.").nullable().optional(),
     /** Written text ⇄ a to-do with a checkbox (a hand-cut note stays a note; a picture is always a drop). */
     kind: z.enum(["text", "todo"]).optional(),
     /** Takes a crumple back (an undo). */
     restore: z.literal(true).optional(),
   })
-  .refine((p) => p.text !== undefined || p.status !== undefined || p.size !== undefined || p.color !== undefined || p.due !== undefined || p.kind !== undefined || p.restore);
+  .refine((p) => p.text !== undefined || p.status !== undefined || p.size !== undefined || p.color !== undefined || p.due !== undefined || p.kind !== undefined || p.happens !== undefined || p.restore);
 
 const gone = () => Response.json({ error: "That thought isn't on this paper." }, { status: 404 });
 
