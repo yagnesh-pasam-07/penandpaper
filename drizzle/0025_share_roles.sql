@@ -1,0 +1,1 @@
+ALTER TABLE "drop_shares" ADD COLUMN "role" text DEFAULT 'view' NOT NULL;

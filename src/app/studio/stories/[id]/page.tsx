@@ -10,9 +10,12 @@ import { writerOrPage } from "@/modules/stories/studio-gate";
 
 export const metadata: Metadata = { title: "Writing · Studio", robots: { index: false, follow: false } };
 
-async function Editor({ params }: { params: Promise<{ id: string }> }) {
+async function Editor({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ p?: string | string[] }> }) {
   await connection();
   const { id } = await params;
+  // ?p=7: open at paragraph 8 (0-based), from "where readers stop".
+  const { p } = await searchParams;
+  const focusBlock = typeof p === "string" && /^\d{1,4}$/.test(p) ? Number(p) : null;
   const writer = await writerOrPage(`/studio/stories/${id}`);
   if (!writer || typeof writer !== "object" || !("id" in writer)) return writer;
   if (!z.uuid().safeParse(id).success) notFound();
@@ -26,6 +29,7 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
         ))}
       </datalist>
       <StoryEditor
+      focusBlock={focusBlock}
       initial={{
         id: s.id,
         slug: s.slug,
@@ -62,7 +66,7 @@ export default function EditStoryPage(props: PageProps<"/studio/stories/[id]">) 
   return (
     <div className={storyFonts}>
       <Suspense fallback={<div className="min-h-dvh bg-bg" aria-busy="true" />}>
-        <Editor params={props.params} />
+        <Editor params={props.params} searchParams={props.searchParams} />
       </Suspense>
     </div>
   );

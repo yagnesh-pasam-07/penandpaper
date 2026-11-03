@@ -28,6 +28,9 @@ import { Toolbar, TOOL_ORDER, type Tool } from "./tools";
 import { useCanvasView, ViewControls } from "./use-view";
 import { setVoiceVocabulary, useVoice } from "./use-voice";
 import { PenButton, Writer } from "./writer";
+import { applyLive } from "./live";
+import { LiveCursors, LiveFaces } from "./live-ui";
+import { useLive } from "./use-live";
 
 /* ---------- A paper ---------- */
 
@@ -61,6 +64,9 @@ function readPen(): { color: InkName; shape: ShapeKind } {
   }
 }
 
+/** Which of the six hand-cut note shapes a new note gets. */
+const randomShape = () => Math.floor(Math.random() * 6);
+
 /** Undo window for crumpling (and how long the toast stays). */
 const UNDO_MS = 6000;
 const CRUMPLE_MS = 450;
@@ -68,7 +74,29 @@ const CRUMPLE_MS = 450;
 type Toast = { text: string; undo?: () => void; action?: { label: string; run: () => void } };
 type Leaving = Map<string, "crumple">;
 
-export function DropCanvas({ initial, papers, me, focus = null, write = false, today = false }: { initial: DropPaper; papers: PaperMeta[]; me: Me; focus?: string | null; write?: boolean; today?: boolean }) {
+/**
+ * Someone the paper is shared with to edit (not its owner): the same canvas,
+ * live, without the owner's own tools (other papers, Tonight, sharing, dates).
+ */
+export type Guest = { owner: string };
+
+export function DropCanvas({
+  initial,
+  papers,
+  me,
+  focus = null,
+  write = false,
+  today = false,
+  guest = null,
+}: {
+  initial: DropPaper;
+  papers: PaperMeta[];
+  me: Me;
+  focus?: string | null;
+  write?: boolean;
+  today?: boolean;
+  guest?: Guest | null;
+}) {
   const router = useRouter();
   // One paper per mount (the page keys this by paper), so its id is fixed.
   const paperId = initial.id;
@@ -80,7 +108,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
     setPaper(live.current);
   }, []);
   // The writer: open, and what's half-written in it (kept on close, and across reloads on this device).
-  const [writing, setWriting] = useState(initial.thoughts.length === 0 || write);
+  const [writing, setWriting] = useState((!guest && initial.thoughts.length === 0) || write);
   const [draft, setDraft] = useState(() => readDraft(draftKey(paperId)));
   // A picture pasted into the writer, dropped with the next thought.
   const [draftImage, setDraftImage] = useState<Picture | null>(null);
@@ -117,7 +145,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   const cancelCrumple = useRef(new Map<string, () => void>());
   const tz = useViewerTz();
   // Who "@" can suggest and notify: the people this paper is shared with.
-  const people = usePeople(paperId);
+  const people = usePeople(paperId, !guest);
   // Whisper is told the names on this paper (and of the people it's shared with), so it spells them right.
   useEffect(() => {
     setVoiceVocabulary([...paper.thoughts.map((t) => t.text), ...people.map((p) => (p.name ? `with ${p.name}` : ""))].join("\n"));
@@ -182,6 +210,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
 
   // Thoughts tried on the homepage before signing up land on a paper of their own.
   useEffect(() => {
+    if (guest) return;
     void importTryPaper({ id: paperId, blank: initial.thoughts.length === 0 && !initial.name }).then(async (into) => {
       if (!into) return;
       if (into !== paperId) {
@@ -259,6 +288,36 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       window.removeEventListener("focus", sync);
     };
   }, [update, paperId]);
+
+  /*
+   * Live: what anyone else with this paper open saves shows here at once, and
+   * where they point. A change to something this tab is still saving waits:
+   * the fresh read after the queue empties brings it in.
+   */
+  const resync = useCallback(async () => {
+    try {
+      const next = await call<DropPaper>(`/api/drop/papers/${paperId}`);
+      if (pending.current === 0 && waiting.current.size === 0) update(() => next);
+    } catch {
+      // Keep what's on screen.
+    }
+  }, [paperId, update]);
+  const live_ = useLive(paperId, {
+    spot,
+    onChange: (ev) => {
+      // A thought this tab hasn't saved yet (text still being written) is left alone.
+      if (ev.type === "thought" && unsaved.current.has(ev.thought.id)) return;
+      const arrived = ev.type === "thought" && !live.current.thoughts.some((t) => t.id === ev.thought.id);
+      update((p) => applyLive(p, ev));
+      if (arrived) briefly(setFresh, [ev.thought.id], 900);
+    },
+    onSync: () => void resync(),
+    onRole: () => router.refresh(),
+  });
+  // Taken off the paper while it was open.
+  useEffect(() => {
+    if (live_.removed && guest) router.replace("/drop");
+  }, [live_.removed, guest, router]);
 
   // Leaving with a crumple still undoable: send it now so it isn't lost.
   useEffect(() => {
@@ -436,6 +495,8 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   const offered = useRef(new Set<string>());
   /** Words with "@name@company.com": offer to share the paper with them (never shares on its own). */
   const offerMentions = (text: string) => {
+    // Only the owner shares and mentions.
+    if (guest) return;
     // "@Teja": someone already on the paper. They get a short email with the words (once per name per visit).
     const named = people.filter((p) => {
       const handle = mentionText(p).slice(1).toLowerCase();
@@ -457,7 +518,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
         label: "Share",
         run: () => {
           for (const email of fresh) {
-            void call(`/api/drop/papers/${paperId}/share`, { method: "POST", body: JSON.stringify({ invite: email }) })
+            void call(`/api/drop/papers/${paperId}/share`, { method: "POST", body: JSON.stringify({ invite: email, role: "view" }) })
               .then(() => setToast({ text: `Shared with ${email}: they'll get an email` }))
               .catch((e) => setError(e instanceof Error ? e.message : String(e)));
           }
@@ -533,14 +594,15 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
   /** Puts a new thought on the paper and saves it; a picture and a spot are optional. */
   const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number }; kind?: ThoughtKind; id?: string; color?: InkName; size?: number }) => {
     // "… remind me tomorrow at 5": the words become a to-do with that reminder.
-    const ask = !extra.image ? parseReminder(value, new Date(), tz) : null;
+    // Reminders are the owner's: on someone else's paper, "remind me" is just words.
+    const ask = !extra.image && !guest ? parseReminder(value, new Date(), tz) : null;
     if (ask) value = ask.text;
     const kind: ThoughtKind = ask && extra.kind === "text" ? "todo" : (extra.kind ?? "note");
     const thought: Thought = {
       id: extra.id ?? uid(),
       text: value,
       status: "open",
-      shape: Math.floor(Math.random() * 6),
+      shape: randomShape(),
       createdAt: new Date().toISOString(),
       doneAt: null,
       x: extra.x ?? null,
@@ -958,7 +1020,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
 
   const pickedColor =
     picked?.kind === "ink" ? ((paper.strokes ?? []).find((x) => x.id === picked.id)?.color ?? "ink") : picked?.kind === "text" ? (paper.thoughts.find((x) => x.id === picked.id)?.color ?? "ink") : null;
-  useReminders(paper.thoughts, (t) => setToast({ text: `Reminder: ${t.text.length > 60 ? `${t.text.slice(0, 59)}…` : t.text}`, action: { label: "Show", run: () => router.push(`/drop/${paperId}?note=${encodeURIComponent(t.id)}`) } }));
+  useReminders(guest ? [] : paper.thoughts, (t) => setToast({ text: `Reminder: ${t.text.length > 60 ? `${t.text.slice(0, 59)}…` : t.text}`, action: { label: "Show", run: () => router.push(`/drop/${paperId}?note=${encodeURIComponent(t.id)}`) } }));
   const items = sheetItems(paper);
   const onSheet = items;
 
@@ -972,8 +1034,8 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       returning={returning.has(t.id)}
       {...extra}
       {...handlers(t)}
-      onDue={todo(t) ? () => setDueFor(t.id) : undefined}
-      footer={t.dueAt && todo(t) ? <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} /> : undefined}
+      onDue={todo(t) && !guest ? () => setDueFor(t.id) : undefined}
+      footer={t.dueAt && todo(t) && !guest ? <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} /> : undefined}
       popover={
         dueFor === t.id ? (
           <DuePicker
@@ -1021,6 +1083,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
               <DueChip dueAt={t.dueAt} hasTime={!!t.dueHasTime} tz={tz} onClick={() => setDueFor(t.id)} />
             ) : (
               !stream &&
+              !guest &&
               picked?.id === t.id && (
                 <button type="button" onClick={() => setDueFor(t.id)} className="rounded-full bg-soft px-2 py-0.5 text-[12px] font-medium text-mute hover:text-ink">
                   + Date · remind me
@@ -1051,14 +1114,24 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
       <DropHeader
         floating
         me={me}
-        title={<PaperBar paper={{ id: paperId, name: initial.name, createdAt: initial.createdAt, archivedAt: initial.archivedAt }} papers={papers} />}
+        title={
+          guest ? (
+            <span className="flex items-center gap-2">
+              <span className="font-hand text-[20px] text-ink">{paperTitle(initial)}</span>
+              <span className="rounded-full bg-soft px-2 py-0.5 text-[12px] whitespace-nowrap text-mute">{guest.owner}&apos;s paper · you can edit</span>
+            </span>
+          ) : (
+            <PaperBar paper={{ id: paperId, name: initial.name, createdAt: initial.createdAt, archivedAt: initial.archivedAt }} papers={papers} />
+          )
+        }
         right={
           <>
-            <TonightButton />
-            <ShareButton paperId={paperId} />
-            <SearchButton />
+            <LiveFaces live={live_} me={me.name} />
+            {!guest && <TonightButton />}
+            {!guest && <ShareButton paperId={paperId} />}
+            {!guest && <SearchButton />}
             <Link href="/drop/library" className="rounded-lg px-2.5 py-2 text-sm font-medium text-mute hover:bg-soft hover:text-ink">
-              Library
+              {guest ? "Your papers" : "Library"}
             </Link>
           </>
         }
@@ -1149,9 +1222,11 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
             dragEnabled={tool === "select" || tool === "text"}
             apiRef={canvasApi}
             offset={carry ? ({ ids: carry.noteIds, dx: carry.dx, dy: carry.dy } satisfies Offset) : null}
-            overlay={({ boxes, zoom }) => {
+            overlay={({ boxes, zoom, toCanvas }) => {
               boxesRef.current = boxes;
               return (
+                <>
+                <LiveCursors peers={live_.peers} toCanvas={toCanvas} zoom={zoom} />
                 <InkLayer
                   strokes={strokes}
                   boxes={boxes}
@@ -1175,6 +1250,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
                     if (s && (s.label ?? "") !== text) editStroke(id, { label: text || null });
                   }}
                 />
+                </>
               );
             }}
             render={(it) => (
@@ -1190,7 +1266,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
 
       {(onSheet.length > 0 || strokes.length > 0) && <ViewControls view={view} onZoom={(f) => zoomBy(f)} onReset={reset} onFit={fit} />}
 
-      <TodayThought
+      {!guest && <TodayThought
         force={today}
         onUsed={(onPaper, newId) => {
           // Used: it lands on today's paper. Here, show it at once; elsewhere, go there with it highlighted.
@@ -1206,7 +1282,7 @@ export function DropCanvas({ initial, papers, me, focus = null, write = false, t
             .catch(() => {});
           setToast({ text: "On today's paper" });
         }}
-      />
+      />}
       <PenButton ref={penButton} hidden={writing} onOpen={() => setWriting(true)} />
       {writing && mounted && (
         <Writer draft={draft} onDraft={setDraft} image={draftImage} onImage={setDraftImage} onDrop={drop} onClose={closeWriter} />

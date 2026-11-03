@@ -176,6 +176,13 @@
       "when": 1793597189442,
       "tag": "0024_canvas_planning",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793638765218,
+      "tag": "0025_share_roles",
+      "breakpoints": true
     }
   ]
 }

@@ -1,19 +1,31 @@
 import { z } from "zod";
 import { MAX_PAPER_NAME } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
+import { accessTo } from "@/modules/drop/live-server";
+import { currentUser } from "@/server/session";
 import { archivePaper, deletePaper, getPaper, renamePaper, restorePaper } from "@/modules/drop/server";
 
 const gone = () => Response.json({ error: "That paper isn't there." }, { status: 404 });
 const badId = () => Response.json({ error: "Not a paper." }, { status: 400 });
 
-/** A paper with its thoughts. */
-export async function GET(_request: Request, ctx: RouteContext<"/api/drop/papers/[id]">) {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
+/**
+ * A paper with its thoughts: the owner's own, or one shared with them (or a
+ * public link's, `?t=<token>`), as a live paper re-reads it after a reconnect.
+ * Anyone but the owner gets it without due dates.
+ */
+export async function GET(request: Request, ctx: RouteContext<"/api/drop/papers/[id]">) {
   const { id } = await ctx.params;
   if (!z.uuid().safeParse(id).success) return badId();
-  const paper = await getPaper(user.id, id);
-  return paper ? Response.json(paper, noStore) : gone();
+  const token = new URL(request.url).searchParams.get("t");
+  const user = await currentUser().catch(() => null);
+  if (!user && !token) return Response.json({ error: "Sign in to use your paper." }, { status: 401 });
+  const access = await accessTo(id, user, token);
+  if (!access) return gone();
+  const paper = await getPaper(access.ownerId, id);
+  if (!paper) return gone();
+  if (access.role === "owner") return Response.json(paper, noStore);
+  const { thoughts, strokes, name, createdAt } = paper;
+  return Response.json({ id, name, createdAt, archivedAt: null, strokes, thoughts: thoughts.map((t) => ({ ...t, dueAt: null, dueHasTime: false })) }, noStore);
 }
 
 const patch = z

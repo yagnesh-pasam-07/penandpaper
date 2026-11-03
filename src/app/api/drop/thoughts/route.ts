@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { X_SHARE_LIMIT, Y_LIMIT } from "@/components/canvas/arrange";
 import { MAX_IMAGE, MAX_THOUGHT } from "@/modules/drop/logic";
-import { noStore, requireUser } from "@/modules/drop/http";
+import { noStore, requireEditor } from "@/modules/drop/http";
+import { broadcast, tabOf, thoughtEvent } from "@/modules/drop/live-server";
 import { addThought, PaperNotFound } from "@/modules/drop/server";
 
 const body = z
@@ -27,14 +28,17 @@ const body = z
   // Words, a picture, or both.
   .refine((b) => b.text.length > 0 || !!b.image);
 
+/** Puts a thought on a paper: the owner's, or one shared with them to edit. Everyone with it open sees it at once. */
 export async function POST(request: Request) {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That thought didn't come through. Try again." }, { status: 400 });
   const { paperId, ...input } = parsed.data;
+  const ed = await requireEditor(paperId);
+  if (ed instanceof Response) return ed;
   try {
-    return Response.json(await addThought(user.id, paperId, input), noStore);
+    const thought = await addThought(ed.ownerId, paperId, input, ed.user.id);
+    await broadcast(paperId, thoughtEvent(thought), tabOf(request));
+    return Response.json(ed.ownerId === ed.user.id ? thought : { ...thought, dueAt: null, dueHasTime: false }, noStore);
   } catch (e) {
     if (e instanceof PaperNotFound) return Response.json({ error: "That paper isn't there any more." }, { status: 404 });
     return Response.json({ error: "Couldn't save that thought." }, { status: 409 });

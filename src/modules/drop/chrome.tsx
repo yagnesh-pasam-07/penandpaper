@@ -92,8 +92,14 @@ export function DropHeader({ me, title, right, floating = false }: { me: Me; tit
 }
 
 /** JSON in and out of Drop's API; a lost session reloads to the log-in page. */
+/**
+ * This tab, on a live paper: sent with every save so the change comes back to
+ * everyone else on the paper but not, as an echo, to the tab that made it.
+ */
+export const TAB_ID = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID().replace(/-/g, "").slice(0, 20) : Math.random().toString(36).slice(2, 14);
+
 export async function call<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json" }, cache: "no-store" });
+  const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", "x-pp-tab": TAB_ID }, cache: "no-store" });
   if (res.status === 401) {
     // A full load on purpose: the session is gone, so nothing on screen should survive.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination

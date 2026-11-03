@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageRead, biggestDrop, daily, deviceOf, duration, isBot, mean, median, readThrough, retention, shareRate, sourceOf, tagged, whatsappText } from "./reach";
+import { averageRead, biggestDrop, daily, rate, usual, deviceOf, duration, isBot, mean, median, readThrough, retention, shareRate, sourceOf, tagged, whatsappText } from "./reach";
 
 const own = "penandpaper-app.vercel.app";
 
@@ -123,5 +123,21 @@ describe("attention", () => {
     expect(duration(45)).toBe("45 s");
     expect(duration(200)).toBe("3 min 20 s");
     expect(duration(180)).toBe("3 min");
+  });
+});
+
+describe("your usual story", () => {
+  const s = (id: string, readers: number, finished: number) => ({ id, readers, week1: readers, pastOpening: readers, finished, returning: 0 });
+  it("is the median of the other stories that had enough readers", () => {
+    const others = [s("a", 100, 40), s("b", 50, 30), s("c", 200, 90), s("tiny", 3, 3)];
+    expect(usual(others, (x) => rate(x.finished, x.readers))).toBe(45);
+  });
+  it("says nothing until two other stories can be compared", () => {
+    expect(usual([s("a", 100, 40)], (x) => x.readers)).toBeNull();
+    expect(usual([s("a", 100, 40), s("b", 9, 9)], (x) => x.readers)).toBeNull();
+  });
+  it("rates against nobody as 0, not a division by zero", () => {
+    expect(rate(3, 0)).toBe(0);
+    expect(rate(1, 3)).toBe(33);
   });
 });

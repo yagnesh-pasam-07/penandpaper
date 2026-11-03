@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { INKS, MAX_LABEL, MAX_STROKE_POINTS, STROKE_LIMIT } from "@/modules/drop/logic";
-import { requireUser } from "@/modules/drop/http";
-import { eraseStroke, updateStroke } from "@/modules/drop/server";
+import { requireEditor } from "@/modules/drop/http";
+import { broadcast, tabOf } from "@/modules/drop/live-server";
+import { eraseStroke, strokeOn, updateStroke } from "@/modules/drop/server";
 
 const coord = z.number().finite().min(-STROKE_LIMIT).max(STROKE_LIMIT);
 const thoughtId = z.string().regex(/^[a-z0-9-]{6,40}$/);
@@ -20,12 +21,14 @@ const gone = () => Response.json({ error: "That line isn't on this paper." }, { 
 
 /** Erases a line: hidden at once, swept up a week later. The paper goes in the query: `?paper=<id>`. */
 export async function DELETE(request: Request, ctx: RouteContext<"/api/drop/strokes/[id]">) {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
   const paper = z.uuid().safeParse(new URL(request.url).searchParams.get("paper"));
   if (!paper.success) return Response.json({ error: "Which paper?" }, { status: 400 });
+  const ed = await requireEditor(paper.data);
+  if (ed instanceof Response) return ed;
   const { id } = await ctx.params;
-  return (await eraseStroke(user.id, paper.data, id)) ? new Response(null, { status: 204 }) : gone();
+  if (!(await eraseStroke(ed.ownerId, paper.data, id, true, ed.user.id))) return gone();
+  await broadcast(paper.data, { type: "stroke-gone", id }, tabOf(request));
+  return new Response(null, { status: 204 });
 }
 
 /**
@@ -33,13 +36,21 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/drop/stro
  * With nothing but `{ "paperId" }` (or `restore: true`), brings an erased line back (an undo).
  */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/strokes/[id]">) {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
   const parsed = change.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That change didn't come through." }, { status: 400 });
   const { id } = await ctx.params;
   const { paperId, restore, ...rest } = parsed.data;
+  const ed = await requireEditor(paperId);
+  if (ed instanceof Response) return ed;
+  const tab = tabOf(request);
   const edits = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
-  if (restore || !Object.keys(edits).length) return (await eraseStroke(user.id, paperId, id, false)) ? new Response(null, { status: 204 }) : gone();
-  return (await updateStroke(user.id, paperId, id, edits)) ? new Response(null, { status: 204 }) : gone();
+  if (restore || !Object.keys(edits).length) {
+    if (!(await eraseStroke(ed.ownerId, paperId, id, false, ed.user.id))) return gone();
+    const back = await strokeOn(paperId, id);
+    if (back) await broadcast(paperId, { type: "stroke", stroke: back }, tab);
+    return new Response(null, { status: 204 });
+  }
+  if (!(await updateStroke(ed.ownerId, paperId, id, edits, ed.user.id))) return gone();
+  await broadcast(paperId, { type: "stroke-edit", id, change: edits }, tab);
+  return new Response(null, { status: 204 });
 }

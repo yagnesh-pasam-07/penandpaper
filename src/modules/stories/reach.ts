@@ -190,3 +190,27 @@ export function duration(seconds: number): string {
   const r = s % 60;
   return r ? `${m} min ${r} s` : `${m} min`;
 }
+
+/**
+ * One live story's readers, as the writer compares stories: everyone who
+ * opened it, how many of them in its first 7 days, how many got past the
+ * opening (reached the third paragraph), finished it, and had already read
+ * another story first (came back).
+ */
+export type StoryNumbers = { id: string; readers: number; week1: number; pastOpening: number; finished: number; returning: number };
+
+/** n of d as a whole percent; 0 when there's nobody. */
+export const rate = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+
+/** Stories with fewer readers than this say more about chance than about the writing, so they don't set "your usual". */
+export const USUAL_MIN_READERS = 10;
+
+/**
+ * "Your usual": the median of the writer's other stories, for one measure.
+ * Null until there are at least two other stories with enough readers to compare with,
+ * so a story is never judged against one other story or a handful of friends.
+ */
+export function usual(others: StoryNumbers[], measure: (s: StoryNumbers) => number): number | null {
+  const fair = others.filter((s) => s.readers >= USUAL_MIN_READERS);
+  return fair.length >= 2 ? median(fair.map(measure)) : null;
+}

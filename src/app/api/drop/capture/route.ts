@@ -4,6 +4,7 @@ import { noStore, userFromRequest } from "@/modules/drop/http";
 import { pictureFromUrl } from "@/modules/drop/picture";
 import { allowWithin } from "@/modules/drop/rate";
 import { canCapture, captureText, cleanUrl } from "@/modules/drop/share";
+import { broadcast, thoughtEvent } from "@/modules/drop/live-server";
 import { captureTarget, captureThought } from "@/modules/drop/server";
 
 const body = z.object({
@@ -42,6 +43,8 @@ export async function POST(request: Request) {
   if (!text && !image) return Response.json({ error: "Couldn't get that picture." }, { status: 400 });
   try {
     const done = await captureThought(who.user.id, { id: parsed.data.id, text: text ?? "", image });
+    // Anyone with that paper open (the owner on another screen, people it's shared with) sees it land.
+    await broadcast(done.paperId, thoughtEvent(done.thought));
     return Response.json({ id: done.thought.id, paperId: done.paperId, paperName: done.paperName?.trim() || null, ...(imageUrl && !image ? { imageSkipped: true } : {}) }, noStore);
   } catch {
     return Response.json({ error: "Couldn't save that thought." }, { status: 409 });

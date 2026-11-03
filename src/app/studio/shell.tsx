@@ -119,11 +119,11 @@ export function StudioShell({
         aria-label="Studio"
         className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 lg:hidden"
       >
-        <Link href="/studio" className={tab(section === "overview")}>
-          Overview
-        </Link>
         <Link href="/studio/stories" className={tab(section === "stories")}>
           Stories
+        </Link>
+        <Link href="/studio" className={tab(section === "overview")}>
+          App
         </Link>
         {stories.map((s) => (
           <Link
@@ -138,13 +138,14 @@ export function StudioShell({
 
       <div className="flex flex-1">
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-line px-3 py-5 lg:flex">
-          <Link href="/studio" className={item(section === "overview")}>
-            <OverviewIcon />
-            Overview
-          </Link>
+          {/* Stories first: what a writer opens Studio for. The app's own numbers sit beside them. */}
           <Link href="/studio/stories" className={item(section === "stories")}>
             <StoriesIcon />
             Stories
+          </Link>
+          <Link href="/studio" className={item(section === "overview")}>
+            <OverviewIcon />
+            App
           </Link>
           {stories.length > 0 && (
             <>

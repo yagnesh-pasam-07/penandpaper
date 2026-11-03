@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { INKS, MAX_TEXT_SIZE, MAX_THOUGHT, MIN_TEXT_SIZE } from "@/modules/drop/logic";
-import { noStore, requireUser, userFromRequest } from "@/modules/drop/http";
-import { crumpleThought, setThoughtKind, uncrumpleThought, updateThought } from "@/modules/drop/server";
+import { INKS, MAX_TEXT_SIZE, MAX_THOUGHT, MIN_TEXT_SIZE, type Thought } from "@/modules/drop/logic";
+import { noStore, requireEditor, userFromRequest } from "@/modules/drop/http";
+import { broadcast, tabOf, thoughtEvent } from "@/modules/drop/live-server";
+import { crumpleThought, setThoughtKind, thoughtOn, uncrumpleThought, updateThought } from "@/modules/drop/server";
 
 const patch = z
   .object({
@@ -23,20 +24,35 @@ const patch = z
 const gone = () => Response.json({ error: "That thought isn't on this paper." }, { status: 404 });
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/thoughts/[id]">) {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
   const parsed = patch.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Nothing to change." }, { status: 400 });
   const { id } = await ctx.params;
   const { paperId, kind, restore, ...change } = parsed.data;
-  if (restore) return (await uncrumpleThought(user.id, paperId, id)) ? new Response(null, { status: 204 }) : gone();
-  if (kind) {
-    const k = await setThoughtKind(user.id, paperId, id, kind);
-    if (!k) return gone();
-    if (!Object.values(change).some((v) => v !== undefined)) return Response.json(k, noStore);
+  const ed = await requireEditor(paperId);
+  if (ed instanceof Response) return ed;
+  // Dates and reminders are the owner's own planning: a guest can't set them.
+  if (change.due !== undefined && ed.ownerId !== ed.user.id) return Response.json({ error: "Only the paper's owner sets dates." }, { status: 403 });
+  const tab = tabOf(request);
+  // A guest never gets the owner's dates back.
+  const mine = (t: Thought): Thought => (ed.ownerId === ed.user.id ? t : { ...t, dueAt: null, dueHasTime: false });
+  if (restore) {
+    if (!(await uncrumpleThought(ed.ownerId, paperId, id, ed.user.id))) return gone();
+    const back = await thoughtOn(ed.ownerId, paperId, id);
+    if (back) await broadcast(paperId, thoughtEvent(back), tab);
+    return new Response(null, { status: 204 });
   }
-  const thought = await updateThought(user.id, paperId, id, change);
-  return thought ? Response.json(thought, noStore) : gone();
+  if (kind) {
+    const k = await setThoughtKind(ed.ownerId, paperId, id, kind, ed.user.id);
+    if (!k) return gone();
+    if (!Object.values(change).some((v) => v !== undefined)) {
+      await broadcast(paperId, thoughtEvent(k), tab);
+      return Response.json(mine(k), noStore);
+    }
+  }
+  const thought = await updateThought(ed.ownerId, paperId, id, change, ed.user.id);
+  if (!thought) return gone();
+  await broadcast(paperId, thoughtEvent(thought), tab);
+  return Response.json(mine(thought), noStore);
 }
 
 /** Crumples it: hidden at once, swept up for good a week later. The paper goes in the query: `?paper=<id>`. A session or a Bearer token. */
@@ -44,9 +60,13 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/drop/thou
   // The Mac app undoes a save with its token; the web app uses the signed-in session.
   const who = await userFromRequest(request);
   if (who instanceof Response) return who;
-  const { user } = who;
   const paper = z.uuid().safeParse(new URL(request.url).searchParams.get("paper"));
   if (!paper.success) return Response.json({ error: "Which paper?" }, { status: 400 });
+  // A token only ever reaches its own papers; a signed-in editor reaches papers shared with them too.
+  const ed = who.tokenId ? { ownerId: who.user.id } : await requireEditor(paper.data, who.user);
+  if (ed instanceof Response) return ed;
   const { id } = await ctx.params;
-  return (await crumpleThought(user.id, paper.data, id)) ? new Response(null, { status: 204 }) : gone();
+  if (!(await crumpleThought(ed.ownerId, paper.data, id, "user" in ed ? ed.user.id : undefined))) return gone();
+  await broadcast(paper.data, { type: "gone", id }, tabOf(request));
+  return new Response(null, { status: 204 });
 }

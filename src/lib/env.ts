@@ -5,6 +5,8 @@ const optional = z.string().trim().min(1).optional().catch(undefined);
 
 const schema = z.object({
   DATABASE_URL: z.url({ message: "DATABASE_URL must be a Postgres connection string. See .env.example." }),
+  /** The direct (unpooled) connection: live papers LISTEN on it (a pooled connection can't hold a LISTEN). */
+  DATABASE_URL_UNPOOLED: z.url().optional().catch(undefined),
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters. See .env.example."),
   /** The address the app is served from. Vercel previews may leave it unset. */
   BETTER_AUTH_URL: z.url().optional().catch(undefined),

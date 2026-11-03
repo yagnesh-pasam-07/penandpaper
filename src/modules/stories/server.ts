@@ -213,8 +213,12 @@ async function freeSlug(title: string, exceptId?: string): Promise<string> {
     .select({ slug: stories.slug })
     .from(stories)
     .where(and(sql`${stories.slug} like ${`${base}%`}`, exceptId ? ne(stories.id, exceptId) : undefined));
-  return uniqueSlug(base, taken.map((t) => t.slug));
+  // Addresses the site already uses under /stories are never a story's.
+  return uniqueSlug(base, [...taken.map((t) => t.slug), ...RESERVED_SLUGS]);
 }
+
+/** /stories/<these> are pages of their own, so a story never takes them. */
+const RESERVED_SLUGS = ["unnoticed", "saved", "series", "rss-xml"];
 
 /** A new, empty draft. */
 export async function createStory(authorId: string, init: { title?: string; subtitle?: string; hook?: string; body?: string; category?: Category; originalUrl?: string | null } = {}): Promise<string> {

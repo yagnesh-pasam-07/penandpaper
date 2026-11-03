@@ -18,6 +18,10 @@ export function StoriesHeader() {
           </Link>
         </span>
         <span className="ml-auto flex items-center gap-1">
+          {/* The short pieces, from Instagram. */}
+          <Link href="/stories/unnoticed" className="font-hand rounded-lg px-2.5 py-1 text-[20px] text-ink hover:bg-soft">
+            unnoticed
+          </Link>
           <ThemeToggle />
           <ReaderAccount />
         </span>

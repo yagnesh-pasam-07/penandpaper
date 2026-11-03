@@ -6,9 +6,11 @@ import { call } from "./chrome";
 export type Person = { email: string; name: string | null };
 
 /** The people a paper is shared with: who "@" can suggest. Fetched once per paper, refreshed when a share changes. */
-export function usePeople(paperId: string): Person[] {
+export function usePeople(paperId: string, enabled = true): Person[] {
   const [people, setPeople] = useState<Person[]>([]);
   useEffect(() => {
+    // Only the owner can read who a paper is shared with.
+    if (!enabled) return;
     let live = true;
     const load = () =>
       void call<{ people: Person[] }>(`/api/drop/papers/${paperId}/share`)
@@ -20,7 +22,7 @@ export function usePeople(paperId: string): Person[] {
       live = false;
       window.removeEventListener("pp-shared", load);
     };
-  }, [paperId]);
+  }, [paperId, enabled]);
   return people;
 }
 

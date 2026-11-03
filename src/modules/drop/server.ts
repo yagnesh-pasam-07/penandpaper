@@ -83,8 +83,30 @@ async function ownedPaper(userId: string, paperId: string) {
   return row ?? null;
 }
 
+/**
+ * Who may change a paper: its owner, or someone it is shared with to edit (by
+ * their signed-in email). Returns the owner's id, which every row on the paper
+ * is kept under (so a guest's drop is part of the owner's paper: their search,
+ * Tonight's paper and evening email), or null. Checked on every save.
+ */
+export async function editorOf(user: { id: string; email: string }, paperId: string): Promise<{ ownerId: string } | null> {
+  const [row] = await db
+    .select({ ownerId: dropPapers.userId })
+    .from(dropPapers)
+    .where(
+      and(
+        eq(dropPapers.id, paperId),
+        isNull(dropPapers.deletedAt),
+        sql`(${dropPapers.userId} = ${user.id} or exists (select 1 from drop_shares s where s.paper_id = ${dropPapers.id} and s.email = ${user.email.toLowerCase()} and s.role = 'edit'))`,
+      ),
+    );
+  return row ?? null;
+}
+
 /** Notes that something on the paper changed, so it is the one /drop opens next. */
-async function touch(paperId: string): Promise<void> {
+async function touch(paperId: string, ownerId?: string, actor?: string): Promise<void> {
+  // A guest's change doesn't make it "the paper touched last": the owner's captures keep landing where the owner was.
+  if (actor && ownerId && actor !== ownerId) return;
   await db.update(dropPapers).set({ updatedAt: sql`now()` }).where(eq(dropPapers.id, paperId));
 }
 
@@ -114,13 +136,14 @@ async function strokesOf(paperId: string): Promise<Stroke[]> {
 }
 
 /** Draws a line on this paper. The same id twice (a retry) is one line. */
-export async function addStroke(userId: string, paperId: string, input: Stroke): Promise<Stroke> {
+export async function addStroke(userId: string, paperId: string, input: Stroke, actor?: string): Promise<Stroke> {
+  // `userId` is the paper's owner (the route has checked the person may edit it).
   if (!(await ownedPaper(userId, paperId))) throw new PaperNotFound();
   await db
     .insert(dropStrokes)
     .values({ id: input.id, paperId, userId, points: input.points, fromId: input.fromId, toId: input.toId, color: input.color ?? "ink", shape: input.shape ?? null, label: input.label ?? null })
     .onConflictDoNothing();
-  await touch(paperId);
+  await touch(paperId, userId, actor);
   return input;
 }
 
@@ -130,6 +153,7 @@ export async function updateStroke(
   paperId: string,
   id: string,
   patch: { points?: [number, number][]; color?: Stroke["color"]; label?: string | null; fromId?: string | null; toId?: string | null },
+  actor?: string,
 ): Promise<boolean> {
   const rows = await db
     .update(dropStrokes)
@@ -142,19 +166,25 @@ export async function updateStroke(
     })
     .where(and(eq(dropStrokes.id, id), eq(dropStrokes.userId, userId), eq(dropStrokes.paperId, paperId), isNull(dropStrokes.erasedAt)))
     .returning({ id: dropStrokes.id });
-  if (rows.length) await touch(paperId);
+  if (rows.length) await touch(paperId, userId, actor);
   return rows.length > 0;
 }
 
 /** Erases a line on this paper (or brings it back, for an undo). */
-export async function eraseStroke(userId: string, paperId: string, id: string, erased = true): Promise<boolean> {
+export async function eraseStroke(userId: string, paperId: string, id: string, erased = true, actor?: string): Promise<boolean> {
   const rows = await db
     .update(dropStrokes)
     .set({ erasedAt: erased ? sql`now()` : null })
     .where(and(eq(dropStrokes.id, id), eq(dropStrokes.userId, userId), eq(dropStrokes.paperId, paperId)))
     .returning({ id: dropStrokes.id });
-  if (rows.length) await touch(paperId);
+  if (rows.length) await touch(paperId, userId, actor);
   return rows.length > 0;
+}
+
+/** One line on this paper as it is now (for telling the others about an undo). */
+export async function strokeOn(paperId: string, id: string): Promise<Stroke | null> {
+  const all = await strokesOf(paperId);
+  return all.find((s) => s.id === id) ?? null;
 }
 
 /** Opens a paper with its thoughts, if it is theirs. */
@@ -256,6 +286,7 @@ export async function addThought(
   userId: string,
   paperId: string,
   input: { id: string; text: string; shape: number; image?: string | null; x?: number | null; y?: number | null; kind?: ThoughtKind },
+  actor?: string,
 ): Promise<Thought> {
   if (!(await ownedPaper(userId, paperId))) throw new PaperNotFound();
   const [row] = await db
@@ -264,11 +295,12 @@ export async function addThought(
     .onConflictDoNothing()
     .returning();
   if (row) {
-    await touch(paperId);
+    await touch(paperId, userId, actor);
     return toThought(row);
   }
   // Same id sent twice (a retry): return what's there, if it's theirs.
-  const [again] = await db.select().from(dropThoughts).where(and(eq(dropThoughts.id, input.id), eq(dropThoughts.userId, userId)));
+  // Only from this paper: a guest editing it must never read the owner's other papers by guessing an id.
+  const [again] = await db.select().from(dropThoughts).where(and(eq(dropThoughts.id, input.id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId)));
   if (!again) throw new Error("conflict");
   return toThought(again);
 }
@@ -304,6 +336,7 @@ export async function updateThought(
   paperId: string,
   id: string,
   patch: { text?: string; status?: "open" | "done"; size?: number; color?: Thought["color"]; due?: { at: string; hasTime: boolean } | null },
+  actor?: string,
 ): Promise<Thought | null> {
   const [row] = await db
     .update(dropThoughts)
@@ -328,41 +361,50 @@ export async function updateThought(
     )
     .returning();
   if (!row) return null;
-  await touch(paperId);
+  await touch(paperId, userId, actor);
   return toThought(row);
 }
 
 /** Crumples a thought on this paper (kept a week, then swept up). */
-export async function crumpleThought(userId: string, paperId: string, id: string): Promise<boolean> {
+export async function crumpleThought(userId: string, paperId: string, id: string, actor?: string): Promise<boolean> {
   const rows = await db
     .update(dropThoughts)
     .set({ crumpledAt: sql`now()` })
     .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt)))
     .returning({ id: dropThoughts.id });
-  if (rows.length) await touch(paperId);
+  if (rows.length) await touch(paperId, userId, actor);
   return rows.length > 0;
 }
 
 /** Takes a crumple back (an undo): the thought returns exactly as it was. */
-export async function uncrumpleThought(userId: string, paperId: string, id: string): Promise<boolean> {
+export async function uncrumpleThought(userId: string, paperId: string, id: string, actor?: string): Promise<boolean> {
   const rows = await db
     .update(dropThoughts)
     .set({ crumpledAt: null })
     .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNotNull(dropThoughts.crumpledAt)))
     .returning({ id: dropThoughts.id });
-  if (rows.length) await touch(paperId);
+  if (rows.length) await touch(paperId, userId, actor);
   return rows.length > 0;
 }
 
+/** One thought on this paper as it is now (for telling the others about an undo). */
+export async function thoughtOn(ownerId: string, paperId: string, id: string): Promise<Thought | null> {
+  const [row] = await db
+    .select()
+    .from(dropThoughts)
+    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, ownerId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt)));
+  return row ? toThought(row) : null;
+}
+
 /** Turns written text into a to-do (a checkbox in front), or back into plain written text. Notes and pictures are left as they are. */
-export async function setThoughtKind(userId: string, paperId: string, id: string, kind: "text" | "todo"): Promise<Thought | null> {
+export async function setThoughtKind(userId: string, paperId: string, id: string, kind: "text" | "todo", actor?: string): Promise<Thought | null> {
   const [row] = await db
     .update(dropThoughts)
     .set({ kind, ...(kind === "text" ? { status: "open" as const, doneAt: null, dueAt: null, dueHasTime: false, remindedAt: null } : {}) })
     .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image), inArray(dropThoughts.kind, ["text", "todo"])))
     .returning();
   if (!row) return null;
-  await touch(paperId);
+  await touch(paperId, userId, actor);
   return toThought(row);
 }
 
@@ -370,7 +412,7 @@ export async function setThoughtKind(userId: string, paperId: string, id: string
  * Moves thoughts on this paper; a null spot sends one back into the flow.
  * Ids that aren't on this paper are skipped. Returns how many moved.
  */
-export async function arrangeThoughts(userId: string, paperId: string, placements: { id: string; x: number | null; y: number | null }[]): Promise<number> {
+export async function arrangeThoughts(userId: string, paperId: string, placements: { id: string; x: number | null; y: number | null }[], actor?: string): Promise<number> {
   if (!placements.length) return 0;
   const ids = placements.map((p) => p.id);
   const at = (col: "x" | "y") => sql.join(placements.map((p) => sql`when ${p.id} then ${p[col]}::real`), sql` `);
@@ -379,17 +421,17 @@ export async function arrangeThoughts(userId: string, paperId: string, placement
     .set({ x: sql`case ${dropThoughts.id} ${at("x")} end`, y: sql`case ${dropThoughts.id} ${at("y")} end` })
     .where(and(inArray(dropThoughts.id, ids), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId)))
     .returning({ id: dropThoughts.id });
-  if (rows.length) await touch(paperId);
+  if (rows.length) await touch(paperId, userId, actor);
   return rows.length;
 }
 
 /** Sends every thought on this paper back into the flow. */
-export async function tidyPaper(userId: string, paperId: string): Promise<void> {
+export async function tidyPaper(userId: string, paperId: string, actor?: string): Promise<void> {
   await db
     .update(dropThoughts)
     .set({ x: null, y: null })
     .where(and(eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId)));
-  await touch(paperId);
+  await touch(paperId, userId, actor);
 }
 
 /* ---------- Search ---------- */

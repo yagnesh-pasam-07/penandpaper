@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { and, count, countDistinct, desc, eq, gte, sql } from "drizzle-orm";
 import { httpDb } from "@/db";
 import { env } from "@/lib/env";
-import { MAX_ACTIVE_SECONDS, MAX_CLAPS, type Channel, type EventKind, type Source, type Totals } from "./reach";
+import { MAX_ACTIVE_SECONDS, MAX_CLAPS, type Channel, type EventKind, type Source, type StoryNumbers, type Totals } from "./reach";
 import { users } from "@/db/schema";
 import { stories, storyClaps, storyEvents, storySaves } from "./schema";
 
@@ -44,28 +44,6 @@ export async function recordEvent(e: { storyId: string; kind: EventKind; reader:
 }
 
 const empty = (): Totals => ({ views: 0, readers: 0, reads: 0, listens: 0, shares: 0, byChannel: {}, bySource: {}, byDevice: {} });
-
-/** Per-story totals for the Studio list, keyed by story id. */
-export async function totalsByStory(): Promise<Record<string, Pick<Totals, "views" | "readers" | "reads" | "shares">>> {
-  try {
-    const rows = await httpDb
-      .select({ storyId: storyEvents.storyId, kind: storyEvents.kind, n: count(), people: countDistinct(storyEvents.reader) })
-      .from(storyEvents)
-      .groupBy(storyEvents.storyId, storyEvents.kind);
-    const out: Record<string, Pick<Totals, "views" | "readers" | "reads" | "shares">> = {};
-    for (const r of rows) {
-      const t = (out[r.storyId] ??= { views: 0, readers: 0, reads: 0, shares: 0 });
-      if (r.kind === "view") {
-        t.views = r.n;
-        t.readers = r.people;
-      } else if (r.kind === "read") t.reads = r.people;
-      else if (r.kind === "share") t.shares = r.n;
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
 
 /** Everything Studio shows for one story. */
 export async function storyReach(storyId: string, days = 28): Promise<Totals & { daily: { day: string; views: number }[] }> {
@@ -303,4 +281,43 @@ export async function storyAttention(storyId: string): Promise<{
       .map((x) => ({ source: x.source ?? "direct", readers: Number(x.readers), finished: Number(x.finished) }))
       .sort((a, b) => b.readers - a.readers),
   };
+}
+
+/**
+ * The numbers every live story is compared on, in one read: readers, readers
+ * in its first 7 days, readers past the opening (the third paragraph came on
+ * screen), finishers, and readers who had read another story before this one
+ * (the ones who came back). Anonymous reader keys only.
+ */
+export async function storyNumbers(): Promise<StoryNumbers[]> {
+  try {
+    const rows = await httpDb.execute<{ id: string; readers: number; week1: number; past_opening: number; finished: number; returning: number }>(sql`
+      with live as (
+        select id, publish_at from ${stories} where status = 'published' and publish_at <= now()
+      ),
+      firsts as (
+        select e.story_id, e.reader, min(e.created_at) as at
+        from ${storyEvents} e join live l on l.id = e.story_id
+        where e.kind = 'view' group by e.story_id, e.reader
+      ),
+      first_any as (
+        select reader, min(at) as at from firsts group by reader
+      )
+      select l.id::text as id,
+        count(f.reader)::int as readers,
+        count(f.reader) filter (where f.at < l.publish_at + interval '7 days')::int as week1,
+        count(f.reader) filter (where exists (select 1 from ${storyEvents} d where d.story_id = l.id and d.reader = f.reader and d.kind = 'depth' and d.depth >= 2))::int as past_opening,
+        count(f.reader) filter (where exists (select 1 from ${storyEvents} r where r.story_id = l.id and r.reader = f.reader and r.kind = 'read'))::int as finished,
+        count(f.reader) filter (where a.at < f.at)::int as returning
+      from live l
+      left join firsts f on f.story_id = l.id
+      left join first_any a on a.reader = f.reader
+      group by l.id
+    `);
+    const list = ((rows as unknown as { rows?: unknown[] }).rows ?? (rows as unknown as unknown[])) as { id: string; readers: number; week1: number; past_opening: number; finished: number; returning: number }[];
+    return list.map((r) => ({ id: r.id, readers: Number(r.readers), week1: Number(r.week1), pastOpening: Number(r.past_opening), finished: Number(r.finished), returning: Number(r.returning) }));
+  } catch (e) {
+    console.error("storyNumbers", e);
+    return [];
+  }
 }

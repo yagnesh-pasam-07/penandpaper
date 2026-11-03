@@ -10,6 +10,8 @@ export type Placement = { id: string; x: number; y: number };
 export type OverlayCtx = {
   boxes: Map<string, Box>;
   zoom: number;
+  /** A saved spot (x a share of the reading column, y px) as a point on this sheet: where another screen's pointer is on this one. */
+  toCanvas: (spot: Point) => Point;
 };
 
 /** Things being carried together (a loop and what's inside it), shown shifted by (dx, dy) canvas px. */
@@ -350,7 +352,7 @@ export function FreeCanvas<T extends Item>({
     >
       {guides.x !== undefined && <span aria-hidden="true" className="pointer-events-none absolute w-px bg-red-text/60" style={{ left: guides.x, top: -200000, height: 400000 }} />}
       {guides.y !== undefined && <span aria-hidden="true" className="pointer-events-none absolute h-px bg-red-text/60" style={{ top: guides.y, left: -200000, width: 400000 }} />}
-      {overlay?.({ boxes, zoom: view.zoom })}
+      {overlay?.({ boxes, zoom: view.zoom, toCanvas: (p) => ({ x: column.left + p.x * column.width, y: p.y + lift }) })}
       {items.map((it) => {
         const b = boxes.get(it.id);
         const dragging = drag?.moving && drag.id === it.id;

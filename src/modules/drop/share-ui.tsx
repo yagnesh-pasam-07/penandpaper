@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { call } from "./chrome";
 
-type State = { people: { email: string; name: string | null; createdAt: string }[]; publicToken: string | null };
+type Role = "edit" | "view";
+type State = { people: { email: string; name: string | null; role: Role; createdAt: string }[]; publicToken: string | null };
 
 /**
  * Share, top right on the paper: one small sheet with two parts.
- * Invite people (private, read-only: they sign in with that email) and
- * Anyone with the link (public, read-only, off by default).
+ * Invite people (private: they sign in with that email; they can edit with you,
+ * live, or only view) and Anyone with the link (public, view only, off by default).
  */
 export function ShareButton({ paperId }: { paperId: string }) {
   const [open, setOpen] = useState(false);
@@ -30,6 +31,7 @@ export function ShareButton({ paperId }: { paperId: string }) {
 export function ShareSheet({ paperId, onClose, initialEmail = "" }: { paperId: string; onClose: () => void; initialEmail?: string }) {
   const [state, setState] = useState<State | null>(null);
   const [email, setEmail] = useState(initialEmail);
+  const [role, setRole] = useState<Role>("edit");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -76,12 +78,12 @@ export function ShareSheet({ paperId, onClose, initialEmail = "" }: { paperId: s
       className="pointer-events-auto absolute top-full right-0 z-50 mt-2 w-[340px] rounded-2xl border border-line bg-raised p-4 text-left shadow-[0_18px_40px_-18px_var(--shadow)]"
     >
       <p className="mb-1 text-[15px] font-semibold text-ink">Share this paper</p>
-      <p className="mb-3 text-[13px] text-mute">People you share with can look, not change anything.</p>
+      <p className="mb-3 text-[13px] text-mute">Live: you&apos;ll see each other&apos;s changes and cursors as they happen.</p>
 
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (email.trim() && (await send({ invite: email.trim() }))) setEmail("");
+          if (email.trim() && (await send({ invite: email.trim(), role }))) setEmail("");
         }}
         className="mb-2 flex gap-2"
       >
@@ -97,6 +99,18 @@ export function ShareSheet({ paperId, onClose, initialEmail = "" }: { paperId: s
           placeholder="name@company.com"
           className="h-9 min-w-0 flex-1 rounded-lg border border-line-strong bg-sheet px-2.5 text-[14px] text-ink placeholder:text-mute"
         />
+        <label htmlFor="share-role" className="sr-only">
+          They can
+        </label>
+        <select
+          id="share-role"
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          className="h-9 rounded-lg border border-line-strong bg-sheet px-1.5 text-[13px] text-ink"
+        >
+          <option value="edit">can edit</option>
+          <option value="view">can view</option>
+        </select>
         <button type="submit" disabled={busy || !email.trim()} className="h-9 rounded-[10px] bg-ink px-3 text-sm font-semibold text-bg disabled:opacity-40">
           Invite
         </button>
@@ -115,7 +129,19 @@ export function ShareSheet({ paperId, onClose, initialEmail = "" }: { paperId: s
                   p.email
                 )}
               </span>
-              <span className="text-graphite">can view</span>
+              <label htmlFor={`role-${p.email}`} className="sr-only">
+                What {p.email} can do
+              </label>
+              <select
+                id={`role-${p.email}`}
+                value={p.role}
+                disabled={busy}
+                onChange={(e) => void send({ email: p.email, role: e.target.value })}
+                className="rounded-md bg-transparent px-1 text-[13px] text-graphite hover:bg-soft"
+              >
+                <option value="edit">can edit</option>
+                <option value="view">can view</option>
+              </select>
               <button type="button" onClick={() => void send({ remove: p.email })} aria-label={`Stop sharing with ${p.email}`} className="rounded-md px-1.5 text-mute hover:bg-red-soft hover:text-red-text">
                 ✕
               </button>

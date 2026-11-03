@@ -85,9 +85,18 @@ function nextSundayNine(): string {
  * margin adds a picture, a heading, a quote or a break; Markdown shortcuts
  * work too ("## ", "> ", "---"). It saves itself as you write.
  */
-export function StoryEditor({ initial }: { initial: EditorStory }) {
+export function StoryEditor({ initial, focusBlock = null }: { initial: EditorStory; focusBlock?: number | null }) {
   const [s, setS] = useState(initial);
   const [blocks, setBlocks] = useState<EditBlock[]>(() => toBlocks(initial.body));
+  // Arriving from Studio's "where readers stop": bring that paragraph into view and mark it for a moment.
+  const [marked, setMarked] = useState<number | null>(focusBlock);
+  useEffect(() => {
+    if (focusBlock === null) return;
+    const el = document.querySelector(`[data-block="${focusBlock}"]`);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = setTimeout(() => setMarked(null), 4000);
+    return () => clearTimeout(t);
+  }, [focusBlock]);
   const [saved, setSaved] = useState<"saved" | "saving" | "error">("saved");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -481,7 +490,7 @@ export function StoryEditor({ initial }: { initial: EditorStory }) {
 
         <div className="mt-10 flex flex-col gap-8 text-[19px] leading-[1.6] tracking-[-0.003em] text-ink/90 sm:text-[20px]">
           {blocks.map((b, i) => (
-            <div key={b.key} className="group relative">
+            <div key={b.key} data-block={i} className={`group relative rounded-md transition-colors duration-700 ${marked === i ? "bg-red-soft/60 outline-2 outline-offset-8 outline-red-text/40" : ""}`}>
               <Margin
                 onPicture={(f) => void addPicture(f, b.key)}
                 onAdd={(t) => insertAfter(b.key, t === "hr" ? { key: newKey(), t: "hr" } : { key: newKey(), t, text: "" })}

@@ -35,6 +35,10 @@ async function StoriesList({ order }: { order: "new" | "loved" }) {
         <header className="flex flex-col gap-3 border-b border-line pb-8">
           <h1 className="story-serif text-[44px] leading-none font-medium tracking-[-0.02em] text-ink italic sm:text-[64px]">Stories</h1>
           <p className="story-serif max-w-[560px] text-[19px] leading-[1.5] text-mute sm:text-[21px]">Real people, history and art. A few minutes each: read it on the way, or listen with your eyes closed.</p>
+          <Link href="/stories/unnoticed" className="group flex max-w-[560px] items-baseline gap-3 rounded-xl border border-dashed border-line-strong px-4 py-3 hover:bg-soft">
+            <span className="font-hand text-[26px] leading-none font-bold text-red-text">Unnoticed</span>
+            <span className="font-sans text-[14px] text-mute">Short ones, in Telugu: people, nature and the things we all do, told with a smile →</span>
+          </Link>
         </header>
         {series.length > 0 && (
           <nav aria-label="Series" className="-mt-4 flex flex-wrap items-center gap-2 font-sans">

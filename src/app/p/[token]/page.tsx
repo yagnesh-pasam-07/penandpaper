@@ -15,7 +15,7 @@ async function Shared({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const [paper, user] = await Promise.all([paperByToken(token), currentUser().catch(() => null)]);
   if (!paper) notFound();
-  return <SharedView paper={paper} signedIn={!!user} />;
+  return <SharedView paper={paper} signedIn={!!user} token={token} />;
 }
 
 export default function PublicPaperPage(props: PageProps<"/p/[token]">) {

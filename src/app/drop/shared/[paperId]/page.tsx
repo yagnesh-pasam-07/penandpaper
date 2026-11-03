@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getPaper } from "@/modules/drop/server";
 import { paperSharedWith } from "@/modules/drop/share-server";
 import { SharedView } from "@/modules/drop/shared-view";
+import { DropCanvas } from "@/modules/drop/ui";
 import { currentUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "A shared paper · Pen & Paper", robots: { index: false, follow: false } };
@@ -21,6 +22,18 @@ async function Shared({ params }: { params: Promise<{ paperId: string }> }) {
   // Only the email it was shared with, signed in: checked on every request.
   const paper = await paperSharedWith(user.email, paperId);
   if (!paper) notFound();
+  // Shared to edit: the same live canvas the owner has, without the owner's own tools.
+  if (paper.role === "edit") {
+    return (
+      <DropCanvas
+        key={paper.id}
+        initial={{ id: paper.id, name: paper.name, createdAt: paper.createdAt, archivedAt: null, thoughts: paper.thoughts, strokes: paper.strokes }}
+        papers={[]}
+        me={{ name: user.name, email: user.email }}
+        guest={{ owner: paper.owner }}
+      />
+    );
+  }
   return <SharedView paper={paper} signedIn />;
 }
 

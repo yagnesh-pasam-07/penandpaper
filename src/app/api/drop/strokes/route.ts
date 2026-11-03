@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { INKS, MAX_LABEL, MAX_STROKE_POINTS, SHAPES, STROKE_LIMIT } from "@/modules/drop/logic";
-import { noStore, requireUser } from "@/modules/drop/http";
+import { noStore, requireEditor } from "@/modules/drop/http";
+import { broadcast, tabOf } from "@/modules/drop/live-server";
 import { addStroke, PaperNotFound } from "@/modules/drop/server";
 
 const coord = z.number().finite().min(-STROKE_LIMIT).max(STROKE_LIMIT);
@@ -20,15 +21,17 @@ const body = z.object({
   label: z.string().trim().max(MAX_LABEL).nullable().optional(),
 }).refine((s) => !s.shape || s.points.length === 2, "A shape is two corners.");
 
-/** Draws a line (or a connector) on a paper. Signed in from this site. */
+/** Draws a line (or a connector) on a paper: the owner's, or one shared with them to edit. Signed in from this site. */
 export async function POST(request: Request) {
-  const user = await requireUser();
-  if (user instanceof Response) return user;
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That line didn't come through. Try again." }, { status: 400 });
   const { paperId, ...stroke } = parsed.data;
+  const ed = await requireEditor(paperId);
+  if (ed instanceof Response) return ed;
   try {
-    return Response.json(await addStroke(user.id, paperId, stroke), noStore);
+    const saved = await addStroke(ed.ownerId, paperId, stroke, ed.user.id);
+    await broadcast(paperId, { type: "stroke", stroke: saved }, tabOf(request));
+    return Response.json(saved, noStore);
   } catch (e) {
     if (e instanceof PaperNotFound) return Response.json({ error: "That paper isn't there any more." }, { status: 404 });
     return Response.json({ error: "Couldn't save that line." }, { status: 409 });

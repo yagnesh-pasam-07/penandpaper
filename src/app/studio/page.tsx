@@ -339,7 +339,7 @@ async function Studio() {
   }
   const [stats, rail] = await Promise.all([studioStats(), liveStoriesForRail()]);
   return (
-    <StudioShell section="overview" title="Overview" subtitle={`How Pen & Paper is growing, and what to do next · last ${WINDOW_DAYS} days`} stories={rail}>
+    <StudioShell section="overview" title="App" subtitle={`Is the paper becoming a habit? Writers, thoughts and who stays · last ${WINDOW_DAYS} days`} stories={rail}>
       <Dashboard s={stats} />
     </StudioShell>
   );

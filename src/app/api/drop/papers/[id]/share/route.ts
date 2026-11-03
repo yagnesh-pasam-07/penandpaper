@@ -5,7 +5,8 @@ import { mailServers } from "@/lib/email-dns";
 import { paperTitle } from "@/modules/drop/logic";
 import { noStore, requireUser } from "@/modules/drop/http";
 import { allowWithin } from "@/modules/drop/rate";
-import { invite, setPublicLink, shareState, uninvite } from "@/modules/drop/share-server";
+import { broadcast } from "@/modules/drop/live-server";
+import { invite, setPublicLink, setRole, shareState, uninvite } from "@/modules/drop/share-server";
 import { sendMail } from "@/server/email";
 
 const gone = () => Response.json({ error: "That paper isn't there." }, { status: 404 });
@@ -23,7 +24,9 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/drop/papers
 const body = z.union([
   /** Someone already on the paper was @mentioned: tell them, with the words. */
   z.object({ mention: z.string().trim().max(254), words: z.string().trim().max(400) }),
-  z.object({ invite: z.string().trim().max(254) }),
+  /** "edit" (the default): they change things with you, live. "view": they look. */
+  z.object({ invite: z.string().trim().max(254), role: z.enum(["edit", "view"]).optional() }),
+  z.object({ email: z.string().trim().max(254), role: z.enum(["edit", "view"]) }),
   z.object({ remove: z.string().trim().max(254) }),
   z.object({ link: z.boolean(), reset: z.boolean().optional() }),
 ]);
@@ -61,7 +64,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/drop/papers
     if (problem) return Response.json({ error: problem.message, suggestion: problem.suggestion }, { status: 400 });
     // Twenty invites a day, so sharing can't be used to send mail at people.
     if (!(await allowWithin(`share-invite:${user.id}`, 20, 86_400_000))) return Response.json({ error: "That's enough invites for today. Try again tomorrow." }, { status: 429 });
-    const r = await invite(user.id, id, email);
+    const role = b.role ?? "edit";
+    const r = await invite(user.id, id, email, role);
     if (!r.ok) return gone();
     if (r.added) {
       const title = paperTitle({ name: r.name });
@@ -69,14 +73,24 @@ export async function POST(request: Request, ctx: RouteContext<"/api/drop/papers
         to: email,
         subject: `${user.name || user.email} shared "${title}" with you`,
         heading: `${user.name || user.email} shared a paper with you`,
-        lines: [`"${title}", on Pen & Paper. You can look; it's read-only.`, `Sign in with ${email} to open it.`],
+        lines: [
+          role === "edit" ? `"${title}", on Pen & Paper. You can add and change things together, live: you'll see each other's cursors.` : `"${title}", on Pen & Paper. You can look; it's view only.`,
+          `Sign in with ${email} to open it.`,
+        ],
         cta: { label: "Open the paper", url: `${appUrl}/drop/shared/${id}` },
       }).catch(() => false);
     }
+  } else if ("email" in b) {
+    if (!(await setRole(user.id, id, b.email, b.role))) return gone();
+    await broadcast(id, { type: "access", email: b.email.toLowerCase() });
   } else if ("remove" in b) {
     if (!(await uninvite(user.id, id, b.remove))) return gone();
+    // Their open paper closes at once, not at the next reload.
+    await broadcast(id, { type: "access", email: b.remove.toLowerCase() });
   } else {
     if ((await setPublicLink(user.id, id, b.link, b.reset)) === undefined) return gone();
+    // Everyone on the old link re-checks (signed-in people on it by name stay).
+    await broadcast(id, { type: "access", email: "*" });
   }
   const state = await shareState(user.id, id);
   return state ? Response.json(state, noStore) : gone();

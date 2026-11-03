@@ -170,6 +170,8 @@ export const dropShares = pgTable(
     invitedBy: uuid("invited_by")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** "edit": they add, change and move things with the owner, live. "view": they look. Shares made before roles are "view". */
+    role: text("role").notNull().default("view"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("drop_shares_paper_email_idx").on(t.paperId, t.email), index("drop_shares_email_idx").on(t.email)],
