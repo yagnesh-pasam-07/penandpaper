@@ -130,6 +130,16 @@ export const dropThoughts = pgTable(
      */
     happensOn: date("happens_on", { mode: "string" }),
     happensUntil: date("happens_until", { mode: "string" }),
+    /**
+     * A to-do list written on the paper: every line is its own to-do (struck,
+     * dated and reviewed alone), and they share this id (the first line's) so
+     * they stand together and move as one. Null for a thing on its own.
+     */
+    listId: text("list_id"),
+    /** Where it sits in its list (lowest first). */
+    listPos: real("list_pos"),
+    /** 1: a sub-to-do, under the line above it. One level only, on purpose. */
+    indent: integer("indent").notNull().default(0),
   },
   (t) => [index("drop_thoughts_paper_idx").on(t.paperId), index("drop_thoughts_user_idx").on(t.userId)],
 );

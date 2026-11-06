@@ -4,6 +4,7 @@ import { MAX_IMAGE, MAX_THOUGHT } from "@/modules/drop/logic";
 import { noStore, requireEditor } from "@/modules/drop/http";
 import { broadcast, tabOf, thoughtEvent } from "@/modules/drop/live-server";
 import { addThought, PaperNotFound } from "@/modules/drop/server";
+import { listBody } from "./list-body";
 
 const body = z
   .object({
@@ -24,6 +25,8 @@ const body = z
     y: z.number().min(-Y_LIMIT).max(Y_LIMIT).nullable().optional(),
     /** "text": written straight on the paper with the Text tool (a drop, never a to-do). */
     kind: z.enum(["note", "text", "todo"]).optional(),
+    /** A line of a to-do list written on the paper: the list, its place in it, and a sub-to-do or not. */
+    list: listBody.optional(),
   })
   // Words, a picture, or both.
   .refine((b) => b.text.length > 0 || !!b.image);

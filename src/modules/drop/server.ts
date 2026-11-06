@@ -52,6 +52,9 @@ function toThought(r: ThoughtRow): Thought {
     dueHasTime: r.dueHasTime,
     happensOn: r.happensOn ?? null,
     happensUntil: r.happensUntil ?? null,
+    listId: r.listId ?? null,
+    listPos: r.listPos ?? null,
+    indent: r.indent,
   };
 }
 
@@ -301,13 +304,26 @@ export class PaperNotFound extends Error {}
 export async function addThought(
   userId: string,
   paperId: string,
-  input: { id: string; text: string; shape: number; image?: string | null; x?: number | null; y?: number | null; kind?: ThoughtKind },
+  input: { id: string; text: string; shape: number; image?: string | null; x?: number | null; y?: number | null; kind?: ThoughtKind; list?: ThoughtList },
   actor?: string,
 ): Promise<Thought> {
   if (!(await ownedPaper(userId, paperId))) throw new PaperNotFound();
+  // Only written words stand in a list (a note or a picture never does).
+  const list = input.list && (input.kind === "text" || input.kind === "todo") && !input.image ? input.list : null;
   const [row] = await db
     .insert(dropThoughts)
-    .values({ id: input.id, paperId, userId, text: input.text, shape: input.shape, image: input.image ?? null, x: input.x ?? null, y: input.y ?? null, kind: input.kind ?? "note" })
+    .values({
+      id: input.id,
+      paperId,
+      userId,
+      text: input.text,
+      shape: input.shape,
+      image: input.image ?? null,
+      x: input.x ?? null,
+      y: input.y ?? null,
+      kind: input.kind ?? "note",
+      ...(list ? { listId: list.id, listPos: list.pos, indent: list.indent } : {}),
+    })
     .onConflictDoNothing()
     .returning();
   if (row) {
@@ -419,6 +435,21 @@ export async function setThoughtKind(userId: string, paperId: string, id: string
   const [row] = await db
     .update(dropThoughts)
     .set({ kind, ...(kind === "text" ? { status: "open" as const, doneAt: null, dueAt: null, dueHasTime: false, remindedAt: null } : {}) })
+    .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image), inArray(dropThoughts.kind, ["text", "todo"])))
+    .returning();
+  if (!row) return null;
+  await touch(paperId, userId, actor);
+  return toThought(row);
+}
+
+/** Where a written line stands in a to-do list: the list (its first line's id), its place, and whether it's a sub-to-do. */
+export type ThoughtList = { id: string | null; pos: number | null; indent: number };
+
+/** Puts written words in a to-do list, moves them within it, or (a null id) takes them out. Notes and pictures are left as they are. */
+export async function setThoughtList(userId: string, paperId: string, id: string, list: ThoughtList, actor?: string): Promise<Thought | null> {
+  const [row] = await db
+    .update(dropThoughts)
+    .set({ listId: list.id, listPos: list.id ? list.pos : null, indent: list.id ? list.indent : 0 })
     .where(and(eq(dropThoughts.id, id), eq(dropThoughts.userId, userId), eq(dropThoughts.paperId, paperId), isNull(dropThoughts.crumpledAt), isNull(dropThoughts.image), inArray(dropThoughts.kind, ["text", "todo"])))
     .returning();
   if (!row) return null;

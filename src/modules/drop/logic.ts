@@ -26,6 +26,12 @@ export type Thought = {
   /** When it happens (a countdown): a day, and optionally the last day. Any kind of thought. */
   happensOn?: string | null;
   happensUntil?: string | null;
+  /** A to-do list written on the paper: the first line's id, shared by every line (see `todoLists`). */
+  listId?: string | null;
+  /** Where it sits in its list, lowest first. */
+  listPos?: number | null;
+  /** 1: a sub-to-do under the line above. */
+  indent?: number;
 };
 
 /** "note": a hand-cut note (a to-do). "text": words written on the paper (a drop). "todo": written text with a checkbox (a to-do that keeps its handwriting). */
@@ -128,6 +134,61 @@ export { firstLink, firstYoutube, isOnlyYoutube, linkify, youtubeId, type TextPa
 export function isDrop(t: { image?: string | null; kind?: ThoughtKind | null }): boolean {
   // "todo" is written text with a checkbox: a to-do, not a drop.
   return Boolean(t.image) || t.kind === "text";
+}
+
+/* ---------- To-do lists ---------- */
+
+/** How deep a sub-to-do goes: one level, so a paper never turns into a project tree. */
+export const MAX_INDENT = 1;
+
+/**
+ * Gathers a paper's to-do lists. Each line is its own thought; lines that share
+ * a `listId` (the id of the line that started it) stand together, in
+ * `listPos` order. The first is the list's head: only it has a place on the
+ * sheet, the rest are drawn under it. Every line keeps the same spot, so if the
+ * head goes, the next one takes over where it was.
+ */
+export function todoLists<T extends { id: string; listId?: string | null; listPos?: number | null; createdAt: string }>(thoughts: T[]): { heads: Map<string, T[]>; inList: Set<string> } {
+  const groups = new Map<string, T[]>();
+  for (const t of thoughts) {
+    if (!t.listId) continue;
+    const g = groups.get(t.listId);
+    if (g) g.push(t);
+    else groups.set(t.listId, [t]);
+  }
+  const heads = new Map<string, T[]>();
+  const inList = new Set<string>();
+  for (const lines of groups.values()) {
+    // By place, then by when written. The first is the head: a line written above it takes its place.
+    lines.sort((a, b) => (a.listPos ?? 0) - (b.listPos ?? 0) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    if (lines.length < 2) continue;
+    heads.set(lines[0].id, lines);
+    for (const l of lines.slice(1)) inList.add(l.id);
+  }
+  return { heads, inList };
+}
+
+/** A place between two lines (or after the last), so a new line never reorders the others. */
+export function posBetween(before: number | null | undefined, after: number | null | undefined): number {
+  const a = before ?? 0;
+  if (after === null || after === undefined) return a + 1;
+  return (a + after) / 2;
+}
+
+/**
+ * Splits pasted or spoken words into the lines of a list: one to-do each,
+ * with a leading "[ ]", "- ", "• " or "1." taken off, and indented lines
+ * (two spaces or a tab) as sub-to-dos. Blank lines are dropped.
+ */
+export function listLines(text: string): { text: string; indent: number }[] {
+  return text
+    .split(/\r?\n/)
+    .map((raw) => {
+      const indent = /^(\t| {2,})/.test(raw) ? MAX_INDENT : 0;
+      const words = raw.trim().replace(/^(?:[-*•]\s*)?(?:\[\s?[xX]?\]\s*)?(?:\d+[.)]\s+)?/, "").trim();
+      return { text: words, indent };
+    })
+    .filter((l) => l.text.length > 0);
 }
 
 /* ---------- Mentions ---------- */

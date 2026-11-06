@@ -7,13 +7,13 @@ import { Fly } from "@/components/canvas/fly";
 import { FreeCanvas, type CanvasApi, type Offset, type Placement } from "@/components/canvas/free-canvas";
 import { InkLayer, type InkStroke } from "@/components/canvas/ink-layer";
 import { insidePolygon, isLoop, shapeOutline, shift, type Pt } from "@/components/canvas/ink";
-import { PaperText } from "@/components/canvas/paper-text";
+import { PaperText, type ListKeys } from "@/components/canvas/paper-text";
 import { PaperSurface } from "@/components/canvas/paper-surface";
 import { ThoughtBubble } from "@/components/canvas/thought-bubble";
 import { uid } from "@/lib/mutations";
 import { viewKey } from "@/components/canvas/view";
 import { call, COLUMN, DropHeader, meta, useMounted, useViewerTz, type Me } from "./chrome";
-import { isDrop, isInk, mentionedEmails, paperTitle, parseReminder, type DropPaper, type InkName, type PaperMeta, type ShapeKind, type Stroke, type Thought, type ThoughtKind } from "./logic";
+import { isDrop, isInk, MAX_INDENT, mentionedEmails, paperTitle, parseReminder, posBetween, todoLists, type DropPaper, type InkName, type PaperMeta, type ShapeKind, type Stroke, type Thought, type ThoughtKind } from "./logic";
 import { DueChip, DuePicker } from "./due";
 import { dueLabel } from "./logic";
 import { ShareButton } from "./share-ui";
@@ -39,10 +39,17 @@ import { CountdownPicker, CountdownStub, useToday } from "./countdown";
 type SheetItem = { id: string; x: number | null; y: number | null; thought: Thought };
 
 /** The thoughts on the sheet, newest first, right under the writer. */
-function sheetItems(paper: DropPaper): SheetItem[] {
+function sheetItems(paper: DropPaper, inList: Set<string>): SheetItem[] {
   const order = new Map(paper.thoughts.map((t, i) => [t.id, i]));
-  return paper.thoughts.map((t) => ({ id: t.id, x: t.x, y: t.y, thought: t })).sort((a, b) => (order.get(b.id) ?? 0) - (order.get(a.id) ?? 0));
+  // A to-do list stands on the sheet as its first line; the rest are drawn under it.
+  return paper.thoughts
+    .filter((t) => !inList.has(t.id))
+    .map((t) => ({ id: t.id, x: t.x, y: t.y, thought: t }))
+    .sort((a, b) => (order.get(b.id) ?? 0) - (order.get(a.id) ?? 0));
 }
+
+/** A line's place in its list: its id, place, and whether it's a sub-to-do. */
+type ListPlace = { id: string | null; pos: number | null; indent: number };
 
 /** A half-written thought is kept per paper, on this device. */
 const draftKey = (paperId: string) => `pp-drop-draft:${paperId}`;
@@ -155,6 +162,12 @@ export function DropCanvas({
   const [tool, setTool] = useState<Tool>("select");
   // Text just placed with the Text tool, open for writing.
   const [writingText, setWritingText] = useState<string | null>(null);
+  // Where the cursor lands when the pen moves to a line of a list (the end, if not set).
+  const [penCaret, setPenCaret] = useState<number | undefined>(undefined);
+  const openPen = (id: string, caret?: number) => {
+    setPenCaret(caret);
+    setWritingText(id);
+  };
   const [freshInk, setFreshInk] = useState<Set<string>>(new Set());
   // Text placed but not written in yet: never sent until it has words.
   const unsaved = useRef(new Set<string>());
@@ -595,7 +608,7 @@ export function DropCanvas({
   };
 
   /** Puts a new thought on the paper and saves it; a picture and a spot are optional. */
-  const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number }; kind?: ThoughtKind; id?: string; color?: InkName; size?: number }) => {
+  const add = (value: string, extra: { image?: string | null; x?: number | null; y?: number | null; from?: { x: number; y: number }; kind?: ThoughtKind; id?: string; color?: InkName; size?: number; list?: ListPlace }) => {
     // "… remind me tomorrow at 5": the words become a to-do with that reminder.
     // Reminders are the owner's: on someone else's paper, "remind me" is just words.
     const ask = !extra.image && !guest ? parseReminder(value, new Date(), tz) : null;
@@ -615,6 +628,7 @@ export function DropCanvas({
       ...(extra.color && extra.color !== "ink" ? { color: extra.color } : {}),
       ...(extra.size && extra.size !== 1 ? { size: extra.size } : {}),
       ...(ask ? { dueAt: ask.at, dueHasTime: true } : {}),
+      ...(extra.list?.id ? { listId: extra.list.id, listPos: extra.list.pos, indent: extra.list.indent } : {}),
     };
     update((p) => ({ ...p, thoughts: [...p.thoughts, thought] }));
     setFresh((f) => new Set(f).add(thought.id));
@@ -624,7 +638,17 @@ export function DropCanvas({
       () =>
         call("/api/drop/thoughts", {
           method: "POST",
-          body: JSON.stringify({ paperId, id: thought.id, text: thought.text, shape: thought.shape, image: thought.image, x: thought.x, y: thought.y, kind: thought.kind }),
+          body: JSON.stringify({
+            paperId,
+            id: thought.id,
+            text: thought.text,
+            shape: thought.shape,
+            image: thought.image,
+            x: thought.x,
+            y: thought.y,
+            kind: thought.kind,
+            ...(extra.list?.id ? { list: extra.list } : {}),
+          }),
         }).then(() => {
           // Colour, size and a reminder go with it once it exists.
           const more = { ...(thought.color ? { color: thought.color } : {}), ...(thought.size ? { size: thought.size } : {}), ...(ask ? { due: { at: ask.at, hasTime: true } } : {}) };
@@ -771,6 +795,8 @@ export function DropCanvas({
     if (!before || before.kind === kind) return;
     const after: Thought = { ...before, kind, ...(kind === "text" ? { status: "open", doneAt: null, dueAt: null, dueHasTime: false } : {}) };
     update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? after : t)) }));
+    // Still being written for the first time: it's saved with its box when it has words.
+    if (unsaved.current.has(id)) return;
     void save(
       () => call(`/api/drop/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ paperId, kind }) }),
       () => update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? before : t)) })),
@@ -838,8 +864,12 @@ export function DropCanvas({
   };
 
   /** Saves where thoughts were dragged (or, with null spots, sends them back into rows). */
-  const arrange = (placements: { id: string; x: number | null; y: number | null }[], body: object) => {
+  const arrange = (given: { id: string; x: number | null; y: number | null }[], body: object) => {
     const before = live.current;
+    // A to-do list goes where its first line goes: every line keeps the same spot, so the list stays whole if the first is crumpled.
+    const { heads } = todoLists(before.thoughts);
+    const placements = given.flatMap((pl) => [pl, ...(heads.get(pl.id)?.slice(1).map((l) => ({ id: l.id, x: pl.x, y: pl.y })) ?? [])]);
+    if ("placements" in body) body = { ...body, placements };
     const was = placements.map((pl) => {
       const t = before.thoughts.find((x) => x.id === pl.id);
       return { id: pl.id, x: t?.x ?? null, y: t?.y ?? null };
@@ -854,7 +884,7 @@ export function DropCanvas({
         void save(() => call("/api/drop/arrange", { method: "POST", body: JSON.stringify({ paperId, placements: flowing.map((f) => ({ id: f.id, x: null, y: null })) }) }));
       }
     };
-    record({ label: "tidy" in body ? "tidy up" : "move", undo: () => backTo(was), redo: () => arrange(placements, body) });
+    record({ label: "tidy" in body ? "tidy up" : "move", undo: () => backTo(was), redo: () => arrange(given, body) });
     const at = new Map(placements.map((p) => [p.id, p]));
     const moved = <T extends { id: string }>(x: T) => (at.has(x.id) ? { ...x, x: at.get(x.id)!.x, y: at.get(x.id)!.y } : x);
     update((p) => ({ ...p, thoughts: p.thoughts.map(moved) }));
@@ -892,7 +922,15 @@ export function DropCanvas({
     if (unsaved.current.has(id) || !t.text) {
       unsaved.current.delete(id);
       update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) }));
-      add(value, { kind: box ? "todo" : "text", x: t.x, y: t.y, id, color: t.color, size: t.size });
+      add(value, {
+        kind: box || t.kind === "todo" ? "todo" : "text",
+        x: t.x,
+        y: t.y,
+        id,
+        color: t.color,
+        size: t.size,
+        list: t.listId ? { id: t.listId, pos: t.listPos ?? 0, indent: t.indent ?? 0 } : undefined,
+      });
       return;
     }
     if (box && t.kind !== "todo") setKind(id, "todo");
@@ -914,6 +952,144 @@ export function DropCanvas({
     if (!t) return;
     if (!t.text) update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) }));
     else crumple(id);
+  };
+
+  /* ---------- To-do lists: each line its own to-do, written one after another ---------- */
+
+  /** Several changes as one step to undo (a line split in two is one Enter). */
+  const asOne = (label: string, work: () => void) => {
+    const mark = past.current.length;
+    work();
+    const steps = past.current.splice(mark);
+    if (steps.length > 1) record({ label, undo: () => [...steps].reverse().forEach((st) => st.undo()), redo: () => steps.forEach((st) => st.redo()) });
+    else past.current.push(...steps);
+  };
+
+  /** The lines of the list this one stands in (just itself, if none), in order. */
+  const linesNow = (id: string): Thought[] => {
+    const { heads } = todoLists(live.current.thoughts);
+    for (const lines of heads.values()) if (lines.some((l) => l.id === id)) return lines;
+    const t = live.current.thoughts.find((x) => x.id === id);
+    return t ? [t] : [];
+  };
+
+  /** Into a list, to another place in it, or out of it (a null id). */
+  const setList = (id: string, list: ListPlace) => {
+    const before = live.current.thoughts.find((t) => t.id === id);
+    if (!before) return;
+    const after: Thought = { ...before, listId: list.id, listPos: list.id ? list.pos : null, indent: list.id ? list.indent : 0 };
+    update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? after : t)) }));
+    if (unsaved.current.has(id)) return;
+    void save(
+      () => call(`/api/drop/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ paperId, list }) }),
+      () => update((p) => ({ ...p, thoughts: p.thoughts.map((t) => (t.id === id ? before : t)) })),
+    );
+    const back = { id: before.listId ?? null, pos: before.listPos ?? null, indent: before.indent ?? 0 };
+    record({ label: "list", undo: () => setList(id, back), redo: () => setList(id, list) });
+  };
+
+  /**
+   * Enter on a to-do: it keeps `before`, and each of `more` becomes a to-do
+   * right under it (the first time, the two become a list). The pen goes to
+   * the last new one, `caret` in. A blank new one isn't saved until written in.
+   */
+  const splitLine = (id: string, before: string, more: { text: string; indent?: number }[], caret: number) => {
+    const t = live.current.thoughts.find((x) => x.id === id);
+    if (!t) return;
+    const lines = linesNow(id);
+    const i = Math.max(0, lines.findIndex((l) => l.id === id));
+    const head = lines[0] ?? t;
+    const listId = t.listId ?? t.id;
+    const after = lines[i + 1]?.listPos;
+    let keep = before.trim();
+    const rest = [...more];
+    // Enter at the very start of a written line: it moves down one, and a blank to-do opens above it.
+    if (!keep && rest.length === 1 && rest[0].text.trim() && t.text) {
+      // What was written in it so far is kept.
+      if (rest[0].text.trim() !== t.text) writeText(id, rest[0].text.trim());
+      const prevPos = lines[i - 1]?.listPos;
+      const pos = t.listId ? posBetween(prevPos ?? (t.listPos ?? 0) - 1, t.listPos ?? 0) : -1;
+      const nid = uid();
+      if (!t.listId) setList(id, { id: listId, pos: 0, indent: 0 });
+      // Above the list's first line: the new one is first now, so it takes the list's place on the sheet.
+      const blank: Thought = { id: nid, text: "", status: "open", shape: 0, createdAt: new Date().toISOString(), doneAt: null, x: head.x, y: head.y, image: null, kind: "todo", color: t.color, size: t.size, listId, listPos: i === 0 ? (head.listPos ?? 0) - 1 : pos, indent: t.indent ?? 0 };
+      unsaved.current.add(nid);
+      update((p) => ({ ...p, thoughts: [...p.thoughts, blank] }));
+      openPen(nid, 0);
+      return;
+    }
+    // Nothing before the cursor on a line never saved: the words after it stay on this line.
+    if (!keep && rest.length) keep = rest.shift()!.text.trim();
+    let lastId = id;
+    let at = caret;
+    asOne("new to-do", () => {
+      if (!t.listId) setList(id, { id: listId, pos: 0, indent: 0 });
+      if (keep && keep !== t.text) writeText(id, keep);
+      let pos = t.listId ? (t.listPos ?? 0) : 0;
+      for (const m of rest) {
+        pos = posBetween(pos, after);
+        const nid = uid();
+        const list = { id: listId, pos, indent: Math.min(MAX_INDENT, m.indent ?? t.indent ?? 0) };
+        const words = m.text.trim();
+        if (words) add(words, { kind: "todo", id: nid, x: head.x, y: head.y, color: t.color, size: t.size, list });
+        else {
+          const blank: Thought = { id: nid, text: "", status: "open", shape: 0, createdAt: new Date().toISOString(), doneAt: null, x: head.x, y: head.y, image: null, kind: "todo", color: t.color, size: t.size, listId, listPos: pos, indent: list.indent };
+          unsaved.current.add(nid);
+          update((p) => ({ ...p, thoughts: [...p.thoughts, blank] }));
+        }
+        lastId = nid;
+      }
+    });
+    if (!rest.length) at = Math.min(caret, keep.length);
+    openPen(lastId, Math.min(at, (rest[rest.length - 1]?.text ?? keep).length));
+  };
+
+  /** Tab / Shift+Tab: a sub-to-do of the line above, or not. The first line of a list can't be. */
+  const indentLine = (id: string, delta: 1 | -1): boolean => {
+    const t = live.current.thoughts.find((x) => x.id === id);
+    if (!t?.listId) return false;
+    const lines = linesNow(id);
+    if (lines[0]?.id === id && delta > 0) return false;
+    const next = Math.min(MAX_INDENT, Math.max(0, (t.indent ?? 0) + delta));
+    if (next === (t.indent ?? 0)) return false;
+    setList(id, { id: t.listId, pos: t.listPos ?? 0, indent: next });
+    return true;
+  };
+
+  /** Backspace at the start of a line: its words join the line above, and it goes. */
+  const joinUp = (id: string, words: string) => {
+    const lines = linesNow(id);
+    const i = lines.findIndex((l) => l.id === id);
+    const prev = lines[i - 1];
+    const t = lines[i];
+    if (!prev || !t) return;
+    const end = prev.text.length;
+    asOne("join", () => {
+      if (unsaved.current.has(id)) {
+        unsaved.current.delete(id);
+        update((p) => ({ ...p, thoughts: p.thoughts.filter((x) => x.id !== id) }));
+      } else {
+        crumpleNow(id);
+        record({ label: "join", undo: () => uncrumple(t), redo: () => crumpleNow(id) });
+      }
+      if (words.trim()) patch(prev.id, { text: prev.text + words });
+    });
+    openPen(prev.id, end);
+  };
+
+  /** What a to-do line on the sheet can do with the list it stands in. */
+  const listKeys = (t: Thought, lines: Thought[] | undefined): ListKeys => {
+    const all = lines ?? [t];
+    const i = all.findIndex((l) => l.id === t.id);
+    const prev = all[i - 1];
+    const next = all[i + 1];
+    return {
+      split: (before, more, caret) => splitLine(t.id, before, more, caret),
+      indent: (d) => indentLine(t.id, d),
+      joinUp: prev ? (words) => joinUp(t.id, words) : undefined,
+      up: prev ? () => openPen(prev.id) : undefined,
+      down: next ? () => openPen(next.id) : undefined,
+    };
   };
 
   /** Ink put down with the Draw tool. */
@@ -1038,7 +1214,8 @@ export function DropCanvas({
   const pickedColor =
     picked?.kind === "ink" ? ((paper.strokes ?? []).find((x) => x.id === picked.id)?.color ?? "ink") : picked?.kind === "text" ? (paper.thoughts.find((x) => x.id === picked.id)?.color ?? "ink") : null;
   useReminders(guest ? [] : paper.thoughts, (t) => setToast({ text: `Reminder: ${t.text.length > 60 ? `${t.text.slice(0, 59)}…` : t.text}`, action: { label: "Show", run: () => router.push(`/drop/${paperId}?note=${encodeURIComponent(t.id)}`) } }));
-  const items = sheetItems(paper);
+  const lists = todoLists(paper.thoughts);
+  const items = sheetItems(paper, lists.inList);
   const onSheet = items;
 
   const todo = (t: Thought) => !isDrop(t);
@@ -1099,7 +1276,7 @@ export function DropCanvas({
     />
   );
 
-  const textItem = (t: Thought, stream = false) => (
+  const textItem = (t: Thought, stream = false, lines?: Thought[], count?: string) => (
     <PaperText
       text={t.text}
       seed={t.createdAt}
@@ -1110,6 +1287,11 @@ export function DropCanvas({
       onEdit={(v) => writeText(t.id, v)}
       onDelete={() => rubText(t.id)}
       onDone={() => setWritingText((w) => (w === t.id ? null : w))}
+      caret={writingText === t.id ? penCaret : undefined}
+      // The box comes off only a to-do on its own: a line of a list stays in it (Backspace joins it to the line above instead).
+      onBox={stream ? undefined : (on) => (on || !lines || lines.length < 2 ? setKind(t.id, on ? "todo" : "text") : undefined)}
+      list={!stream && t.kind === "todo" ? listKeys(t, lines) : undefined}
+      count={count}
       size={t.size ?? 1}
       color={t.color ?? "ink"}
       selectable={!stream && tool === "select"}
@@ -1159,6 +1341,40 @@ export function DropCanvas({
       }
     />
   );
+
+  /**
+   * Written words on the sheet: on their own, or a to-do list, one line under
+   * another. On the canvas the list's first line is what's placed (so the list
+   * grows down, never up) and the rest hang under it; dragging any line carries
+   * them all.
+   */
+  const writtenItem = (t: Thought, stream = false) => {
+    const lines = lists.heads.get(t.id);
+    if (!lines) return textItem(t, stream);
+    const doneOf = (k: number) => {
+      if ((lines[k].indent ?? 0) > 0) return undefined;
+      let n = 0;
+      let done = 0;
+      for (let j = k + 1; j < lines.length && (lines[j].indent ?? 0) > 0; j++) {
+        n++;
+        if (lines[j].status === "done") done++;
+      }
+      return n ? `${done}/${n}` : undefined;
+    };
+    const row = (l: Thought, k: number) => (
+      <div key={l.id} data-item={k ? l.id : undefined} style={{ paddingLeft: (l.indent ?? 0) * 32 * (t.size ?? 1) }}>
+        {textItem(l, stream, lines, doneOf(k))}
+      </div>
+    );
+    // On a phone, and while it flows (nobody has placed it yet), the list takes its full height.
+    if (stream || t.x === null) return <div className="flex flex-col gap-1.5" role="group" aria-label="To-do list">{lines.map(row)}</div>;
+    return (
+      <div className="relative" role="group" aria-label="To-do list">
+        {row(lines[0], 0)}
+        <div className="absolute top-full left-0 flex w-max flex-col gap-1.5 pt-1.5">{lines.slice(1).map((l, k) => row(l, k + 1))}</div>
+      </div>
+    );
+  };
 
   return (
     <div ref={page} className="canvas-surface canvas-page flex min-h-dvh flex-col bg-bg">
@@ -1219,7 +1435,7 @@ export function DropCanvas({
           <PaperSurface label={paperTitle(initial)} className={`${COLUMN} flex flex-1 flex-col gap-3 sm:hidden`}>
             {onSheet.map((it) => (
               <Fly key={it.id} from={flights.get(it.id)}>
-                <div data-item={it.id}>{it.thought.kind === "text" || it.thought.kind === "todo" ? textItem(it.thought, true) : bubble(it.thought, { stream: true })}</div>
+                <div data-item={it.id}>{it.thought.kind === "text" || it.thought.kind === "todo" ? writtenItem(it.thought, true) : bubble(it.thought, { stream: true })}</div>
               </Fly>
             ))}
           </PaperSurface>
@@ -1307,7 +1523,7 @@ export function DropCanvas({
             }}
             render={(it) => (
               <Fly from={flights.get(it.id)}>
-                <div data-item={it.id}>{it.thought.kind === "text" || it.thought.kind === "todo" ? textItem(it.thought) : bubble(it.thought, { movable: true })}</div>
+                <div data-item={it.id}>{it.thought.kind === "text" || it.thought.kind === "todo" ? writtenItem(it.thought) : bubble(it.thought, { movable: true })}</div>
               </Fly>
             )}
           />
