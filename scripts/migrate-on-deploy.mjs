@@ -4,21 +4,33 @@
 // read `users.role` before the column existed). If a migration fails, the build
 // fails and the old deployment stays live. Everywhere else (a laptop, a preview)
 // it does nothing; run `npm run db:migrate` yourself there.
-import { spawnSync } from "node:child_process";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { migrate } from "drizzle-orm/neon-serverless/migrator";
+import ws from "ws";
 
 if (process.env.VERCEL_ENV !== "production") {
   console.log("migrate-on-deploy: not a Vercel production build, skipping.");
   process.exit(0);
 }
-if (!process.env.DATABASE_URL_UNPOOLED && !process.env.DATABASE_URL) {
+const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+if (!url) {
   console.error("migrate-on-deploy: no DATABASE_URL on Vercel production. Refusing to deploy without migrating.");
   process.exit(1);
 }
 
+// drizzle-orm's own migrator (the same journal and table as `drizzle-kit migrate`),
+// because drizzle-kit exits 1 on a failure without saying what the database said.
+if (typeof WebSocket === "undefined") neonConfig.webSocketConstructor = ws;
 console.log("migrate-on-deploy: applying pending migrations to production…");
-const run = spawnSync("npx", ["drizzle-kit", "migrate"], { stdio: "inherit", env: process.env });
-if (run.status !== 0) {
+const pool = new Pool({ connectionString: url });
+try {
+  await migrate(drizzle({ client: pool }), { migrationsFolder: "./drizzle" });
+  console.log("migrate-on-deploy: database is up to date.");
+} catch (e) {
   console.error("migrate-on-deploy: migration failed. Stopping the deploy so the live site keeps working.");
-  process.exit(run.status ?? 1);
+  console.error(e?.cause ?? e);
+  process.exitCode = 1;
+} finally {
+  await pool.end();
 }
-console.log("migrate-on-deploy: database is up to date.");
