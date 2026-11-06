@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { clampSize, type InkName } from "@/modules/drop/logic";
+import { clampSize, listLines, type InkName } from "@/modules/drop/logic";
 import { matchPeople, mentionAt, mentionText, type Person } from "@/modules/drop/use-people";
 import { MicIcon } from "@/components/icons";
 import { useHoldToTalk } from "@/modules/drop/use-hold-to-talk";
@@ -13,13 +13,32 @@ import { HandText } from "./thought-bubble";
 const WRAP = 420;
 /** The base size of written text (size 1). */
 const BASE = 22;
+/** "[ ] ", "[] " or "- [ ] " typed at the start: the words become a to-do. */
+const BOX_TYPED = /^\s*(?:-\s*)?\[\s?\]\s/;
+
+/**
+ * What a to-do line can ask of the list it stands in. Each line is its own
+ * to-do; the list is how they're written, one after another, without the mouse.
+ */
+export type ListKeys = {
+  /** Enter: this line keeps `before`; `lines` go in under it and the pen goes to the last of them, `caret` in. */
+  split: (before: string, lines: { text: string; indent?: number }[], caret: number) => void;
+  /** Tab (1) or Shift+Tab (-1): a sub-to-do or not. False if it can't (the first line, or already there). */
+  indent: (delta: 1 | -1) => boolean;
+  /** Backspace at the very start: these words join the line above, and the pen goes there. Missing on the first line. */
+  joinUp?: (text: string) => void;
+  /** The arrow keys at the top or bottom: the pen moves to the line above or below. */
+  up?: () => void;
+  down?: () => void;
+};
 
 /**
  * Words written straight on the paper with the Text tool: no card, no tape,
  * just ink. With Select in hand, a click picks it (an outline and a corner to
  * drag bigger or smaller) and a double-click (or Enter) edits; with the Text
  * tool a click edits. Empty on save rubs it out. A blank one opens already
- * editing. Never a to-do: there is nothing to strike.
+ * editing. With a box in front it's a to-do, and a line of a to-do list:
+ * Enter writes the next one under it (see ListKeys).
  */
 export function PaperText({
   text,
@@ -44,6 +63,10 @@ export function PaperText({
   onCountdown,
   footer,
   people = [],
+  onBox,
+  list,
+  caret,
+  count,
 }: {
   text: string;
   seed: string;
@@ -79,6 +102,14 @@ export function PaperText({
   footer?: React.ReactNode;
   /** Who "@" can suggest: the people this paper is shared with. */
   people?: Person[];
+  /** Typing "[ ] " or "/todo" puts a box in front at once (true), Backspace at the start of a to-do takes it away (false). */
+  onBox?: (on: boolean) => void;
+  /** Writing a list: Enter, Tab, Backspace, the arrows and a pasted list (see ListKeys). */
+  list?: ListKeys;
+  /** Where the cursor goes when the pen opens here (the end, if not given). */
+  caret?: number;
+  /** A to-do with sub-to-dos: how many are done ("1/3"). */
+  count?: string;
 }) {
   const [live, setLive] = useState<number | null>(null);
   const shown = live ?? size;
@@ -86,8 +117,14 @@ export function PaperText({
   useEffect(() => {
     if (selected) self.current?.focus({ preventScroll: true });
   }, [selected]);
+  // Set once the pen has been put down here by a list key, so the blur that follows doesn't save twice.
+  const closed = useRef(false);
   const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState(text);
+  // The pen is open here again: it saves on its own once more.
+  useEffect(() => {
+    if (editing) closed.current = false;
+  }, [editing]);
   // Asked to open again (a new one placed, or speech arriving): adjust while rendering, not in an effect.
   const [asked, setAsked] = useState(startEditing);
   if (startEditing !== asked) {
@@ -98,11 +135,25 @@ export function PaperText({
     }
   }
   const finish = () => {
+    if (closed.current) return;
     const next = draft.trim();
     setEditing(false);
     onDone?.();
     if (!next) onDelete();
     else if (next !== text) onEdit(next);
+  };
+  /** Puts the pen down here without saving (the list does it), then `then`. */
+  const handOff = (then: () => void) => {
+    closed.current = true;
+    setEditing(false);
+    onDone?.();
+    then();
+  };
+  /** Saves what's written (or rubs it out, if nothing), then moves the pen with `then`. */
+  const moveOn = (then: () => void) => {
+    finish();
+    closed.current = true;
+    then();
   };
 
   const ink: CSSProperties = { maxWidth: WRAP * Math.max(1, shown), fontSize: BASE * shown, color: `var(--ink-${color})` };
@@ -145,8 +196,9 @@ export function PaperText({
   };
   const motion = leaving === "crumple" ? "fade-away" : fresh && !startEditing ? "drop-in" : "";
 
+  const box = todo ? <TodoBox done={done} size={shown} color={color} onToggle={onToggle} /> : null;
   if (editing) {
-    return (
+    const editor = (
       <TextEditor
         draft={draft}
         setDraft={setDraft}
@@ -154,14 +206,33 @@ export function PaperText({
         style={ink}
         onFinish={finish}
         // The hint shows only on fresh text just placed, never when editing words already written.
-        hint={!text}
+        hint={!text && !todo}
         people={people}
         onHeading={() => onResize?.(size >= 1.8 ? 1 : 2)}
+        todo={todo}
+        onBox={onBox}
+        caret={caret}
+        list={
+          list && {
+            split: (before, lines, at) => handOff(() => list.split(before, lines, at)),
+            indent: list.indent,
+            joinUp: list.joinUp && ((words) => handOff(() => list.joinUp!(words))),
+            up: list.up && (() => moveOn(list.up!)),
+            down: list.down && (() => moveOn(list.down!)),
+          }
+        }
       />
+    );
+    // The box stays while the words are written, so the line doesn't jump. The same
+    // wrapper either way: the box arriving ("[ ] " typed) never rebuilds the textarea.
+    return (
+      <div className={todo ? "flex items-start" : undefined} style={todo ? { gap: 10 * shown } : undefined}>
+        {box}
+        <div className={todo ? "min-w-0 flex-1" : undefined}>{editor}</div>
+      </div>
     );
   }
 
-  const box = todo ? <TodoBox done={done} size={shown} color={color} onToggle={onToggle} /> : null;
   return (
     <div className="relative">
       {selected && onMakeTodo && (
@@ -228,6 +299,7 @@ export function PaperText({
         <span className={todo ? "pen-strike" : undefined}>
           <HandText text={text} seed={seed} />
         </span>
+        {count && <span className="ml-2 align-middle font-mono text-[11px] text-mute" aria-label={`${count} sub-to-dos done`}>{count}</span>}
         {footer && <span className="mt-1 block font-sans">{footer}</span>}
       </div>
       </div>
@@ -261,6 +333,10 @@ function TextEditor({
   hint,
   people,
   onHeading,
+  todo,
+  onBox,
+  caret,
+  list,
 }: {
   draft: string;
   setDraft: (fn: (d: string) => string) => void;
@@ -270,6 +346,10 @@ function TextEditor({
   hint: boolean;
   people: Person[];
   onHeading: () => void;
+  todo: boolean;
+  onBox?: (on: boolean) => void;
+  caret?: number;
+  list?: ListKeys;
 }) {
   // The "/" menu and "@" suggestions: what's being typed after the trigger, and which row is lit.
   const [cursor, setCursor] = useState(draft.length);
@@ -350,7 +430,18 @@ function TextEditor({
     if (slash) {
       const c = commands[i];
       if (!c) return;
-      if (c.id === "todo") splice(slash.start, "", "[ ] ");
+      if (c.id === "todo") {
+        const lineStart = draft.lastIndexOf("\n", slash.start - 1) + 1;
+        const rest = draft.slice(0, slash.start) + draft.slice(cursor);
+        if (onBox && lineStart === 0) {
+          // The box goes in front at once; the words stay as they are.
+          splice(slash.start, "");
+          if (!todo) onBox(true);
+        } else if (list && lineStart > 0) {
+          // On a later line of plain words: the lines above stay as they are, and this one starts a list under them.
+          list.split(rest.slice(0, lineStart).trimEnd(), [{ text: rest.slice(lineStart) }], slash.start - lineStart);
+        } else splice(slash.start, "", "[ ] ");
+      }
       else if (c.id === "list") splice(slash.start, "", "• ");
       else if (c.id === "heading") {
         splice(slash.start, "");
@@ -369,7 +460,11 @@ function TextEditor({
     const el = area.current;
     if (!el) return;
     el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    const at = caret === undefined ? el.value.length : Math.min(caret, el.value.length);
+    el.setSelectionRange(at, at);
+    setCursor(at);
+    // Only where the pen first lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The editor grows with what's written, like the ink would.
@@ -393,9 +488,36 @@ function TextEditor({
         placeholder={hint ? "Write, or hold Space to talk…" : undefined}
         readOnly={listening}
         onChange={(e) => {
-          setDraft(() => e.target.value);
-          setCursor(e.target.selectionStart ?? e.target.value.length);
+          let value = e.target.value;
+          let pos = e.target.selectionStart ?? value.length;
+          // "[ ] " (or "[] ") typed at the start: the box goes in front now, not when the pen is put down.
+          const typed = onBox && !todo ? BOX_TYPED.exec(value) : null;
+          if (typed) {
+            value = value.slice(typed[0].length);
+            pos = Math.max(0, pos - typed[0].length);
+            onBox!(true);
+            requestAnimationFrame(() => area.current?.setSelectionRange(pos, pos));
+          }
+          setDraft(() => value);
+          setCursor(pos);
           setLit(0);
+        }}
+        onPaste={(e) => {
+          // A list pasted into a to-do: a to-do for each line.
+          if (!todo || !list) return;
+          const lines = listLines(e.clipboardData.getData("text/plain"));
+          if (lines.length < 2) return;
+          e.preventDefault();
+          const el = e.currentTarget;
+          const start = el.selectionStart ?? draft.length;
+          const tail = draft.slice(el.selectionEnd ?? start);
+          const [first, ...rest] = lines;
+          const last = rest[rest.length - 1];
+          list.split(
+            draft.slice(0, start) + first.text,
+            rest.map((l, i) => (i === rest.length - 1 ? { ...l, text: l.text + tail } : l)),
+            last.text.length,
+          );
         }}
         onSelect={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
         onBlur={(e) => {
@@ -420,6 +542,54 @@ function TextEditor({
             if (e.key === "Escape") {
               e.preventDefault();
               setShut(menuKey);
+              return;
+            }
+          }
+          // Writing a to-do list: each Enter is a new to-do under this one; Tab makes it a sub-to-do.
+          if (todo && list && !e.nativeEvent.isComposing) {
+            const el = e.currentTarget;
+            const start = el.selectionStart ?? draft.length;
+            const end = el.selectionEnd ?? start;
+            if (e.key === "Enter" && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+              e.preventDefault();
+              // An empty to-do: out of the sub-list first, then out of the list (the pen goes down, the empty line goes).
+              if (!draft.trim()) {
+                if (!list.indent(-1)) el.blur();
+                return;
+              }
+              list.split(draft.slice(0, start), [{ text: draft.slice(end) }], 0);
+              return;
+            }
+            if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+              e.preventDefault();
+              list.indent(e.shiftKey ? -1 : 1);
+              return;
+            }
+            if (e.key === "Backspace" && start === 0 && end === 0 && !e.metaKey && !e.altKey) {
+              // At the very start: out of the sub-list, then into the line above, then the box comes off.
+              if (list.indent(-1)) {
+                e.preventDefault();
+                return;
+              }
+              if (list.joinUp) {
+                e.preventDefault();
+                list.joinUp(draft);
+                return;
+              }
+              if (onBox) {
+                e.preventDefault();
+                onBox(false);
+                return;
+              }
+            }
+            if (e.key === "ArrowUp" && list.up && !e.shiftKey && !e.altKey && !e.metaKey && !draft.slice(0, start).includes("\n")) {
+              e.preventDefault();
+              list.up();
+              return;
+            }
+            if (e.key === "ArrowDown" && list.down && !e.shiftKey && !e.altKey && !e.metaKey && !draft.slice(end).includes("\n")) {
+              e.preventDefault();
+              list.down();
               return;
             }
           }
@@ -538,7 +708,7 @@ function TextEditor({
  * The box in front of a written to-do: drawn by hand in the text's own ink,
  * the size of a capital letter. Ticked, a red pen stroke goes through it.
  */
-function TodoBox({ done, size, color, onToggle }: { done: boolean; size: number; color: InkName; onToggle?: () => void }) {
+export function TodoBox({ done, size, color, onToggle }: { done: boolean; size: number; color: InkName; onToggle?: () => void }) {
   const px = Math.round(BASE * size * 0.82);
   return (
     <button
@@ -612,7 +782,7 @@ const ICONS = {
 };
 
 const COMMANDS: { id: keyof typeof ICONS; label: string; hint: string; keys: string[] }[] = [
-  { id: "todo", label: "To-do", hint: "A box to tick · or type [ ]", keys: ["todo", "task", "check"] },
+  { id: "todo", label: "To-do", hint: "Enter for the next · Tab to nest · or type [ ]", keys: ["todo", "task", "check"] },
   { id: "remind", label: "Remind me", hint: "…tomorrow at 5, friday, in 2 hours", keys: ["remind", "date", "due", "reminder"] },
   { id: "heading", label: "Heading", hint: "Bigger words, to name a part", keys: ["heading", "title", "h1", "big"] },
   { id: "list", label: "List", hint: "Points · Enter for the next", keys: ["list", "bullet", "points"] },

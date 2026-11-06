@@ -9,7 +9,8 @@ import { viewKey } from "@/components/canvas/view";
 import { call } from "./chrome";
 import { applyLive } from "./live";
 import { LiveCursors, LiveFaces } from "./live-ui";
-import { paperTitle, type DropPaper } from "./logic";
+import { paperTitle, todoLists, type DropPaper, type Thought } from "./logic";
+import { TodoBox } from "@/components/canvas/paper-text";
 import type { SharedPaper } from "./share-server";
 import { useLive } from "./use-live";
 import { useViewerTz } from "./chrome";
@@ -59,7 +60,28 @@ export function SharedView({ paper: initial, signedIn, token = null }: { paper: 
     );
   }
 
-  const items = paper.thoughts.map((t) => ({ id: t.id, x: t.x, y: t.y, thought: t }));
+  // A to-do list stands as its first line, the rest under it.
+  const lists = todoLists(paper.thoughts);
+  const items = paper.thoughts.filter((t) => !lists.inList.has(t.id)).map((t) => ({ id: t.id, x: t.x, y: t.y, thought: t }));
+  const written = (t: Thought, k = 0) => (
+    <div
+      key={t.id}
+      className="paper-text hand font-note flex items-start leading-snug break-words whitespace-pre-wrap"
+      style={{ gap: 10 * (t.size ?? 1), paddingLeft: (t.indent ?? 0) * 32 * (t.size ?? 1), marginTop: k ? 6 : 0, fontSize: 22 * (t.size ?? 1), color: `var(--ink-${t.color ?? "ink"})`, maxWidth: 420 * Math.max(1, t.size ?? 1) }}
+    >
+      {t.kind === "todo" && <TodoBox done={t.status === "done"} size={t.size ?? 1} color={t.color ?? "ink"} />}
+      <span className={t.status === "done" ? "is-done opacity-55" : undefined}>
+        <span className={t.kind === "todo" ? "pen-strike" : undefined}>
+          <HandText text={t.text} seed={t.createdAt} />
+        </span>
+        {t.happensOn && (
+          <span className="mt-1 block font-sans text-[13px]">
+            <CountdownStub on={t.happensOn} until={t.happensUntil} today={today} />
+          </span>
+        )}
+      </span>
+    </div>
+  );
   return (
     <div ref={page} className="canvas-surface canvas-page flex min-h-dvh flex-col bg-bg">
       <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-start justify-between gap-3 px-4 pt-3">
@@ -96,17 +118,7 @@ export function SharedView({ paper: initial, signedIn, token = null }: { paper: 
             )}
             render={(it) =>
               it.thought.kind === "text" || it.thought.kind === "todo" ? (
-                <div
-                  className="paper-text hand font-note leading-snug break-words whitespace-pre-wrap"
-                  style={{ fontSize: 22 * (it.thought.size ?? 1), color: `var(--ink-${it.thought.color ?? "ink"})`, maxWidth: 420 * Math.max(1, it.thought.size ?? 1) }}
-                >
-                  <HandText text={it.thought.text} seed={it.thought.createdAt} />
-                  {it.thought.happensOn && (
-                    <span className="mt-1 block font-sans text-[13px]">
-                      <CountdownStub on={it.thought.happensOn} until={it.thought.happensUntil} today={today} />
-                    </span>
-                  )}
-                </div>
+                <div role={lists.heads.has(it.id) ? "group" : undefined}>{(lists.heads.get(it.id) ?? [it.thought]).map((l, k) => written(l, k))}</div>
               ) : (
                 <ThoughtBubble
                   text={it.thought.text}

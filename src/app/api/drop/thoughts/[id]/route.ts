@@ -2,7 +2,8 @@ import { z } from "zod";
 import { INKS, MAX_TEXT_SIZE, MAX_THOUGHT, MIN_TEXT_SIZE, type Thought } from "@/modules/drop/logic";
 import { noStore, requireEditor, userFromRequest } from "@/modules/drop/http";
 import { broadcast, tabOf, thoughtEvent } from "@/modules/drop/live-server";
-import { crumpleThought, setThoughtKind, thoughtOn, uncrumpleThought, updateThought } from "@/modules/drop/server";
+import { crumpleThought, setThoughtKind, setThoughtList, thoughtOn, uncrumpleThought, updateThought } from "@/modules/drop/server";
+import { listBody } from "../list-body";
 
 const patch = z
   .object({
@@ -18,10 +19,12 @@ const patch = z
     happens: z.object({ on: z.iso.date(), until: z.iso.date().nullable() }).refine((h) => !h.until || h.until >= h.on, "The end is before the start.").nullable().optional(),
     /** Written text ⇄ a to-do with a checkbox (a hand-cut note stays a note; a picture is always a drop). */
     kind: z.enum(["text", "todo"]).optional(),
+    /** Into a to-do list, to another place in it, a sub-to-do or not; a null id takes it out. */
+    list: listBody.optional(),
     /** Takes a crumple back (an undo). */
     restore: z.literal(true).optional(),
   })
-  .refine((p) => p.text !== undefined || p.status !== undefined || p.size !== undefined || p.color !== undefined || p.due !== undefined || p.kind !== undefined || p.happens !== undefined || p.restore);
+  .refine((p) => p.text !== undefined || p.status !== undefined || p.size !== undefined || p.color !== undefined || p.due !== undefined || p.kind !== undefined || p.happens !== undefined || p.list !== undefined || p.restore);
 
 const gone = () => Response.json({ error: "That thought isn't on this paper." }, { status: 404 });
 
@@ -29,7 +32,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/thoug
   const parsed = patch.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Nothing to change." }, { status: 400 });
   const { id } = await ctx.params;
-  const { paperId, kind, restore, ...change } = parsed.data;
+  const { paperId, kind, list, restore, ...change } = parsed.data;
   const ed = await requireEditor(paperId);
   if (ed instanceof Response) return ed;
   // Dates and reminders are the owner's own planning: a guest can't set them.
@@ -42,6 +45,14 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/drop/thoug
     const back = await thoughtOn(ed.ownerId, paperId, id);
     if (back) await broadcast(paperId, thoughtEvent(back), tab);
     return new Response(null, { status: 204 });
+  }
+  if (list) {
+    const l = await setThoughtList(ed.ownerId, paperId, id, list, ed.user.id);
+    if (!l) return gone();
+    if (!kind && !Object.values(change).some((v) => v !== undefined)) {
+      await broadcast(paperId, thoughtEvent(l), tab);
+      return Response.json(mine(l), noStore);
+    }
   }
   if (kind) {
     const k = await setThoughtKind(ed.ownerId, paperId, id, kind, ed.user.id);
