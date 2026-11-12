@@ -86,9 +86,9 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - The paper header sits above the canvas; notes slide under it, never over it.
 - Keys are shown in the visitor's own system (⌥ on Mac, Alt on Windows).
 - Logo: a ruled sheet with the red fountain-pen nib, in `public/brand/` (see its README). The favicon is the nib alone.
-- **Homepage is minimal, like Y Combinator's:** the header (logo, Stories, Desk, theme), one headline and one line under it, then **Why it exists**: the maker's LinkedIn post shown as a card (photo, name, the opening two paragraphs, "…see more" for three more, and a link to the whole post at https://lnkd.in/p/duJgX2QJ). No product cards, no Unnoticed strip, no timeline, no open-source section on the page. The footer holds the rest: Products (Stories, Desk, Unnoticed, RSS), Pen and Paper (About, Instagram, Open source, LinkedIn post), Small print.
+- **Homepage is minimal, like Y Combinator's:** the header (logo, Stories, Desk, theme), one headline and one line under it, then **Why it exists**: the maker's LinkedIn post shown as a card (photo, name, the opening two paragraphs, "…see more" for three more, and a link to the whole post at https://lnkd.in/p/duJgX2QJ). No product cards, no Unnoticed strip, no timeline, no GitHub or open-source anything on the page. The footer holds the rest: Products (Stories, Desk, Unnoticed, RSS), Pen and Paper (About, Instagram, LinkedIn post), Small print.
 - *(Superseded 2026-11-12 20:11, kept for history)* Homepage only: behind the headline, a faint strip of everything that changes (fire to the galaxy, 25 freely licensed pictures in `public/timeline/`, including the makers the founder looks up to: da Vinci, Shakespeare, Nolan, Rajamouli, Keeravani, Naval Ravikant), black and white, blurred, ~10% opacity, drifting one loop every 90 s, still for reduced motion. Faith images sit together, away from war. Credits at `/credits`.
-- *(Superseded 2026-11-12 20:11: open source is a footer link now)* Homepage: a GitHub button with the live star count in the header, and **pen & paper is open source** (stars, contributors, commits, forks, contributors' faces, Star on GitHub, Become a contributor) between Unnoticed and the founder's note. From GitHub's public API via `src/lib/github.ts`, cached on the server; left out if GitHub doesn't answer.
+- *(Superseded 2026-11-12 20:17: no GitHub or open source on the homepage at all)* Homepage: a GitHub button with the live star count in the header, and **pen & paper is open source** (stars, contributors, commits, forks, contributors' faces, Star on GitHub, Become a contributor) between Unnoticed and the founder's note. From GitHub's public API via `src/lib/github.ts`, cached on the server; left out if GitHub doesn't answer.
 
 ### Tech
 - Next.js 16 on Vercel (`sin1`), Neon Postgres, Drizzle, Better Auth.
@@ -224,6 +224,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-12 20:17 IST · design · The homepage drops its last open-source link: nothing about GitHub on the page
+Why: the founder wants the homepage minimal, with nothing about open source or GitHub; the footer's "Open source" link was the last trace. The repository stays public; it just isn't promoted here. Decision tree: (1) not the core loop, the front door; (2) removes a link, adds nothing; (3)–(5) no change to thoughts, data or exposure.
+Replaces: 2026-11-12 20:11 · The homepage goes minimal (its footer kept an Open source link)
 
 ### 2026-11-12 20:11 IST · design · The homepage goes minimal: a headline and the maker's LinkedIn post; Stories and Desk only in the header and footer
 Why: the page read as a collection of experiments, not a professional product. The two product cards repeated the header's Stories and Desk links, and the Unnoticed strip, the timeline and the open-source section crowded the page. Following Y Combinator's homepage: one statement, one reason to believe (the maker's own post on why it exists, opening readable on the page, the whole post on LinkedIn), and everything else in a plain footer (Products: Stories, Desk, Unnoticed, RSS; Pen and Paper: About, Instagram, Open source, LinkedIn post; Small print). The page no longer queries stories, so it renders without a database call. Decision tree: (1) not the core loop but the front door; (2) removes sections and adds none, nothing to choose; (3) no change to thoughts; (4) no database change; (5) shows only a public post.
