@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/ui";
 import { PenIcon } from "@/components/icons";
 import { REPO_URL } from "@/lib/github";
-import { GitHubButton } from "@/modules/home/open-source";
+import { GitHubButton, GitHubMark } from "@/modules/home/open-source";
 
 const link = "rounded-sm underline-offset-4 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text";
 
@@ -26,6 +26,43 @@ function Header() {
         <ThemeToggle />
       </nav>
     </header>
+  );
+}
+
+/** One product, one line: its name, what it is, and the way in. */
+function Product({ href, name, line, action }: { href: string; name: string; line: string; action: string }) {
+  return (
+    <li>
+      <Link href={href} className="group flex flex-col gap-1 py-5 sm:flex-row sm:items-baseline sm:gap-6 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-text">
+        <span className="font-hand w-28 shrink-0 text-[24px] leading-none font-bold text-ink">{name}</span>
+        <span className="flex-1 font-sans text-[16px] leading-relaxed text-mute">{line}</span>
+        <span className="font-sans text-[15px] font-medium text-ink group-hover:underline underline-offset-4">{action} →</span>
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * What Pen and Paper is made of, said plainly: two separate products from one
+ * belief, and the code in the open. Text only, no cards.
+ */
+function Products() {
+  return (
+    <section aria-label="What Pen and Paper makes" className="pb-16 md:pb-20">
+      <ul className="divide-y divide-line border-y border-line">
+        <Product href="/stories" name="Stories" line="Real people, written down. Short true stories to read on the way, or listen to." action="Read" />
+        <Product href="/desk" name="Desk" line="A quiet place for your own thoughts. Drop one in a second; it comes back when it matters." action="Open" />
+      </ul>
+      <p className="mt-4 flex items-center gap-2 font-sans text-[14px] text-mute">
+        <GitHubMark size={14} />
+        <span>
+          Open source.{" "}
+          <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className={`text-ink ${link}`}>
+            Read the code on GitHub
+          </a>
+        </span>
+      </p>
+    </section>
   );
 }
 
@@ -117,23 +154,25 @@ function Footer() {
   return (
     <footer className="border-t border-line">
       <div className="mx-auto grid w-full max-w-[1120px] grid-cols-2 gap-8 px-5 py-12 font-sans text-[14px] text-mute sm:grid-cols-4 sm:px-8">
-        <p className="story-serif col-span-2 text-[18px] leading-snug text-ink italic sm:col-span-1">Your thoughts deserve to be written down.</p>
-        <FooterTab title="Products">
-          <Link href="/stories" className={`w-fit ${link}`}>Stories</Link>
-          <Link href="/desk" className={`w-fit ${link}`}>Desk</Link>
-          <Link href="/stories/unnoticed" className={`w-fit ${link}`}>Unnoticed</Link>
+        <div className="col-span-2 flex flex-col gap-2 sm:col-span-1">
+          <p className="story-serif text-[18px] leading-snug text-ink italic">Your thoughts deserve to be written down.</p>
+          <span>© Pen and Paper</span>
+        </div>
+        <FooterTab title="Stories">
+          <Link href="/stories" className={`w-fit ${link}`}>Read stories</Link>
+          <a href="https://www.instagram.com/unnoticed.pnp/" {...out}>Instagram @unnoticed.pnp</a>
           <Link href="/stories/rss.xml" className={`w-fit ${link}`}>RSS</Link>
+        </FooterTab>
+        <FooterTab title="Desk">
+          <Link href="/desk" className={`w-fit ${link}`}>Open your desk</Link>
+          <Link href="/download" className={`w-fit ${link}`}>Apps &amp; extension</Link>
         </FooterTab>
         <FooterTab title="Pen and Paper">
           <Link href="/about" className={`w-fit ${link}`}>About</Link>
-          <a href="https://www.instagram.com/unnoticed.moment/" {...out}>Instagram</a>
           <a href={REPO_URL} {...out}>GitHub (open source)</a>
           <a href={POST_URL} {...out}>LinkedIn post</a>
-        </FooterTab>
-        <FooterTab title="Small print">
           <Link href="/privacy" className={`w-fit ${link}`}>Privacy</Link>
           <Link href="/credits" className={`w-fit ${link}`}>Photo credits</Link>
-          <span>© Pen and Paper</span>
         </FooterTab>
       </div>
     </footer>
@@ -150,10 +189,11 @@ export function StoryHome() {
     <div className="flex min-h-dvh flex-col bg-bg">
       <Header />
       <main className="mx-auto flex w-full max-w-[680px] flex-1 flex-col px-5 sm:px-8">
-        <section className="flex flex-col gap-4 pt-14 pb-12 sm:pt-24 sm:pb-16">
+        <section className="flex flex-col gap-4 pt-14 pb-10 sm:pt-24 sm:pb-12">
           <h1 className="story-serif text-[36px] leading-[1.1] tracking-[-0.02em] text-balance text-ink sm:text-[52px]">Your thoughts deserve to be written down.</h1>
-          <p className="max-w-[520px] font-sans text-[17px] leading-relaxed text-mute">Real stories of real people, to read or listen to. And a quiet desk for your own thoughts.</p>
+          <p className="max-w-[520px] font-sans text-[17px] leading-relaxed text-mute">Pen and Paper makes two things, and builds them in the open.</p>
         </section>
+        <Products />
         <MakersPost />
       </main>
       <Footer />
