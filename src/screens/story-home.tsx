@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui";
 import { PenIcon } from "@/components/icons";
+import { GitHubButton, OpenSource } from "@/modules/home/open-source";
 import { TimelineStrip } from "@/modules/home/timeline-strip";
 import { Picture } from "@/modules/stories/reader";
 import { lovedThisMonth, publishedStories, type StoryCard } from "@/modules/stories/server";
@@ -63,6 +64,9 @@ function Header() {
         <Link href="/about" className={`rounded-full px-3 py-2 max-sm:hidden ${link}`}>
           About
         </Link>
+        <span className="ml-1">
+          <GitHubButton />
+        </span>
         <ThemeToggle />
       </nav>
     </header>
@@ -180,7 +184,8 @@ function Footer() {
 
 /**
  * The homepage: the parent brand and its belief, then its two products as
- * two equal doors (Stories, Desk), then the person behind it.
+ * two equal doors (Stories, Desk), Unnoticed, that it is open source, then
+ * the person behind it.
  */
 export async function StoryHome() {
   const [loved, newest] = await Promise.all([lovedThisMonth(), publishedStories(1)]);
@@ -198,6 +203,8 @@ export async function StoryHome() {
         <Doors lead={lead} />
 
         <Clippings />
+
+        <OpenSource />
 
         <FounderNote />
       </main>

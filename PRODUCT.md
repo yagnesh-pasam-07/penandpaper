@@ -88,6 +88,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - Keys are shown in the visitor's own system (⌥ on Mac, Alt on Windows).
 - Logo: a ruled sheet with the red fountain-pen nib, in `public/brand/` (see its README). The favicon is the nib alone.
 - Homepage only: behind the headline, a faint strip of everything that changes (fire to the galaxy, 25 freely licensed pictures in `public/timeline/`, including the makers the founder looks up to: da Vinci, Shakespeare, Nolan, Rajamouli, Keeravani, Naval Ravikant), black and white, blurred, ~10% opacity, drifting one loop every 90 s, still for reduced motion. Faith images sit together, away from war. Credits at `/credits`.
+- Homepage: a GitHub button with the live star count in the header, and **pen & paper is open source** (stars, contributors, commits, forks, contributors' faces, Star on GitHub, Become a contributor) between Unnoticed and the founder's note. From GitHub's public API via `src/lib/github.ts`, cached on the server; left out if GitHub doesn't answer.
 
 ### Tech
 - Next.js 16 on Vercel (`sin1`), Neon Postgres, Drizzle, Better Auth.
@@ -131,6 +132,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 **What we build**
 | Verb | Typed | `/` menu | Click |
 | --- | --- | --- | --- |
+| Homepage: Pen and Paper is open source, live stars, contributors, commits, forks | Built | [#57](https://github.com/yagnesh-pasam-07/penandpaper/issues/57) |
 | Decide | `[ ] ` at the start | To-do | "To-do" chip on picked text |
 | Remember | `… remind me tomorrow at 5` | Remind me | clock / "+ Date · remind me" |
 | Structure | `• ` (Enter continues the list) | Heading, List | drag the corner to resize |
@@ -222,6 +224,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-12 09:02 IST · growth · The homepage says Pen and Paper is open source: live stars, contributors, commits, forks
+Why: the "Built in the open" section and the GitHub star button left with the old tool page when the homepage became the Stories front page (2026-11-01), so nothing on the site said the code is public. They come back fitted to the new homepage: a GitHub button with the live star count in the header, and "pen & paper is open source" between Unnoticed and the founder's note, with four live numbers (stars, contributors, commits, forks), up to 24 contributor faces, Star on GitHub and Become a contributor. Same data as before (`src/lib/github.ts`): fetched on the server, stars cached two minutes and re-asked once by the browser, the rest hourly, bots left out; if GitHub doesn't answer, the numbers are left out. Decision tree: (1) not the core loop but growth, the same call as 2026-10-30 10:20; (2) adds one section and one header button, nothing to choose; (3) no change to thoughts; (4) no database change; (5) shows only public GitHub data. Ticket #57.
+Replaces: 2026-10-30 10:20 · Live GitHub stars and contributors on the homepage (removed with the old tool page on 2026-11-01)
 
 ### 2026-11-06 12:38 IST · product · Writing a to-do list on the paper: Enter for the next, Tab for a sub-to-do, every line its own to-do
 Why: writing several to-dos meant putting the pen down, clicking the paper and typing `[ ]` or `/todo` for each one, and Enter only added a line inside the same thought, so only the first line had a box, a strike, a date and a place in Tonight's paper. The best list tools (Things, Slack canvas, Notion, Apple Notes) share one rule: once you're in a list, the keyboard keeps you there. So Enter writes the next to-do, an empty Enter leaves, Tab nests one level, Backspace at the start undoes a step (out of the sub-list, into the line above, then the box off), ↑/↓ move between lines, a pasted list becomes one to-do per line, and the box appears the moment `[ ] ` or `/todo` is typed instead of when the pen goes down. Each line is a real `todo` thought, not checkboxes inside one, because a to-do is what's struck, dated, reminded and reviewed: one per line means "Data migration" can be due Friday while "Documents" is today. Sub-to-dos stop at one level: deeper is a project tree, which the five-verbs PRD rules out. Decision tree: (1) serves dropping fast and closing the day (more, smaller to-dos, each reviewed); (2) no new screen, setting or button: the same `/` menu and box, plus keys, and a "1/3" count shown only when there are sub-to-dos; (3) doesn't change what a thought is: every line is an ordinary `todo`, so Tonight's paper, the resurface, the recall, reminders, the email and search act on each line as they already do; only written words can stand in a list, enforced on the server; a recalled copy ("Use it") lands alone; (4) add-only migration `0027_todo_lists`: `drop_thoughts.list_id` (the first line's id), `list_pos`, `indent` (default 0); a list's order and head are worked out from these, and every line keeps the head's spot, so if the first is crumpled the next takes its place; (5) nothing new can be lost: joining lines crumples the empty one with the usual 7-day keep, and each Enter is one ⌘Z step. Ticket #54.
