@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui";
 import { PenIcon } from "@/components/icons";
+import { REPO_URL } from "@/lib/github";
+import { GitHubButton } from "@/modules/home/open-source";
 
 const link = "rounded-sm underline-offset-4 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text";
 
@@ -18,6 +20,9 @@ function Header() {
         <Link href="/desk" className={`rounded-full px-3 py-2 ${link}`}>
           Desk
         </Link>
+        <span className="ml-1">
+          <GitHubButton />
+        </span>
         <ThemeToggle />
       </nav>
     </header>
@@ -122,6 +127,7 @@ function Footer() {
         <FooterTab title="Pen and Paper">
           <Link href="/about" className={`w-fit ${link}`}>About</Link>
           <a href="https://www.instagram.com/unnoticed.moment/" {...out}>Instagram</a>
+          <a href={REPO_URL} {...out}>GitHub (open source)</a>
           <a href={POST_URL} {...out}>LinkedIn post</a>
         </FooterTab>
         <FooterTab title="Small print">

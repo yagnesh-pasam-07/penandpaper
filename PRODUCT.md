@@ -86,7 +86,7 @@ Areas: `product` · `design` · `tech` · `security` · `infra` · `growth`.
 - The paper header sits above the canvas; notes slide under it, never over it.
 - Keys are shown in the visitor's own system (⌥ on Mac, Alt on Windows).
 - Logo: a ruled sheet with the red fountain-pen nib, in `public/brand/` (see its README). The favicon is the nib alone.
-- **Homepage is minimal, like Y Combinator's:** the header (logo, Stories, Desk, theme), one headline and one line under it, then **Why it exists**: the maker's LinkedIn post shown as a card (photo, name, the opening two paragraphs, "…see more" for three more, and a link to the whole post at https://lnkd.in/p/duJgX2QJ). No product cards, no Unnoticed strip, no timeline, no GitHub or open-source anything on the page. The footer holds the rest: Products (Stories, Desk, Unnoticed, RSS), Pen and Paper (About, Instagram, LinkedIn post), Small print.
+- **Homepage is minimal, like Y Combinator's:** the header (logo, Stories, Desk, theme), one headline and one line under it, a small GitHub button with the live star count in the header (it is open source), then **Why it exists**: the maker's LinkedIn post shown as a card (photo, name, the opening two paragraphs, "…see more" for three more, and a link to the whole post at https://lnkd.in/p/duJgX2QJ). No product cards, no Unnoticed strip, no timeline, no open-source section (stars, contributors, commits) on the page. The footer holds the rest: Products (Stories, Desk, Unnoticed, RSS), Pen and Paper (About, Instagram, GitHub (open source), LinkedIn post), Small print.
 - *(Superseded 2026-11-12 20:11, kept for history)* Homepage only: behind the headline, a faint strip of everything that changes (fire to the galaxy, 25 freely licensed pictures in `public/timeline/`, including the makers the founder looks up to: da Vinci, Shakespeare, Nolan, Rajamouli, Keeravani, Naval Ravikant), black and white, blurred, ~10% opacity, drifting one loop every 90 s, still for reduced motion. Faith images sit together, away from war. Credits at `/credits`.
 - *(Superseded 2026-11-12 20:17: no GitHub or open source on the homepage at all)* Homepage: a GitHub button with the live star count in the header, and **pen & paper is open source** (stars, contributors, commits, forks, contributors' faces, Star on GitHub, Become a contributor) between Unnoticed and the founder's note. From GitHub's public API via `src/lib/github.ts`, cached on the server; left out if GitHub doesn't answer.
 
@@ -224,6 +224,10 @@ Every feature asked for, newest first. One row each; move its state as it goes. 
 ---
 
 ## Decision log
+
+### 2026-11-12 20:20 IST · design · GitHub comes back, small: a star button in the header and a footer link; the big open-source section stays off
+Why: Pen and Paper is open source and the homepage should say so, but minimally. A GitHub button with the live star count in the header (the existing `GitHubButton`, from `src/lib/github.ts`; hidden count if GitHub doesn't answer) and "GitHub (open source)" in the footer, the way minimal product sites show it. The stats-and-faces section stays off the page. Decision tree: (1) not the core loop, the front door; (2) one header button, nothing to choose; (3)–(5) no change to thoughts, data or exposure; public GitHub data only.
+Replaces: 2026-11-12 20:17 · The homepage drops its last open-source link
 
 ### 2026-11-12 20:17 IST · design · The homepage drops its last open-source link: nothing about GitHub on the page
 Why: the founder wants the homepage minimal, with nothing about open source or GitHub; the footer's "Open source" link was the last trace. The repository stays public; it just isn't promoted here. Decision tree: (1) not the core loop, the front door; (2) removes a link, adds nothing; (3)–(5) no change to thoughts, data or exposure.
