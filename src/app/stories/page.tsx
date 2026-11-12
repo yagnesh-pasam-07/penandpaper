@@ -6,10 +6,10 @@ import { Suspense } from "react";
 import { allSeries, publishedStories } from "@/modules/stories/server";
 
 export const metadata: Metadata = {
-  title: "Stories · Pen & Paper",
-  description: "Real human stories, history and art. Three to five minutes each, to read on the way or listen to with your eyes closed.",
+  title: "Writing · Pen and Paper",
+  description: "Essays and true stories by Yagnesh Pasam: on life, death, people and the things we notice too late. A few minutes each, to read or listen to.",
   alternates: { canonical: "/stories", types: { "application/rss+xml": "/stories/rss.xml" } },
-  openGraph: { title: "Pen & Paper Stories", description: "Real human stories, history and art. Read it on the way, or listen.", type: "website", url: "/stories" },
+  openGraph: { title: "Writing · Pen and Paper", description: "Essays and true stories by Yagnesh Pasam. A few minutes each, to read or listen to.", type: "website", url: "/stories" },
 };
 
 /** /stories: every published story, newest first. Cached; a new one appears within 15 minutes of its time. */
@@ -33,12 +33,13 @@ async function StoriesList({ order }: { order: "new" | "loved" }) {
     <StoriesShell>
       <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-10 px-5 pt-10 pb-20 sm:px-8 sm:pt-16">
         <header className="flex flex-col gap-3 border-b border-line pb-8">
-          <h1 className="story-serif text-[44px] leading-none font-medium tracking-[-0.02em] text-ink italic sm:text-[64px]">Stories</h1>
-          <p className="story-serif max-w-[560px] text-[19px] leading-[1.5] text-mute sm:text-[21px]">Real people, history and art. A few minutes each: read it on the way, or listen with your eyes closed.</p>
-          <Link href="/stories/unnoticed" className="group flex max-w-[560px] items-baseline gap-3 rounded-xl border border-dashed border-line-strong px-4 py-3 hover:bg-soft">
-            <span className="font-hand text-[26px] leading-none font-bold text-red-text">Unnoticed</span>
-            <span className="font-sans text-[14px] text-mute">Short ones, in Telugu: people, nature and the things we all do, told with a smile →</span>
-          </Link>
+          <h1 className="story-serif text-[44px] leading-none font-medium tracking-[-0.02em] text-ink sm:text-[60px]">Writing</h1>
+          <p className="story-serif max-w-[560px] text-[19px] leading-[1.5] text-mute sm:text-[21px]">Essays and true stories, by Yagnesh Pasam. A few minutes each: read it on the way, or listen.</p>
+          <p className="flex flex-wrap gap-x-5 gap-y-1 font-sans text-[14px] text-mute">
+            <a href="/stories/rss.xml" className="underline-offset-4 hover:text-ink hover:underline">RSS</a>
+            <a href="https://www.instagram.com/unnoticed.pnp/" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:text-ink hover:underline">Instagram</a>
+            <a href="https://www.linkedin.com/in/yagneshpasam/" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:text-ink hover:underline">LinkedIn</a>
+          </p>
         </header>
         {series.length > 0 && (
           <nav aria-label="Series" className="-mt-4 flex flex-wrap items-center gap-2 font-sans">
@@ -66,7 +67,7 @@ async function StoriesList({ order }: { order: "new" | "loved" }) {
           <>
             <LeadCard s={lead} />
             {rest.length > 0 && (
-              <section aria-label="More stories" className="flex flex-col divide-y divide-line border-t border-line">
+              <section aria-label="More writing" className="flex flex-col divide-y divide-line border-t border-line">
                 {rest.map((s) => (
                   <RowCard key={s.id} s={s} />
                 ))}
@@ -74,7 +75,7 @@ async function StoriesList({ order }: { order: "new" | "loved" }) {
             )}
           </>
         ) : (
-          <p className="story-serif py-20 text-center text-[21px] text-mute italic">The first story is on its way.</p>
+          <p className="story-serif py-20 text-center text-[21px] text-mute italic">The first piece is on its way.</p>
         )}
       </div>
     </StoriesShell>

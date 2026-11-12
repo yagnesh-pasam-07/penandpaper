@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toBlocks, toMarkdown } from "./blocks";
 import { isLive, isSlug, parseSources, readingMinutes, seriesSlug, slugify, storyState, uniqueSlug } from "./logic";
-import { firstLine, imageLine, inline, parse, pullQuote, safeHref } from "./markdown";
+import { firstLine, imageLine, inline, parse, pullQuote, safeHref, toLinkedIn } from "./markdown";
 import { htmlToMarkdown, mediumFeedUrl, mediumPostId, postFromFeed } from "./medium";
 
 const now = new Date("2026-11-01T06:00:00Z");
@@ -157,5 +157,14 @@ describe("sources and series", () => {
   });
   it("a series has a readable address", () => {
     expect(seriesSlug("The man behind the words")).toBe("the-man-behind-the-words");
+  });
+});
+
+describe("toLinkedIn", () => {
+  it("turns a piece into plain text with the link at the end", () => {
+    const body = "On **death**, and *time*.\n\n## What stays\n\n> We are all borrowed.\n\n- one\n- two\n\n![a lamp](media:11111111-1111-1111-1111-111111111111)\n\nSee [this](https://example.com).";
+    expect(toLinkedIn("The last letter", body, "https://p.app/stories/x")).toBe(
+      "The last letter\n\nOn death, and time.\n\nWhat stays\n\n“We are all borrowed.”\n\n• one\n• two\n\nSee this (https://example.com).\n\nRead it on Pen and Paper: https://p.app/stories/x",
+    );
   });
 });

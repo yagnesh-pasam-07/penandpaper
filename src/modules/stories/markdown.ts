@@ -153,3 +153,23 @@ export function blockText(b: Block, max = 140): string {
   const one = t.replace(/\s+/g, " ").trim();
   return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
 }
+
+/**
+ * A piece as a LinkedIn post: plain text, because LinkedIn shows no Markdown.
+ * The title, then every paragraph; a heading stands on its own line, a quote
+ * keeps its quote marks, a list keeps its bullets, pictures are left out (they
+ * go in by hand), and the link to the full piece closes it.
+ */
+export function toLinkedIn(title: string, body: string, url: string): string {
+  const flat = (c: Inline[]): string => c.map((n) => (n.t === "text" ? n.v : n.t === "br" ? "\n" : n.t === "link" ? `${flat(n.c)} (${n.href})` : flat(n.c))).join("");
+  const parts: string[] = [];
+  if (title.trim()) parts.push(title.trim());
+  for (const b of parse(body)) {
+    if (b.t === "p" || b.t === "h") parts.push(flat(b.c).trim());
+    else if (b.t === "quote") parts.push(`“${flat(b.c).trim()}”`);
+    else if (b.t === "list") parts.push(b.items.map((i) => `• ${flat(i).trim()}`).join("\n"));
+    else if (b.t === "hr") parts.push("· · ·");
+  }
+  if (url) parts.push(`Read it on Pen and Paper: ${url}`);
+  return parts.filter(Boolean).join("\n\n");
+}

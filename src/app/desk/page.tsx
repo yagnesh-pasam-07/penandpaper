@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function DeskPage() {
   return (
     <div className={storyFonts}>
-      <Home supportEmail={process.env.SUPPORT_EMAIL} />
+      <Home />
     </div>
   );
 }

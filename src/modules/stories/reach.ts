@@ -6,13 +6,13 @@
 
 export const CHANNELS = ["whatsapp", "instagram", "copy", "native", "x", "other"] as const;
 export type Channel = (typeof CHANNELS)[number];
-export const SOURCES = ["whatsapp", "instagram", "google", "home", "stories", "social", "direct", "other"] as const;
+export const SOURCES = ["whatsapp", "instagram", "linkedin", "google", "home", "stories", "social", "direct", "other"] as const;
 export type Source = (typeof SOURCES)[number];
 export const EVENT_KINDS = ["view", "read", "listen", "share", "depth"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
 export const CHANNEL_LABEL: Record<Channel, string> = { whatsapp: "WhatsApp", instagram: "Instagram", copy: "Copied link", native: "Phone share", x: "X", other: "Other" };
-export const SOURCE_LABEL: Record<Source, string> = { whatsapp: "WhatsApp", instagram: "Instagram", google: "Google", home: "Pen & Paper home", stories: "Stories page", social: "Other social", direct: "Direct / unknown", other: "Other sites" };
+export const SOURCE_LABEL: Record<Source, string> = { whatsapp: "WhatsApp", instagram: "Instagram", linkedin: "LinkedIn", google: "Google", home: "Pen & Paper home", stories: "Stories page", social: "Other social", direct: "Direct / unknown", other: "Other sites" };
 
 /**
  * Where a reader came from: the `?s=` our share links carry first (WhatsApp
@@ -22,6 +22,7 @@ export function sourceOf(tag: string | null | undefined, referrer: string | null
   const t = (tag ?? "").toLowerCase();
   if (t === "wa" || t === "whatsapp") return "whatsapp";
   if (t === "ig" || t === "instagram") return "instagram";
+  if (t === "li" || t === "linkedin") return "linkedin";
   if (t === "x") return "social";
   if (!referrer) return "direct";
   let host = "";
@@ -36,6 +37,7 @@ export function sourceOf(tag: string | null | undefined, referrer: string | null
   if (host === ownHost) return path.startsWith("/stories") ? "stories" : "home";
   if (/(^|\.)whatsapp\.(com|net)$/.test(host) || host === "wa.me") return "whatsapp";
   if (/(^|\.)instagram\.com$/.test(host) || host === "l.instagram.com") return "instagram";
+  if (/(^|\.)linkedin\.com$/.test(host) || host === "lnkd.in") return "linkedin";
   if (/(^|\.)google\.[a-z.]+$/.test(host) || host === "news.google.com") return "google";
   if (/(^|\.)(facebook|fb|t|twitter|x|linkedin|lnkd|reddit|threads)\.(com|me|in|net|co|org)$/.test(host) || host === "lnkd.in" || host === "t.co") return "social";
   return "other";

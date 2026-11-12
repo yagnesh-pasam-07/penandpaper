@@ -3,9 +3,9 @@
  * No database and no browser, so they are tested on their own.
  */
 
-export const CATEGORIES = ["human", "history", "art"] as const;
+export const CATEGORIES = ["essay", "human", "history", "art"] as const;
 export type Category = (typeof CATEGORIES)[number];
-export const CATEGORY_LABEL: Record<Category, string> = { human: "Human story", history: "History", art: "Art" };
+export const CATEGORY_LABEL: Record<Category, string> = { essay: "Essay", human: "Human story", history: "History", art: "Art" };
 
 /** Words a minute, read calmly on a phone (slower than the usual 238). */
 export const WORDS_PER_MINUTE = 200;

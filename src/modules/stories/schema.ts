@@ -24,7 +24,7 @@ export const stories = pgTable(
     coverMediaId: uuid("cover_media_id"),
     /** The line under the cover picture (Markdown pictures carry their own captions). */
     coverCaption: text("cover_caption").notNull().default(""),
-    category: text("category", { enum: ["human", "history", "art"] }).notNull().default("human"),
+    category: text("category", { enum: ["essay", "human", "history", "art"] }).notNull().default("human"),
     /** For translations later (Telugu first); every story is one language. */
     language: text("language").notNull().default("en"),
     readingMinutes: integer("reading_minutes").notNull().default(1),

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransitio
 import { publish, remove, save, translate } from "@/app/studio/stories/actions";
 import { newKey, toBlocks, toMarkdown, type EditBlock } from "./blocks";
 import { CATEGORIES, CATEGORY_LABEL, clock, readLabel, type Category, type StoryState } from "./logic";
+import { toLinkedIn } from "./markdown";
 import { uploadAudio, uploadImage } from "./upload";
 
 export type EditorStory = {
@@ -421,6 +422,7 @@ export function StoryEditor({ initial, focusBlock = null }: { initial: EditorSto
       {panel && (
         <PublishPanel
           s={s}
+          body={toMarkdown(blocks)}
           words={words}
           schedule={schedule}
           setSchedule={setSchedule}
@@ -595,6 +597,7 @@ function Margin({ onPicture, onAdd, onRemove }: { onPicture: (f: File) => void; 
 /** Publish: the few things a reader sees outside the story, then now or later. */
 function PublishPanel({
   s,
+  body,
   words,
   schedule,
   setSchedule,
@@ -612,6 +615,7 @@ function PublishPanel({
   onPersonPhoto,
 }: {
   s: EditorStory;
+  body: string;
   words: number;
   schedule: string;
   setSchedule: (v: string) => void;
@@ -647,8 +651,8 @@ function PublishPanel({
         </label>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className={`${label} pb-2`}>Kind of story</legend>
-          <div className="flex gap-2">
+          <legend className={`${label} pb-2`}>Kind of piece</legend>
+          <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
               <button key={c} type="button" onClick={() => onCategory(c)} aria-pressed={s.category === c} className={`h-9 rounded-full border px-4 text-[14px] ${s.category === c ? "border-ink bg-ink text-bg" : "border-line text-ink hover:bg-soft"}`}>
                 {CATEGORY_LABEL[c]}
@@ -777,6 +781,8 @@ function PublishPanel({
           </div>
         </div>
 
+        <LinkedInCopy title={s.title} body={body} slug={s.slug} live={s.state === "published"} />
+
         <label className="flex flex-col gap-2">
           <span className={label}>First published elsewhere? (optional)</span>
           <input type="url" value={s.originalUrl ?? ""} onChange={(e) => onField("originalUrl", e.target.value)} placeholder="https://medium.com/…" className={input} />
@@ -819,6 +825,37 @@ function PublishPanel({
           </form>
         </div>
       </aside>
+    </div>
+  );
+}
+
+/**
+ * Write here first, post it on LinkedIn: the piece as plain text LinkedIn
+ * keeps (no Markdown), with the link to it here at the end. LinkedIn shows a
+ * native post to more people than a bare link, and the piece's home stays here.
+ */
+function LinkedInCopy({ title, body, slug, live }: { title: string; body: string; slug: string; live: boolean }) {
+  const [done, setDone] = useState(false);
+  const copy = async () => {
+    const url = `${window.location.origin}/stories/${slug}?s=linkedin`;
+    try {
+      await navigator.clipboard.writeText(toLinkedIn(title, body, url));
+      setDone(true);
+      setTimeout(() => setDone(false), 2200);
+    } catch {}
+  };
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-line p-4">
+      <span className="text-[12px] font-semibold tracking-[0.06em] text-mute uppercase">Post it on LinkedIn</span>
+      <span className="text-[13px] leading-relaxed text-mute">The whole piece as a LinkedIn post, ending with its link here. Paste it as a new post; add the cover by hand.{!live && " Publish here first so the link works."}</span>
+      <div className="flex gap-2">
+        <button type="button" onClick={() => void copy()} aria-live="polite" className="h-10 rounded-xl border border-ink px-4 text-[14px] font-semibold text-ink hover:bg-soft">
+          {done ? "Copied" : "Copy for LinkedIn"}
+        </button>
+        <a href="https://www.linkedin.com/feed/?shareActive=true" target="_blank" rel="noopener noreferrer" className="flex h-10 items-center rounded-xl px-3 text-[14px] text-mute underline hover:text-ink">
+          Open LinkedIn ↗
+        </a>
+      </div>
     </div>
   );
 }

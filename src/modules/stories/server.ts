@@ -225,7 +225,7 @@ export async function createStory(authorId: string, init: { title?: string; subt
   const slug = await freeSlug(init.title ?? "untitled");
   const [row] = await httpDb
     .insert(stories)
-    .values({ slug, authorId, title: init.title ?? "", subtitle: init.subtitle ?? "", hook: init.hook ?? "", body: init.body ?? "", category: init.category ?? "human", originalUrl: init.originalUrl ?? null, readingMinutes: readingMinutes(init.body ?? "") })
+    .values({ slug, authorId, title: init.title ?? "", subtitle: init.subtitle ?? "", hook: init.hook ?? "", body: init.body ?? "", category: init.category ?? "essay", originalUrl: init.originalUrl ?? null, readingMinutes: readingMinutes(init.body ?? "") })
     .returning({ id: stories.id });
   return row.id;
 }
