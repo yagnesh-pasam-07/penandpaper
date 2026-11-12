@@ -1,49 +1,7 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui";
 import { PenIcon } from "@/components/icons";
-import { GitHubButton, OpenSource } from "@/modules/home/open-source";
-import { TimelineStrip } from "@/modules/home/timeline-strip";
-import { Picture } from "@/modules/stories/reader";
-import { lovedThisMonth, publishedStories, type StoryCard } from "@/modules/stories/server";
-import { Clipping } from "@/modules/stories/clipping";
-import { ReelStrip } from "@/modules/stories/reel-strip";
-import { catalogue } from "@/modules/stories/unnoticed";
-
-/**
- * Unnoticed on the homepage: the newest clippings pasted along the page like
- * a scrapbook spread, scrolled sideways like a reel. Each opens its own page.
- */
-function Clippings() {
-  const all = catalogue();
-  if (!all.length) return null;
-  return (
-    <section aria-labelledby="clippings-title" className="flex flex-col gap-1 pb-16 md:pb-24">
-      <div className="mx-auto flex w-full max-w-[1120px] flex-wrap items-end justify-between gap-3 px-5 sm:px-8">
-        <div className="flex flex-col gap-1">
-          <h2 id="clippings-title" className="font-hand text-[34px] leading-none font-bold text-ink sm:text-[40px]">
-            pen &amp; paper <span className="text-red-text">unnoticed</span>
-          </h2>
-          <p className="story-serif max-w-[520px] text-[17px] leading-snug text-mute">Small moments nobody noticed. In Telugu.</p>
-        </div>
-        <Link href="/stories/unnoticed" className="font-sans text-[15px] text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
-          See them all →
-        </Link>
-      </div>
-      <ReelStrip label="Unnoticed: the newest moments">
-        {all.map((e) => (
-          <li key={e.code} className="snap-start">
-            <Clipping entry={e} width={210} />
-          </li>
-        ))}
-        <li className="flex w-[180px] shrink-0 snap-start items-center">
-          <Link href="/stories/unnoticed" className="font-hand text-[26px] leading-tight text-mute hover:text-ink">
-            see them all →
-          </Link>
-        </li>
-      </ReelStrip>
-    </section>
-  );
-}
+import { REPO_URL } from "@/lib/github";
 
 const link = "rounded-sm underline-offset-4 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text";
 
@@ -61,152 +19,138 @@ function Header() {
         <Link href="/desk" className={`rounded-full px-3 py-2 ${link}`}>
           Desk
         </Link>
-        <Link href="/about" className={`rounded-full px-3 py-2 max-sm:hidden ${link}`}>
-          About
-        </Link>
-        <span className="ml-1">
-          <GitHubButton />
-        </span>
         <ThemeToggle />
       </nav>
     </header>
   );
 }
 
-/** A product's name under the parent: "pen & paper" in ink, the product in red. */
-function Wordmark({ product }: { product: string }) {
-  return (
-    <span className="font-hand text-[26px] leading-none font-bold">
-      pen &amp; paper <span className="text-red-text">{product}</span>
-    </span>
-  );
-}
+const POST_URL = "https://lnkd.in/p/duJgX2QJ";
 
-/** A quiet little sheet: three handwritten thoughts, one struck through in red pen. */
-function PaperMock() {
-  const note = "rounded-xl px-4 py-2.5 font-note text-[19px] leading-snug text-ink shadow-[0_1px_0_var(--line)]";
-  return (
-    <div aria-hidden="true" className="canvas-preview relative aspect-[4/3] overflow-hidden rounded-md border border-line bg-sheet p-6" data-canvas="dotted">
-      <div className="canvas-surface absolute inset-0" />
-      <div className="relative flex flex-col items-start gap-4">
-        <span className={`${note} -rotate-2 bg-t1`}>call amma tonight</span>
-        <span className={`${note} relative ml-10 rotate-1 bg-t3 text-mute`}>
-          book the bus
-          <span className="absolute inset-x-3 top-1/2 h-[3px] -rotate-2 rounded-full bg-red" />
-        </span>
-        <span className={`${note} ml-4 -rotate-1 bg-t2`}>write the tea-shop man&apos;s story</span>
-      </div>
-    </div>
-  );
-}
+/** The post's opening, as written. The rest is read on LinkedIn. */
+const POST_LEAD = [
+  "I build things. After weeks, I'm still the only person using this one. Let me tell you why I built it.",
+  "I was never a digital note-taker. Honestly, all those fancy productivity apps never made me productive. I'm a paper person. Ideas, plans, random thoughts at 2am, everything goes in my notebook.",
+];
+const POST_MORE = [
+  "But I can't carry my notebook everywhere. And I'm a forgetter, bro. A movie I want to watch, a place I want to visit, a friend I need to call. If I don't drop it somewhere in 5 seconds, it's gone. I think all of us are like that.",
+  "The problem is, most of my life is digital now. I see an Instagram page I love, and I want it on my paper so I can come back to it. Instead I copy the link, paste it somewhere, and never see it again. Every place had a piece of me, and nothing had all of it.",
+  "So I started noticing what I loved in each one.",
+];
 
-/** The two products, as two equal doors under one belief. */
-function Doors({ lead }: { lead: StoryCard | null }) {
-  const door = "group flex flex-col gap-5 rounded-2xl border border-line bg-sheet p-5 shadow-[var(--lift)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-line-strong sm:p-7";
+/**
+ * Why it exists, in the maker's own post: pinned to the page like an
+ * attachment, the opening readable here, "see more" for a little more,
+ * and the whole post on LinkedIn.
+ */
+function MakersPost() {
   return (
-    <section aria-label="Pen and Paper" className="mx-auto grid w-full max-w-[1120px] gap-5 px-5 pb-16 sm:px-8 md:grid-cols-2 md:gap-8 md:pb-24">
-      <Link href="/stories" className={door}>
-        <span className="block overflow-hidden rounded-md bg-soft">
-          {lead?.coverId ? (
-            <Picture base="/api/stories/media/" id={lead.coverId} alt="" sizes="(max-width: 768px) 100vw, 540px" eager className="aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
-          ) : (
-            <span className="flex aspect-[4/3] items-center justify-center text-[56px] text-red-text">“</span>
-          )}
-        </span>
-        <span className="flex flex-col gap-2">
-          <Wordmark product="stories" />
-          <span className="story-serif text-[24px] leading-snug text-ink">Real people, written down.</span>
-          <span className="font-sans text-[15px] leading-relaxed text-mute">Short, true stories of ordinary lives, history and art. Read one on the way, or listen.</span>
-        </span>
-        <span className="mt-auto font-sans text-[15px] font-semibold text-ink">Read stories →</span>
-      </Link>
-      <Link href="/desk" className={door}>
-        <PaperMock />
-        <span className="flex flex-col gap-2">
-          <Wordmark product="desk" />
-          <span className="story-serif text-[24px] leading-snug text-ink">A quiet place for your own thoughts.</span>
-          <span className="font-sans text-[15px] leading-relaxed text-mute">Drop a thought in a second. See it on one paper. It comes back when it matters.</span>
-        </span>
-        <span className="mt-auto font-sans text-[15px] font-semibold text-ink">Open your desk →</span>
-      </Link>
-    </section>
-  );
-}
-
-/** Who is behind it: a real person, in his own words. */
-function FounderNote() {
-  return (
-    <section aria-labelledby="founder-title" className="mx-auto w-full max-w-[720px] px-5 pb-20 sm:px-8 md:pb-28">
-      <div className="flex flex-col items-start gap-5 border-t border-line pt-10 sm:flex-row sm:gap-7">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a 320 px local photo shown small */}
-        <img src="/creator.jpg" alt="Yagnesh Pasam" width={72} height={72} loading="lazy" className="size-[72px] shrink-0 rounded-full object-cover ring-1 ring-line" />
-        <div className="flex flex-col gap-3">
-          <h2 id="founder-title" className="sr-only">
-            Why Pen and Paper
-          </h2>
-          <p className="story-serif text-[20px] leading-[1.6] text-ink">
-            Hi, I&apos;m Yagnesh. I love making things, and nothing has shaped me more than a pen and paper. I believe writers are the original thinkers. Everything else is a summary.
-          </p>
-          <p className="story-serif text-[20px] leading-[1.6] text-ink">Pen and Paper is a quality space for writers and for thoughts. This is just the beginning.</p>
-          <Link href="/about" className={`font-sans text-[14px] font-medium text-mute ${link}`}>
-            Why I started Pen and Paper →
-          </Link>
+    <section aria-labelledby="post-title" className="pb-20 md:pb-28">
+      <h2 id="post-title" className="mb-4 font-sans text-[12px] font-semibold tracking-[0.16em] text-mute uppercase">
+        Why it exists
+      </h2>
+      <article className="rounded-2xl border border-line bg-sheet p-5 shadow-[var(--lift)] sm:p-6">
+        <header className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a 320 px local photo shown small */}
+          <img src="/creator.jpg" alt="" width={48} height={48} loading="lazy" className="size-12 shrink-0 rounded-full object-cover ring-1 ring-line" />
+          <div className="flex min-w-0 flex-col">
+            <span className="font-sans text-[15px] font-semibold text-ink">Yagnesh Pasam</span>
+            <span className="truncate font-sans text-[13px] text-mute">Maker of Pen and Paper · on LinkedIn</span>
+          </div>
+          <LinkedInGlyph />
+        </header>
+        <div className="mt-4 flex flex-col gap-3 font-sans text-[15px] leading-relaxed text-ink">
+          {POST_LEAD.map((t) => (
+            <p key={t}>{t}</p>
+          ))}
+          <details className="group flex flex-col gap-3">
+            <summary className="w-fit cursor-pointer list-none font-medium text-mute hover:text-ink group-open:hidden [&::-webkit-details-marker]:hidden">…see more</summary>
+            <div className="flex flex-col gap-3">
+              {POST_MORE.map((t) => (
+                <p key={t}>{t}</p>
+              ))}
+            </div>
+          </details>
         </div>
-      </div>
+        <a
+          href={POST_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg px-4 py-3 font-sans text-[14px] text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-text"
+        >
+          <span className="flex flex-col">
+            <span className="font-semibold">I&apos;m still its only user.</span>
+            <span className="text-[13px] text-mute">Read the whole post on LinkedIn</span>
+          </span>
+          <span aria-hidden="true">↗</span>
+        </a>
+      </article>
     </section>
   );
 }
 
+function LinkedInGlyph() {
+  return (
+    <svg aria-label="LinkedIn" role="img" viewBox="0 0 24 24" width="20" height="20" className="ml-auto shrink-0 text-mute" fill="currentColor">
+      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 110-4.13 2.06 2.06 0 010 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z" />
+    </svg>
+  );
+}
+
+/** One column of footer links under a small heading. */
+function FooterTab({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <nav aria-label={title} className="flex flex-col gap-2.5">
+      <span className="text-[12px] font-semibold tracking-[0.14em] text-ink uppercase">{title}</span>
+      {children}
+    </nav>
+  );
+}
+
+/** Everything else lives down here, in three short tabs, so the page above stays quiet. */
 function Footer() {
+  const out = { target: "_blank", rel: "noopener noreferrer", className: `w-fit ${link}` } as const;
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-4 px-5 py-10 font-sans text-[13px] text-mute sm:flex-row sm:items-center sm:px-8">
-        <p className="story-serif text-[17px] text-ink italic">Your thoughts deserve to be written down.</p>
-        <p className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:ml-auto">
-          <a href="https://www.linkedin.com/in/yagneshpasam/" target="_blank" rel="noopener noreferrer" className={link}>
-            LinkedIn
-          </a>
-          <Link href="/stories/rss.xml" className={link}>
-            RSS
-          </Link>
-          <Link href="/privacy" className={link}>
-            Privacy
-          </Link>
-          <Link href="/credits" className={link}>
-            Photo credits
-          </Link>
+      <div className="mx-auto grid w-full max-w-[1120px] grid-cols-2 gap-8 px-5 py-12 font-sans text-[14px] text-mute sm:grid-cols-4 sm:px-8">
+        <p className="story-serif col-span-2 text-[18px] leading-snug text-ink italic sm:col-span-1">Your thoughts deserve to be written down.</p>
+        <FooterTab title="Products">
+          <Link href="/stories" className={`w-fit ${link}`}>Stories</Link>
+          <Link href="/desk" className={`w-fit ${link}`}>Desk</Link>
+          <Link href="/stories/unnoticed" className={`w-fit ${link}`}>Unnoticed</Link>
+          <Link href="/stories/rss.xml" className={`w-fit ${link}`}>RSS</Link>
+        </FooterTab>
+        <FooterTab title="Pen and Paper">
+          <Link href="/about" className={`w-fit ${link}`}>About</Link>
+          <a href="https://www.instagram.com/unnoticed.moment/" {...out}>Instagram</a>
+          <a href={REPO_URL} {...out}>Open source</a>
+          <a href={POST_URL} {...out}>LinkedIn post</a>
+        </FooterTab>
+        <FooterTab title="Small print">
+          <Link href="/privacy" className={`w-fit ${link}`}>Privacy</Link>
+          <Link href="/credits" className={`w-fit ${link}`}>Photo credits</Link>
           <span>© Pen and Paper</span>
-        </p>
+        </FooterTab>
       </div>
     </footer>
   );
 }
 
 /**
- * The homepage: the parent brand and its belief, then its two products as
- * two equal doors (Stories, Desk), Unnoticed, that it is open source, then
- * the person behind it.
+ * The homepage, kept as plain as a notice board: one line of belief, and the
+ * maker's post on why it exists. Stories and Desk are in the header and the
+ * footer; everything else is in the footer.
  */
-export async function StoryHome() {
-  const [loved, newest] = await Promise.all([lovedThisMonth(), publishedStories(1)]);
-  const lead = loved ?? newest[0] ?? null;
+export function StoryHome() {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <Header />
-      <main className="flex flex-1 flex-col">
-        <section className="relative isolate flex w-full flex-col items-center gap-4 px-5 pt-10 pb-12 text-center sm:px-8 sm:pt-16 sm:pb-16">
-          <TimelineStrip />
-          <p className="font-sans text-[12px] font-semibold tracking-[0.16em] text-red-text uppercase">Pen and Paper</p>
-          <h1 className="story-serif max-w-[820px] text-[38px] leading-[1.08] tracking-[-0.02em] text-balance text-ink sm:text-[60px]">Your thoughts deserve to be written down.</h1>
-          <p className="max-w-[520px] font-sans text-[17px] leading-relaxed text-mute sm:text-[19px]">Other people&apos;s, in our stories. Your own, on your desk.</p>        </section>
-
-        <Doors lead={lead} />
-
-        <Clippings />
-
-        <OpenSource />
-
-        <FounderNote />
+      <main className="mx-auto flex w-full max-w-[680px] flex-1 flex-col px-5 sm:px-8">
+        <section className="flex flex-col gap-4 pt-14 pb-12 sm:pt-24 sm:pb-16">
+          <h1 className="story-serif text-[36px] leading-[1.1] tracking-[-0.02em] text-balance text-ink sm:text-[52px]">Your thoughts deserve to be written down.</h1>
+          <p className="max-w-[520px] font-sans text-[17px] leading-relaxed text-mute">Real stories of real people, to read or listen to. And a quiet desk for your own thoughts.</p>
+        </section>
+        <MakersPost />
       </main>
       <Footer />
     </div>
